@@ -1,0 +1,8 @@
+PROGRAM ::= (STATEMENT EOL)*
+STATEMENT ::= USE_STATEMENT | MODULE_STATEMENT
+MODULE_STATEMENT ::= 'module' SPC WORD
+USE_STATEMENT ::= 'use' SPC 'version' SPC VERSION
+WORD ::= [a-zA-Z0-9_]+
+VERSION ::= [0-9.]+
+EOL ::= ';' | #x0a
+SPC ::= ' '+
