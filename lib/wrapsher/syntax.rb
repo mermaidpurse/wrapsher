@@ -11,10 +11,13 @@ module Wrapsher
     end
 
     rule(:program)                  { statement.repeat }
-    rule(:statement)                { (use_version_statement | meta_statement | module_statement) >> eol }
+    rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement) >> eol }
+    rule(:use_statement)            { use_version_statement }
     rule(:meta_statement)           { str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data) }
     rule(:use_version_statement)    { str('use') >> space >> str('version') >> space >> version.as(:version) }
     rule(:module_statement)         { str('module') >> space >> word.as(:module) }
+    rule(:type_statement)           { str('type') >> space >> word.as(:type) }
+
     rule(:version)                  { match('[0-9.]').repeat(1) }
     rule(:string)                   { single_quoted }
     rule(:single_quoted)            { str('\'') >> char.repeat.as(:single_quoted) >> str('\'') }
