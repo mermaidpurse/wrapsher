@@ -13,3 +13,15 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 end
+
+# Stringify leaves of parse tree
+def stringify(item)
+  if item.respond_to?(:to_ary)
+    item.map { |e| stringify(e) }
+  elsif item.respond_to?(:to_hash)
+    Hash[item.map { |k, v| [k, stringify(v)] }]
+  else
+    item.to_str
+  end
+end
+

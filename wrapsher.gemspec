@@ -34,5 +34,5 @@ EOF
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "ebnf", '~> 2.5.0'
+  spec.add_dependency "parslet", '~> 2.0.0'
 end

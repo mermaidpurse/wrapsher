@@ -41,7 +41,7 @@ EOF
 
     def parse(args)
       @logger = Logger.new $stderr
-      parser = Wrapsher::Parser.new(logger: @logger, trace: :DEBUG)
+      parser = Wrapsher::Parser.new(logger: @logger, level: :DEBUG)
       args.each do |text|
         pp parser.parsetext(text)
       end
@@ -49,7 +49,7 @@ EOF
 
     def grammar()
       @logger = Logger.new $stderr
-      parser = Wrapsher::Parser.new(logger: @logger, trace: :DEBUG)
+      parser = Wrapsher::Parser.new(logger: @logger, level: :DEBUG)
       puts parser.grammar
     end
 
