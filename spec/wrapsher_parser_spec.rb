@@ -18,4 +18,32 @@ EOF
                             { type: 'vector' }
                           ])
   end
+
+  it "parses a function definition" do
+  source = <<-EOF
+int add(int a, int b) { a + b }
+EOF
+    parser = Wrapsher::Parser.new()
+    program = stringify(parser.parsetext(source))
+    expect(program).to eq([
+                            { fun_definition: {
+                                signature: {
+                                  type: 'int',
+                                  name: 'add',
+                                  arg_definitions: [
+                                    {
+                                      type: 'int',
+                                      name: 'a'
+                                    },
+                                    {
+                                      type: 'int',
+                                      name: 'b'
+                                    }
+                                  ]
+                                },
+                                body: "{ a + b }"
+                              }
+                            }
+                          ])
+  end
 end
