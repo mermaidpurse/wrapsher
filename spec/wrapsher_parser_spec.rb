@@ -21,7 +21,9 @@ EOF
 
   it "parses a function definition" do
   source = <<-EOF
-int add(int a, int b) { a + b }
+int add(int a, int b) {
+  a + b
+}
 EOF
     parser = Wrapsher::Parser.new()
     program = stringify(parser.parsetext(source))
@@ -41,7 +43,17 @@ EOF
                                     }
                                   ]
                                 },
-                                body: "{ a + b }"
+                                body: {
+                                  primary_op: {
+                                    left: {
+                                      var_ref: 'a'
+                                    },
+                                    operator: '+',
+                                    right: {
+                                      var_ref: 'b'
+                                    }
+                                  }
+                                }
                               }
                             }
                           ])
