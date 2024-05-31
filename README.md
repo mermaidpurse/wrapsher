@@ -107,18 +107,29 @@ Here's some things that aren't important/things it shouldn't do:
 
 Things I like in various languages that would be nice to incorporate:
 
-- First-class functions and objects, like Ruby and Lisps
-- Powershell and Elixir: pipeline syntax
+- First-class functions
 - Go-like mandatory initialization of typed variables (every type has a "zero value")
   rather than nullability.
+- Namespacing
 - Easy parallelism of some kind
 - `use` as a way to enable a feature or bring in a module--I just like the word
 - Algol-ish syntax for popularity (I love Erlang but few people really do. It should look
   kind of like C/Go/everything else).
-- Set/array/list comprehensions
 - Perl-like version constraints (`use version ...`)
-- Erlang-like lack of keyword for function definiton
-- Namespacing
+- Erlang-like lack of keyword for function definiton (no `def`)
+- Set/array/list comprehensions
+
+Some ideas I had that don't seem feasible:
+
+- Pipelines. I do like them in Powershell, I guess I like them in
+  Elixir but they seem complicated and I think they actually result
+  in Elixir being harder to read for a newcomer.
+- Mildly object-oriented method message sending syntax, e.g.
+  `var.fun(1)` -> `__type_fun(var, 1)` or something. This
+  conflicts with module namespacing, so I think I'll stick with
+  this. If you want something object-ish (for now) you'll need
+  to do C-style convention where the first argument is `self`
+  kind of thing.
 
 ## Implementation Notes/Ideas
 
@@ -126,15 +137,14 @@ Things I like in various languages that would be nice to incorporate:
 To achieve output using strictly POSIX-mandated built-ins, we can use :, . (dot), break, cd, continue, eval, exec, exit, export, readonly, return, set, shift, times, trap, and unset. However, generating user-visible output strictly with these built-ins is not feasible since they do not handle output directly.
 ```
 
-In `use module io` (also maybe implicit), you are permitted to use the
-following often built-in commands (but whether `io` requires the
-feature `external` is platform-dependent and detected at
-runtime). See, there are no strictly POSIX commands that can do I/O:
-although most shells implement `echo` and `printf` as built-ins, they
-aren't required to, and I'd like the language core to be strictly
-dependent on a POSIX shell and nothing else. The `io` module will
-probably use the following declarations to indicate its dependency
-on these tools.
+In `use module io`, you are permitted to use the following often
+built-in commands (but whether `io` requires the feature `external` is
+platform-dependent and detected at runtime). See, there are no
+strictly POSIX commands that can do I/O: although most shells
+implement `echo` and `printf` as built-ins, they aren't required to,
+and I'd like the language core to be strictly dependent on a POSIX
+shell and nothing else. The `io` module will probably use the
+following declarations to indicate its dependency on these tools.
 
 `use external echo`
 `use external printf`
@@ -151,3 +161,88 @@ shell code, e.g.:
 - array `array/any:<ref> <ref>`, `<ref>`s here are variable names storing the value. Arrays could get renamed and may get
   optional type-checking of elements added.
 - map `map/any:key=<ref>`. Maps could get renamed, keys are strings (like in JSON) and values are anything.
+
+Function calls are namespaced into modules and the type of their first
+argument. When compiling a file, the functions in that file are not
+namespaced:
+
+Wrapsher source (`wrapsher compile frobulate.wsh` -> `frobulate`):
+```
+# frobulate.wsh
+meta description 'frobulate your quibbles'
+
+int main(string args...) {
+  arr = []
+  for a in args {
+    arr = append(arr, toint(a))
+  }
+  0
+}
+```
+
+**Q:** Would this be easier to choose a top-level namespace? `main` or something?
+
+`sh` output:
+
+```
+# omitting boilerplate
+
+__wsh_string_main() {
+  __wsh__error=
+  __wsh__loc=frobulate.wsh:4
+  __wsh__check_type array/int "${1}" || return 1
+  __wsh__error=
+  __wsh__loc=frobulate.wsh:5
+  __wsh_array_new || return 1
+  __wsh__error=
+  __wsh__loc=frobulate.wsh:5
+  __wsh__loc=frobulate.wsh:6
+  for __wsh__ref_a in ${__wsh_arr}
+  do
+    __wsh__loc=frobulate.wsh:6
+    __wsh__deref 'a' || return 1
+    __wsh__error=
+    __wsh__loc=frobulate.wsh:6
+    __wsh_a="${__wsh_result}"
+    __wsh__loc=frobulate.wsh:7
+    __wsh_string_toint "${__wsh_a}" || return 1
+    __wsh__error=
+    __wsh__loc=frobulate.wsh:7
+    __wsh__arg1="${__wsh__result}"
+    __wsh_array_append "${__wsh_arr}" "${__wsh__arg1}" || return 1
+    __wsh__error=
+    __wsh__loc=frobulate.wsh:7
+    __wsh_arr="${__wsh__result}"
+  done
+  __wsh__loc=frobulate.wsh:8
+  __result='int:0'
+}
+
+__wsh_string_main "$@" || __wsh__error
+```
+
+Internal utility functions (form reserved words that you can't
+use for your function, e.g., you can't call a function
+`_check_type` because of `__wsh__check_type`):
+
+| `sh` Function | Wrapsher reserved word | Description |
+| --- | --- | --- |
+| __wsh__check_type | `_check_type` | Checks argument types and sets __wsh__error if they're wrong, returning `1` |
+
+Special shell variables:
+
+| Variable | Wrapsher reserved word | Meaning  |
+| --- | --- | --- |
+| __wsh__loc | `_loc` variable | Source code location |
+| __wsh__result | `_result` variable | Result of latest expression |
+| __wsh__error | `_error` variable | Result of latest error |
+| __wsh__arg.* | `_arg?` variables | Arguments to the next function call, if expression results |
+
+There's no "return" in `sh`: there's output and exitcodes. Every shell expression
+that can fail is postpended with `|| return 1`. This bubbles all the way up
+to the main function which has a `||` that (tries to) print the error and
+exit 1. Returning 1 from a function is analogous to throwing an exception
+and is how Wrapsher handles unrecoverable errors.
+
+Since there's no output in core Wrapsher or POSIX `sh`, calling convention is to
+assemble arguments to pass to functions and receive the result in `__wsh__result`.

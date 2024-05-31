@@ -119,6 +119,10 @@ Top-level statements in Wrapsher can be:
         - The `main` function returns an `int` and accepts a variadic
           list of arguments that will show up in an array of strings
           named `args`.
+    - Functions have a form of polymorphism based on the first
+      argument. So, for example, you can define a `int toint(string s)`
+      as well as a `int toint(math.float f)` function, and the
+      right function will be selected by Wrapsher.
 - A type definition of the form:
     ```
     type _typename_
