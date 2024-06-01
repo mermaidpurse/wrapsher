@@ -1,3 +1,4 @@
+require 'json'
 require 'logger'
 require 'wrapsher'
 
@@ -19,6 +20,8 @@ module Wrapsher
       case @cmd
       when 'help'
         help @argv
+      when 'compile'
+        compile @argv
       when 'parse'
         parse @argv
       when 'grammar'
@@ -37,6 +40,16 @@ Usage:
     wrapsher parse
     wrapsher grammar
 EOF
+    end
+
+    def compile(args)
+      @logger = Logger.new $stderr
+      parser = Wrapsher::Parser.new(logger: @logger, level: :DEBUG)
+      args.each do |source|
+        output = source.delete_suffix('.wsh')
+        parsed = parser.parsefile(source)
+        File.open(output, 'w') { |fh| fh.write(JSON.pretty_generate(parsed)) }
+      end
     end
 
     def parse(args)

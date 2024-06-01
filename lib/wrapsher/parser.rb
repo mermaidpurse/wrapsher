@@ -20,5 +20,10 @@ module Wrapsher
       end
     end
 
+    def parsefile(filename)
+      text = File.read(filename)
+      parsetext(text)
+    end
+
   end
 end
