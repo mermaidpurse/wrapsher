@@ -79,6 +79,7 @@ list" and subject to constant, opinionated change).
   [POSIX utilities](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html)
   to be more reliable than arbitrary ones (e.g., curl).
 - Parallelism
+- First-class functions
 
 Here's some things that aren't important/things it shouldn't do:
 
@@ -105,18 +106,8 @@ Here's some things that aren't important/things it shouldn't do:
   interact with a Wrapsher interface, not `sed`'s. That said, something like 
   `system()` will be provided.
 
-Things I like in various languages that would be nice to incorporate:
+Things I like in various languages that would be nice to incorporate (someday?):
 
-- First-class functions
-- Go-like mandatory initialization of typed variables (every type has a "zero value")
-  rather than nullability.
-- Namespacing
-- Easy parallelism of some kind
-- `use` as a way to enable a feature or bring in a module--I just like the word
-- Algol-ish syntax for popularity (I love Erlang but few people really do. It should look
-  kind of like C/Go/everything else).
-- Perl-like version constraints (`use version ...`)
-- Erlang-like lack of keyword for function definiton (no `def`)
 - Set/array/list comprehensions
 
 Some ideas I had that don't seem feasible:
@@ -124,14 +115,11 @@ Some ideas I had that don't seem feasible:
 - Pipelines. I do like them in Powershell, I guess I like them in
   Elixir but they seem complicated and I think they actually result
   in Elixir being harder to read for a newcomer.
-- Mildly object-oriented method message sending syntax, e.g.
-  `var.fun(1)` -> `__type_fun(var, 1)` or something. This
-  conflicts with module namespacing, so I think I'll stick with
-  this. If you want something object-ish (for now) you'll need
-  to do C-style convention where the first argument is `self`
-  kind of thing.
 
 ## Implementation Notes/Ideas
+
+This section is highly-fluid and contains partial proposals
+on implementation and code generation.
 
 ```
 To achieve output using strictly POSIX-mandated built-ins, we can use :, . (dot), break, cd, continue, eval, exec, exit, export, readonly, return, set, shift, times, trap, and unset. However, generating user-visible output strictly with these built-ins is not feasible since they do not handle output directly.
@@ -162,64 +150,12 @@ shell code, e.g.:
   optional type-checking of elements added.
 - map `map/any:key=<ref>`. Maps could get renamed, keys are strings (like in JSON) and values are anything.
 
-Function calls are namespaced into modules and the type of their first
-argument. When compiling a file, the functions in that file are not
-namespaced:
-
-Wrapsher source (`wrapsher compile frobulate.wsh` -> `frobulate`):
-```
-# frobulate.wsh
-meta description 'frobulate your quibbles'
-
-int main(string args...) {
-  arr = []
-  for a in args {
-    arr = append(arr, toint(a))
-  }
-  0
-}
-```
-
-**Q:** Would this be easier to choose a top-level namespace? `main` or something?
-
-`sh` output:
-
-```
-# omitting boilerplate
-
-__wsh_string_main() {
-  __wsh__error=
-  __wsh__loc=frobulate.wsh:4
-  __wsh__check_type array/int "${1}" || return 1
-  __wsh__error=
-  __wsh__loc=frobulate.wsh:5
-  __wsh_array_new || return 1
-  __wsh__error=
-  __wsh__loc=frobulate.wsh:5
-  __wsh__loc=frobulate.wsh:6
-  for __wsh__ref_a in ${__wsh_arr}
-  do
-    __wsh__loc=frobulate.wsh:6
-    __wsh__deref 'a' || return 1
-    __wsh__error=
-    __wsh__loc=frobulate.wsh:6
-    __wsh_a="${__wsh_result}"
-    __wsh__loc=frobulate.wsh:7
-    __wsh_string_toint "${__wsh_a}" || return 1
-    __wsh__error=
-    __wsh__loc=frobulate.wsh:7
-    __wsh__arg1="${__wsh__result}"
-    __wsh_array_append "${__wsh_arr}" "${__wsh__arg1}" || return 1
-    __wsh__error=
-    __wsh__loc=frobulate.wsh:7
-    __wsh_arr="${__wsh__result}"
-  done
-  __wsh__loc=frobulate.wsh:8
-  __result='int:0'
-}
-
-__wsh_string_main "$@" || __wsh__error
-```
+**Note:** I'm not sure how feasible this `array/int` kind of thing
+is. It can be implemented as a new type with some extra type
+assertions, which might be the way to go. Maybe types should just
+be able to have a `/` in them? Maybe Wrapsher should detect
+`array/int` and generate the right stuff based on `array`?
+Or maybe I should just implement `string_array` for now?
 
 Internal utility functions (form reserved words that you can't
 use for your function, e.g., you can't call a function
@@ -228,6 +164,7 @@ use for your function, e.g., you can't call a function
 | `sh` Function | Wrapsher reserved word | Description |
 | --- | --- | --- |
 | __wsh__check_type | `_check_type` | Checks argument types and sets __wsh__error if they're wrong, returning `1` |
+| __wsh__resolve_signature | `_resolve_signature` | Generates a type signature for a set of arguments, for polymorphic dispatch |
 
 Special shell variables:
 
@@ -236,7 +173,7 @@ Special shell variables:
 | __wsh__loc | `_loc` variable | Source code location |
 | __wsh__result | `_result` variable | Result of latest expression |
 | __wsh__error | `_error` variable | Result of latest error |
-| __wsh__arg.* | `_arg?` variables | Arguments to the next function call, if expression results |
+| __wsh__expr* | `_arg?` variables | Arguments to the next function call, if expression results |
 
 There's no "return" in `sh`: there's output and exitcodes. Every shell expression
 that can fail is postpended with `|| return 1`. This bubbles all the way up
@@ -244,5 +181,171 @@ to the main function which has a `||` that (tries to) print the error and
 exit 1. Returning 1 from a function is analogous to throwing an exception
 and is how Wrapsher handles unrecoverable errors.
 
-Since there's no output in core Wrapsher or POSIX `sh`, calling convention is to
-assemble arguments to pass to functions and receive the result in `__wsh__result`.
+Since there's no output in core Wrapsher or POSIX `sh`, calling
+convention is to assemble arguments to pass to functions and receive
+the result in `__wsh__result`.
+
+The compiler will store all the signatures that are possible for a function,
+so it can build a top-level function dispatch like this, and thene
+each implementation, which is the name of the function and the types
+of all its arguments (omitting `__wsh__loc` setting):
+
+```
+__wsh_core_to_string() {
+  __wsh__error=
+  __wsh__result=
+  __wsh__resolve_signature "$@" || return 1
+  case "${__wsh__result}" in
+    1:string) __wsh_core_to_string_string ;;
+    1:int)    __wsh_core_to_string_int ;;
+    1:vector) __wsh_vector_to_string_vector ;;
+    *)      __wsh__error="No function core:to_string with signature: (${__wsh__result}), have: (string) (int) (vector)\n"
+  esac
+}
+
+__wsh_core_to_string_string() {
+  __wsh__error=
+  __wsh__result=
+  __wsh__loc=whatever:0
+    __wsh__result="${1#string:}"
+}
+
+__wsh_core_to_string_int() {
+  __wsh__error=
+  __wsh__loc=whatever:22
+    __wsh__result="${1#int:}"
+}
+
+```
+
+The dispatch function for `map set(map m, string key, any e)` and
+`array set(array a, int i, any e)` would look like:
+
+```
+__wsh_core_set() {
+  __wsh__error=
+  __wsh__result=
+  __wsh__resolve_signature "$@" || return 1
+  case "${__wsh_result}" in
+    3:array/int/*)
+    
+```
+
+Due to our calling convention and syntactic sugar, there's a lot of rewriting:
+
+```
+# 27  string to_string(vector v) {
+# 28    a = v.as(array)
+# 29    '(' + a[0].to_string() + ',' + a[1].to_string() + ',' + a[2].to_string() + ')'
+# 30  }
+# or
+# string to_string(vector v) {
+#   a = as(v, array)
+#   add(                                                                                                          )
+#   |   '(', add(                                                                                                )|
+#   |        |   to_string(        ), add(                                                                      )||
+#   |        |   |         at(a, 0)|  |   ',', add(                                                            )|||
+#   |        |   |         |-expr7||  |        |   to_string(        ), add(                                  )||||
+#   |        |   |-expr8-----------|  |        |   |         at(a, 1)|  |   ',', add(                        )|||||
+#   |        |                        |        |   |         |-expr4||  |        |   to_string(        ), ')'||||||
+#   |        |                        |        |   |-expr5-----------|  |        |   |         at(a, 2)     |||||||
+#   |        |                        |        |                        |        |   |         |-expr0-----||||||||
+#   |        |                        |        |                        |        |   |-expr1----------------|||||||
+#   |        |                        |        |                        |        |-expr2---------------------||||||
+#   |        |                        |        |                        |-expr3-------------------------------|||||
+#   |        |                        |        |-expr6---------------------------------------------------------||||
+#   |        |                        |-expr9-------------------------------------------------------------------|||
+#   |        |-expr10--------------------------------------------------------------------------------------------||
+#   |-expr11------------------------------------------------------------------------------------------------------|
+#
+#   expr0 = at(a, 2)
+#   expr1 = to_string(expr0)
+#   expr3 = add(expr1, ')')
+#   expr4 = at(a, 1)
+#   expr5 = to_string(expr4)
+#   expr6 = add(expr5, expr3)
+#   expr7 = at(a, 0)
+#   expr8 = to_string(expr8)
+#   expr9 = add(',', expr6)
+#   expr10 = add(expr8, expr9)
+#   expr11 = add('(', expr10)
+# }
+__wsh_vector_to_string_vector() {
+  __wsh__error=
+    __wsh_v="${1}"
+    __wsh_vector_as "${__wsh_v}" 'array' || return 1
+    __wsh__error=
+    __wsh__loc=vector.wsh:27
+    __wsh_a="${__wsh__result}"
+    __wsh_core_at "${__wsh_a}" 'int:2' || return 1
+    __wsh__error=
+    __wsh__expr0="${__wsh__result}"
+    __wsh_core_to_string "${__wsh__expr0}" || return 1
+    __wsh__error=
+    __wsh__expr1="${__wsh__result}"
+    __wsh_core_add "${__wsh__expr1}" 'string:)' || return 1
+    __wsh__error=
+    __wsh__expr2="${__wsh__result}"
+    __wsh_core_add ',' "${__wsh__expr2}" || return 1
+    __wsh__error=
+    __wsh__expr3="${__wsh__result}"
+    __wsh_core_at "${__wsh_a}"
+    ...
+
+```
+
+And the boilerplate `__wsh__resolve_signature` looks like:
+```
+__wsh__resolve_signature() {
+  __wsh__result=
+  __wsh__error=
+  for __wsh__arg in "$@"
+  do
+    case "${__wsh__result}" in
+      '') __wsh__result="$#:${__wsh__arg%%:*}" ;;
+      *)  __wsh__result="${__result}/${__wsh__arg%%:*}" ;;
+    esac
+  done
+}
+```
+
+```
+module vector
+type vector array
+```
+
+```
+vector as_vector(array a) {
+  sh {
+    __wsh__result="vector:${__wsh_a#array:}"
+  }
+}
+```
+
+```
+array as_array(vector v) {
+  sh {
+    __wsh__result="array:${__wsh_v#vector:}"
+  }
+}
+```
+
+```
+as_array_vector() {
+  __wsh__error=
+  __wsh__result=
+  __wsh_v="${1}"
+    __wsh__result="array:${__wsh_v#vector:}"
+}
+```
+
+```
+module matrix
+use module vector
+type matrix array
+
+matrix new(int dim, array a) {
+  # type assertions?
+  a.map(array fun(e) { vector.new(e) }).as_matrix
+}
+```

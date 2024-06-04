@@ -51,7 +51,15 @@ signature, so the `main` function will typically have an empty signature
 or accept an array
 
 ```
-int main(array args) {
+int main(array/string args) {
+  io.print("Hello, world")
+}
+```
+
+or (using the variadic syntactic sugar):
+
+```
+int main(string args...) {
   io.print("Hello, world")
 }
 ```
@@ -79,18 +87,19 @@ Top-level statements in Wrapsher can be:
 
 - A `use` statement which enables or incorporates dependencies,
   features or constraints:
-    - `use version _constraint`: specifies a version constraint for the compiler
-      version required to compile the program.
-    - `use external _command_`: specifies an external command which is
+    - <code>use version _constraint_</code>: specifies a version
+      constraint for the compiler version required to compile the
+      program. See [Wrapsher versions](#wrapsher-versions) below.
+    - <code>use external _command_</code>: specifies an external command which is
       required.  At runtime, if the command is found to be built-in
       (e.g., `printf`, usually), it doesn't trigger an `external`
-      requirement. If it's not builtin, it does, and the program will
+      requirement. If it's not builtin, it does; and the program will
       need to `use feature external` to allow this constraint.
-    - `use feature _feature_`: indicate that the program requires
+    - <code>use feature _feature_</code>: indicate that the program requires
       the named feature. For example, a program isn't allowed to shell
       out to an external dependency without enabling the `external`
       feature, to indicate the program might need to shell out.
-    - `use module _module_`: During compilation, find and load the
+    - <code>use module _module_</code>: During compilation, find and load the
       named module in the module search location(s).
 - A `meta` statement providing metadata which is available to programs
   loading the module:
@@ -99,16 +108,17 @@ Top-level statements in Wrapsher can be:
     - `meta author`: the author
     - `meta docs`: help documentation. When the program is at the
       top-level (not in a `module`), this is used as help text in
-      the standard option processing.
+      the standard option processing. See [Documentation Style](style.md)
+      for more.
 - A `module` statement which defines the program as a loadable module,
   which can be loaded in other programs with a `use` statement, as well
   as the function namespace. Functions defined at the top level as well
   as those in the `core` module can be called without qualification--all
   other functions need the module name mentioned.
 - A function definiton of the form:
-    ```
-    _type_ _name_(_argument specifiers_) _block_
-    ```
+    <pre>
+    <i>type</i> <i>name</i>(<i>argument specifiers</i>) <i>block</i>
+    </pre> 
     for example:
     ```
     int main(string args...) {
@@ -119,54 +129,56 @@ Top-level statements in Wrapsher can be:
         - The `main` function returns an `int` and accepts a variadic
           list of arguments that will show up in an array of strings
           named `args`.
-    - Functions have a form of polymorphism based on the first
-      argument. So, for example, you can define a `int toint(string s)`
-      as well as a `int toint(math.float f)` function, and the
-      right function will be selected by Wrapsher.
+    - Functions can be called as methods (see [Methods](#methods)),
+      which is just syntactic sugar for allowing the method "receiver"
+      to be passed as the function's first argument, when called.
 - A type definition of the form:
-    ```
-    type _typename_
-    ```
-    This declares a new user-defined named type. In order to implement
-    the type, you will need (at a minimum) to create a `<type>_new`
-    function which creates a zero-valued instance of the type. Other
-    functions will probably be required to implement other
-    functionality.
+    <pre>
+    type <i>typename</i> <i>type</i>
+    </pre>
+    This declares a new user-defined named type, based on _type_.
+    Note that _type_ is used as _storage_ here, this is not any
+    form of inheritance. It merely means that functions that
+    accept it can cast it into the fundamental type to access
+    it as that type (usually used only for the type's most
+    low-level implementation).
 
 A block is a list of expressions enclosed by curly braces. All
 expressions have values, and the value of the last expression is the
 value of the block. The following are expressions that can be used:
 
-- A variable assignment of the form `_var_ = _expression_`.
-- A function call of the form `_fun_(_arguments_)`. Functions can
-  be qualified by module name (functions in the `core` module
+- A variable assignment of the form </code>_var_ = _expression_</code>.
+- A function call of the form <code>_function_(_arguments_)</code>. Functions can
+  be qualified by module name (functions in the **core** module
   don't need it) by prepending the module name and a dot, e.g.,
   `io.print`, or invoked against a value with the same dot syntax
-  (e.g., `var.to_string()`, which, in the example case that `var`
-  has a value of type `int`, is syntactic sugar for `int_to_string(var)`)
+  (e.g., <code>_var_.to_string()</code>, which, in the example case that _var_
+  has a value of type `int`, is syntactic sugar for `to_string(var)`).
+  See [Methods](#methods) for more.
 - Certain block expressions like `if` and `sh`.
 - Block control keywords `continue` and `break`.
 - Boolean expressions.
 - Arithmetic expressions.
+- Anonymous function definition.
 
 Block expressions accept block(s):
 
-- `if _expression_ _block_`: evaluates the `bool` expression and,
+- <code>if _expression_ _block_</code>: evaluates the `bool` expression and,
   if true, executes the provided block.
-- `if _expression_ _block_ else _block_`: evaluates the `bool` expression
+- <code>if _expression_ _block_ else _block_</code>: evaluates the `bool` expression
   and, if true, executes the provided block. If false, executes
   the `else` block.
-- `sh _block_`: interprate the expression in the block as raw shell
+- <code>sh block_</code>: interprate the expression in the block as raw shell
   code to be inlined into the result. Note that _this is unsafe_ because
   Wrapsher does not check this code for types or POSIX-compliance, or
   compliance with its standards for external dependency management.
   This is usually used in modules to enable direct handling of the
   `sh` data (Wrapsher's internal sh-friendly representation of values)
-  or external commands (for example, in the `http` module based on
+  or external commands (for example, in the **http** module based on
   `curl`).
-- `for _var_ in _collection_ _block_`: evaluate the _block_ setting
+- <code>for _var_ in _collection_ _block_</code>: evaluate the _block_ setting
    the variable _var_ in each iteration.
-- `for (_var_ = _initial_value_; _assignment_ ; _condition_) _block_:
+- <code>for (_var_ = _initial_value_; _assignment_ ; _condition_) _block_</code>:
    evaluate the block with _var_ set to an _initial_value_, applying
    the _assignment_ after each iteration to set a new value, while
    _condition_ holds `true`.
@@ -190,6 +202,20 @@ syntactic sugar for addition functions.
   `int_minus`, `int_times`, `int_div` and `int_mod` functions.
 - `(`, `)`: groups expressions.
 
+An anonymous function definition takes the form of a return type, the
+keyword `fun` and a function signature. For example, you might define
+a function and assign it to a variable, or pass it to a conventional
+function call:
+
+```
+int main(array args) {
+  ints = args.map(int fun(string s) { s.to_int() })
+}
+```
+
+The result in `ints` will be an array of ints that result from calling
+the anonymous function on each (`string`) element of the array `args`.
+
 #### Types and Values
 
 The core language (module **core**) implements the following
@@ -199,13 +225,14 @@ s)`) must be used to read types from input strings or implement
 an optional value.
 
 
-| Type     | Zero    | Example literal values         |
-| -------- | ------- | ------------------------------ |
-| `bool`   | `false` | `true`, `false`                |
-| `int`    | `0`     | `0`, `99`, `-22`, `0xa8`       |
-| `string` | `''`    | `'bob'`, `'café'`              |
-| `array`  | `[]`    | `['one', 2, false, [0, 1, 2]]` |
-| `map`    | `{}`    | `{ 'one': 1, 'two': 2 }`       |
+| Type     | Zero            | Example literal values         |
+| -------- | --------------- | ------------------------------ |
+| `bool`   | `false`         | `true`, `false`                |
+| `int`    | `0`             | `0`, `99`, `-22`, `0xa8`       |
+| `string` | `''`            | `'bob'`, `'café'`              |
+| `array`  | `[]`            | `['one', 2, false, [0, 1, 2]]` |
+| `map`    | `{}`            | `{ 'one': 1, 'two': 2 }`       |
+| `fun`    | `any fun() {}`  | `bool fun(int i) { i == 0 }`   |
 
 Each of these fundamental types has a way of writing literal values
 in that type:
@@ -215,7 +242,17 @@ in that type:
 The only valid values for a `bool` are `true` and `false`. Zero values
 of other types (such as `0`, `''`, `[]`) are never implicitly
 converted to `bool`, you must check explicitly (e.g., with `val == 0`,
-`val == ''` or `val == []` or `val.len == 0` or `val.empty`).
+`val == ''` or `val == []` or `val.len() == 0` or `val.emptyp()`).
+
+Functions:
+
+- `bool and(bool p, bool q)`
+- `bool not(bool p)`
+- `bool or(bool p, bool q)`
+- `bool xor(bool p, bool q)`
+- `string to_string(bool p)`
+- `bool zerop(bool p)`
+- `bool to_bool(string s)`
 
 ##### `int`
 
@@ -227,6 +264,17 @@ Note that floats are not built in the core because they are not built
 in to a POSIX shell. See the **math** module for a floating point
 implementation based on the external dependency `bc`.
 
+Functions:
+
+- `int plus(int i, int j)`
+- `int minus(int i, int j)`
+- `int times(int i, int j)`
+- `int div(int i, int j)`
+- `int mod(int i, int j)`
+- `string to_string(int i)`
+- `bool zerop(int i)`
+- `int to_int(string s)`
+
 ###### `string`
 
 Strings are single-quoted in single quotation marks (with internal
@@ -237,16 +285,30 @@ literal value of of the string.
 provide string interpolation in double-quoted stringhs or not--it
 isn't a priority. You will need to construct strings by hand using the
 `+` operator to incorporate variable values for now, and/or use
-the `io` module's `sprintf` function.
+the **io** module's `sprintf` function.
 
 A string can be subscripted with the `[]` operator that accepts an
-integer subscript, which is syntactic sugar for `string
-string_at(string s, int n)`.
+integer subscript; for example, `s[2]` is syntactic sugar for
+`s.at(2)` (which in turn is syntactic sugar for `at(s, 2)`).
+
+- `string at(string s, int i)`
+- `string ltrim(string s, string x)`
+- `string rtrim(string s, string x)`
+- `string trim(string s, string x)`
+- `bool has(string s, string search)`
+- `int index(string s, string search)`
+- `string slice(string s, int i, int len)`
+- `string set(string s, int i, string s)`
+- `string plus(string s, string addon)`
+- `string times(string s, int i)`
+- `string to_string(string s)`
+- `int length(strings)`
+- `bool zerop(string s)`
 
 ##### `array`
 
-Arrays are arbitrary-length arrays of mixed types accessed by integer
-subscript.
+Arrays are arbitrary-length arrays of either mixed types or a single
+type, accessed by integer subscript.
 
 An array literal is written with enclosing square brackets `[` and `]`
 with a comma-separated list of values. The members of an array do not
@@ -254,91 +316,134 @@ need to agree on type (you can implement a type which does have this
 characteristic, though).
 
 Arrays can be subscripted like strings: `arr[n]` is syntactic sugar
-for `any array_at(array arr, int n)`.
+for `arr.at(n)`.
+
+- `any at(array a, int i)`
+- `bool has(array a, any e)`
+- `int index(array a, any e)`
+- `array slice(array a, int i, int len)`
+- `array set(array a, int i, any e)`
+- `array delete(array a, int i)`
+- `array plus(array a, any e)`
+- `array filter(array a, fun f)`
+- `array map(array a, fun f)`
+- `string to_string(array a)`
+- `int length(array a)`
+- `bool zerop(array a)`
 
 ##### `map`
 
 A map is an associative array indexed by `string` keys. Like arrays
 and strings, it can be subscripted using the `[]` operator: `m[key]`
-is syntactic sugar for `any map_at(map m, string key)`.
+is syntactic sugar for `m.at(key)`.
+
+- `any at(map m, string key)`
+- `bool has(map m, string key)`
+- `string find(map m, any e)`
+- `map set(map m, string key, any e)`
+- `array slice(map m, array a)`
+- `string to_string(map m)`
+- `map filter(map m, fun f)`
+- `map map(map m, fun f)`
+- `int length(map m)`
+- `bool zerop(map m)`
 
 ##### `any`
 
 In some cases, a function may return any type of value, represented
-by the `any` type. The `any` type is not acceptable as a function
-argument type.
+by the `any` type, or accept one. This usually represents an array
+element or map value.
+
+##### `fun`
+
+An anonymous function item.
+
+- `any call(fun f, ...)`
+- `string to_string(fun f)`
+- `bool zerop(fun f)`
+
+### Methods
+
+Function calls in Wrapsher are polymorphic and there is some syntactic
+sugar to make them look like method calls. A function call like this,
+with no receiver:
+
+```
+add(x, y)
+```
+
+Since there's no receiver, Wrapsher looks for a function called
+`add` in either the current module or the **core** module that
+accepts arguments of `x` and `y`'s type.
+
+This can equivalently be written:
+
+```
+x.add(y)
+```
+
+This is merely syntactic sugar for the above.
+
+Types are namespaced according to their module: if `x`, in our
+example, is a `vector` type declared in the `vector` module,
+the equivalent of `x.add(y)` is `vector.add(x, y)`. If not
+using the receiver syntax, then you must specify the function's
+module.
 
 ### User-defined Types
 
 A new type is introduced with a module-level `type` statement, which
-just gives the type a name so that it can be used in function signatures.
-Implementing the following functions allow the type's use. Note that
-you may need to worry about Wrapsher's internal sh-compatible representation
-of data, so that is briefly discussed here.
+just gives the type a name so that it can be used in function signatures,
+and generates cast methods to its underlying storage type.
 
-The `sh` language is very limited in how it can represent data (strings only),
-so Wrapsher internally represents values as type-tagged strings. The type of
-a value is always the first part of the string, followed by a colon `:`,
-followed by a string representation of the value that is understandable
-internally. The fundamental types use a lot of `sh` blocks to implement
-the structuring and destructuring of these string representations, and this
-is Wrapsher's bread and butter. As you might expect, here are the fundamental
-simple types in `sh` representation:
+Implementing appropriate functions allow the type's use. Note that
+the storage type doesn't have anything to do with functions or methods that
+operate with the type: they all have to be implemented; Wrapsher
+is not object-oriented.
 
-- `bool:false`, `bool:true`
-- `int:0`, `int:8`, `int:-22`
-- `string:`, `string:one flew over the cuckoo's nest`, `string:café`
-
-Since POSIX `sh` doesn't implement compond types, this is accomplished in
-Wrapsher by implementing a reference system; the details are less important,
-but essentially a reference is the name of an `sh` variable which contains
-the actual value. This allows arrays to be represented as space-separated
-words, and maps to be represented as space-separated key-value pairs:
-
-- `['one', 2, false]` -> `array:_ref_0 _ref_1 _ref_2`
-    ```sh
-    _ref_0=string:one
-    _ref_1=int:2
-    _ref_2=bool:false
-    ```
-- `{ 'one': 1, 'two': 2, 'three': 3 }` -> `map:key0=_ref_0 key1=_ref_1 key2=_ref_2`
-    ```sh
-    _ref_0=int:1
-    _ref_1=int:2
-    _ref_2=int:3
-    ```
-
-A user-defined type introduces a new type by aliasing an already-existing
-representation, which means its values are a reference to a value.
+Note that you may need to worry about Wrapsher's internal
+sh-compatible representation of data, so that is briefly discussed
+here.
 
 Here are two examples: implementing a `vector` type consisting of a
-three-tuple of integers, and a `package` type consisting of struct-like
-fields representing an OS package (for example, for configuration management).
+three-tuple of integers, and a `package` type consisting of
+struct-like fields representing an OS package (for example, for
+configuration management).
 
-For our vector example, we will alias an array.
+For our vector example, we will basically alias an array.
 
 ```
 # vectors.wsh
-module vectors
+module vector
 
+# Automatically generates array as_array(vector v)
+# and vector as_vector(array a)
 type vector array
 
-vector new_vector() {
+# Callable as vector.new(0, 0, 0)
+vector new(int x, int y, int z) {
   # Return origin x, y, z
-  [0, 0, 0]
+  # Wrapsher understands this alias
+  [x, y, z].as_vector()
 }
 
-vector vector_from_string(string a, string b, string c) {
-  [int_from_string(a),
-   int_from_string(b),
-   int_from_string(c)]
-  # we return an array, wrapsher wraps it in a reference
+# Callable as v.x() -- it's a "getter"
+int x(vector v) {
+  v.as_array()[0]
+}
+
+int y(vector v) {
+  v.as_array()[1]
+}
+
+int z(vector z) {
+  v.as_array()[2]
 }
 
 # Callable as v.to_string
-string vector_to_string(vector v) {
-  # wrapsher dereferences v to an array, so v is an array here
-  '(' + v[0].to_string
+string to_string(vector v) {
+  # We'll need the array
+  '(' + v.as_array().to_string().trim('[]') + ')'
 }
   
 ```
@@ -346,10 +451,13 @@ string vector_to_string(vector v) {
 ```
 # showvector.wsh
 use module io
-use module vectors
+use module vector
 
 int main(string args...) {
-  v = vector_from_string(args[0], args[1], args[2])
+  x = args[0].to_int()
+  y = args[1].to_int()
+  z = args[2].to_int()
+  v = vector.new(x, y, z)
   io.print(v.to_string)
 }
 ```
@@ -362,61 +470,53 @@ $ ./showvector 0 22 1
 (0, 22, 1)
 ```
 
-Note that in our implementation we only need to return the underlying
-value. The `sh`-representation will look like this:
-
-- `vector:_ref_0`
-    ```sh
-    _ref_0=array:_ref_1 _ref_2 _ref_3
-    _ref_1=int:0
-    _ref_2=int:22
-    _ref_3=int:1
-    ```
-
 Of course, there are much more interesting things to do with vectors,
 so we'll probably implement things like a magnitude function using
 the **math** module and so forth.
 
-For the struct-like `package` type, we'd alias a `map` and then
-add additional constraints, again using the `map` as the underlying
-type:
+Like our vector, struct-like types are usually implemented as
+arrays, but we'll implement this as a map to show how to do
+it:
 
 ```
-# packages.wsh
-module packages
+# package.wsh
+module package
 
+# Generates package as_package(map m)
+# Generates map as_map(package p)
 type package map
 
-package new_package() {
-  {
+# Callable as package.new()
+package new()
+  ({
     'name': '',
     'version': '',
     'installed': false
-  }
+  }).as_package()
 }
 
-# additional type constraint
-bool check_package(package p) {
-  p.len == 3 and p.keys.sort == ['installed', 'name', 'version']
-}
-
-package package_from_string(string package) {
+package new(string package) {
   name = package.split('-')[0]
   version = package.split('-')[1]
-  {
+  ({
     'name': name,
     'version': version,
     'installed': false
-  }
+  }).as_package()
 }
 
 # Getters
-string package_name(package p)    { p['name'] }
-string package_version(package p) { p['version'] }
-bool package_installed(package p) { p['installed'] }
+string name(package p)      { p.as_map()['name'] }
+string version(package p)   { p.as_map()['version'] }
+bool   installed(package p) { p.as_map()['installed'] }
 
 # Setters
-string package_install(package p) { p.set('installed', true) }
+package set_name(package p, string name)         { p.as_map().set('name', name).as_package() }
+package set_version(package p, string version)   { p.as_map().set('version', version).as_package() }
+package set_installed(package p, bool installed) { p.as_map().set('installed', installed).as_package() }
+
+# A more convenient setter
+package install(package p) { p.as_map().set('installed', true).as_package() }
 ```
 
 Note that Wrapsher is not an object-oriented language and a type does
@@ -426,15 +526,24 @@ a module for constructing and using structs specifically could be
 written). This is why values in Wrapsher are usually called "items"
 rather than "objects".
 
-You might have noticed by now, too, that values in Wrapsher are
-immutable: functions that change values return an updated item.
+You'll also notice something about the compound types: their values
+are immutable. In order to update them, you generate a new item.
+There is no assignment on dereference (that is, something
+like `data['water'] = 'wet'` is not allowed). You must use
+accessor functions and assign the result (multiple assignment
+_is_ allowed:
 
-### Programs vs. Modules - `main`
+```
+data = data.set('water', 'wet')
+```
 
-A "program" is a Wrapsher file that is not qualified as a `module`
+### Commands vs. Modules - `main`
+
+A "command" is a Wrapsher file that is not qualified as a `module`
 and has a `main` entry point. Note that if `module` is declared in
 the file, any `main` function is interpreted as a normal function
-and no special processing is applied by the Wrapsher compiler.
+and no special processing is applied by the Wrapsher compiler (it
+could be called as <code>_module_.main</code> in the normal way.
 
 A "module" is a Wrapsher file that has a `module` declaration.  When
 loaded using the `module` statement, the functions and types in the
@@ -442,19 +551,9 @@ module are available qualified by the name of the module.
 
 The module namespace is flat--there is no hierarchy of modules.
 
-The `main` function must return an `int`. Further, it must accept
-either no arguments (its signature is `int main()`); a fixed
-number of string arguments (its signature is `int main(string a)`
-or `int main(string a, string b)` for example; or an array
-`int main(array args)`.
-
-Upon invocation, Wrapsher binds the process arguments to this
-array or each individual string argument. An error is produced
-if this binding is invalid. For example if the signature of
-`main` is `int main(string a)`, then exactly one argument
-must be provided on the command line, otherwise an error is
-produced which, by default, references the `metadata docs`
-information, if any.
+The `main` function in a command must return an `int`. Further, it
+must accept either no arguments (its signature is `int main()`) or an
+array.
 
 It's very common to apply the core module's optparse function to the
 arguments to `main` (`optresult optparse(optspec spec, array args)`):
@@ -476,8 +575,8 @@ int main(array args) {
   })
 
   result = optparse(optspec, args)
-  opt = result.opt
-  args = result.args
+  opt = result.opt()
+  args = result.args()
 
   if opt.has('output') {
     output = io.open(opt['output'])
