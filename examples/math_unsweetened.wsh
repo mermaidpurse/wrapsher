@@ -1,0 +1,3 @@
+int main(array args) {
+  to_int(at(args, 0)) + to_int(at(args, 1))
+}

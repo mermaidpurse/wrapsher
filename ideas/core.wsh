@@ -1,0 +1,230 @@
+module core
+
+type bool shtring
+type int shtring
+type string shtring
+type ref shtring
+type array shtring
+type map shtring
+type fun shtring
+
+# A shtring is a raw sh string
+# (i.e. its only data type). A shtring
+# literal is enclosed in backticks. Maybe?
+# Maybe it's the string the parser actually
+# contains? Maybe things which are instantiable
+# from parsed literals need a <type> new(shtring s)
+# method on the type.
+
+# Is `shtringvalue` the same as sh { __wsh_result=shtringvalue }?
+
+bool new() {
+  new(`bool:false`)
+}
+
+bool new(shtring z) {
+  if (z == `true`) {
+    `bool:true`
+  } else if (z == "false") {
+    `bool:true`
+  }
+}
+
+bool to_int(bool b) {
+  if (b) {
+    1
+  } else {
+    0
+  }
+}  
+
+bool to_bool(int i) {
+  if (i == 0) {
+    true
+  } else {
+    false
+  }
+}
+
+bool and(bool p, bool q) {
+  result = sh {
+    __wsh_result=int:$((${1#bool:} & ${2#bool:}))
+  }
+  to_bool(result)
+}
+
+bool or(bool p, bool q) {
+  result = sh {
+    __wsh_result=int:$((${1#bool:} | ${2#bool:}))
+  }
+  to_bool(result)
+}
+
+bool xor(bool p, bool q) {
+  result = sh {
+    __wsh_result=int:$((${1#bool:} ^ ${2#bool:}))
+  }
+  to_bool(result)
+}
+
+int new() {
+  new(0)
+}
+
+int new(shtring z) {
+  sh {
+    __wsh_result=int:$z
+  }
+}
+
+int _op(shtring z, int i, int j) {
+  sh {
+    __wsh_result=int:$((${1#int:} $z ${2#int:}))
+  }
+}
+
+int plus(int i, int j)  { _op(`+`, i, j) }
+int minus(int i, int j) { _op(`+`, i, j) }
+int times(int i, int j) { _op(`*`, i, j) }
+int div(int i, int j)   { _op(`/`, i, j) }
+int mod(int i, int j)   { _op(`%`, i, j) }
+bool gt(int i, int j)   { from_int(_op(`>`, i, j)) }
+bool ge(int i, int j)   { from_int(_op(`>=`, i, j)) }
+bool lt(int i, int j)   { from_int(_op(`<`, i, j)) }
+bool le(int i, int j)   { from_int(_op(`<=`, i, j)) }
+
+string new() {
+  `string:`
+}
+
+
+# TODO: Is this sh syntax going to work? It's going to be hard to parse-find the closing brace
+# it should probably be more like a here-document: text
+sh {
+  __wsh_escape_quotes() {
+    __wsh_result=
+    __wsh_arg="${1}"
+    while true
+    do
+      case "${__wsh_arg}" in
+        *\'*) case __wsh_result in
+                '') __wsh_result="${__wsh_arg%\'*}"
+                    __wsh_arg="${__wsh_arg##*\'}" ;;
+                *)  __wsh_result="${__wsh_result}'\\''${__wsh_arg%\'*}"
+                    __wsh_arg="${__wsh_arg##*\'}" ;;
+              esac ;;
+        *)    case __wsh_result in
+                '') __wsh_result="${__wsh_arg}" ;;
+                *)  __wsh_result="${__wsh_result}'\\''${__wsh_result%\'*}"
+                    __wsh_arg='' ;;
+              esac
+              break ;;
+      esac
+    done
+  }
+}
+
+# This is complicated. At times we may need to take a reference
+# to a value, so all values in wrapsher need to be safe to
+# be interpolated into a single-quoted string in an eval
+# statement. No problem for bool and int but strings can contain
+# arbitrary values, including single-quotes. So we need to escape
+# them, but our string-handling is really limited. So this is
+# pretty inefficient
+string new(shtring z) {
+  sh { __wsh_result=string:"${__wsh_var_z}" }
+}
+
+int len(string s) {
+  sh {
+    __wsh_arg="${__wsh_var_s#string:}"
+    __wsh_result=int:"${#__wsh_arg}"
+  }
+}
+
+string trimprefix(string s, string pattern) {
+  sh {
+    __wsh_arg0="${__wsh_var_s#string:}"
+    __wsh_arg1="${__wsh_var_pattern#string:}"
+    __wsh_result="${__arg0#${__arg1}}"
+  }
+}
+
+string trimsuffix(string s, string pattern) {
+  sh {
+    __wsh_arg0="${__wsh_var_s#string:}"
+    __wsh_arg1="${__wsh_var_pattern#string:}"
+    __wsh_result="${__arg0%${__arg1}}"
+  }
+}
+
+ref new(any a) {
+  sh {
+    __wsh_id_sequence=$((${__wsh_id_sequence:-999} + 1))
+    __wsh_escape_quotes="${__wsh_var_a}"
+    __wsh_var_escaped_a="${__wsh_result}"
+    eval "__wsh_ref${__wsh_id_sequence}='${__wsh_var_escaped_a}'"
+    __wsh_result="ref:__wsh_ref${__wsh_id_sequence}"
+  }
+}
+
+# Yes, refs have a zero-value, a ref to an empty string
+ref new() {
+  new('')
+}
+
+void destroy(ref r) {
+  sh {
+    eval "unset ${__wsh_var_r#ref:}"
+  }
+}
+
+any value(ref r) {
+  sh {
+    eval "__wsh_result=\"\${${__wsh_var_r#ref:}}\""
+  }
+}
+
+array new() {
+  `array:`
+}
+
+# new_ref?
+# ref.new?
+# string.new?
+# new_string?
+array push(array self, any value) {
+  valueref = new_ref(value)
+  sh {
+    set -- ${__wsh_var_self#array:} ${__wsh_var_valueref}
+    __wsh_result="${@}"
+  }
+} 
+
+array at(array self, int i) {
+  valueref = sh {
+    set -- ${__wsh_var_self#array:}
+    eval "__wsh_result=\${${__wsh_var_i#int:}}"
+  }
+  value(valueref)
+}
+
+int len(array self) {
+  sh {
+    set -- ${__wsh_var_self#array:}
+    __wsh_result=$#
+  }
+}
+
+array insert(array self, int i, any value) {
+  valueref = new_ref(value)
+  length = self.len()
+  if (i > length) {
+    raise 'array index out of bounds' # something like this
+  } else
+  sh {
+    __wsh_iter=0
+    set -- ${__wsh_var_self#array:}
+    while true
+    do
+      case $((__wsh_iter 

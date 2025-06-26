@@ -35,4 +35,5 @@ EOF
   spec.require_paths = ["lib"]
 
   spec.add_dependency "parslet", '~> 2.0.0'
+  spec.add_development_dependency "pry", "~> 0.14"
 end

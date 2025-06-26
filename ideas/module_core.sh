@@ -254,7 +254,7 @@ __wsh_next_id() {
 __wsh_create_ref() {
   __wsh_next_id __wsh_myid
   eval "${1}=__wsh_ref_${__wsh_myid}"
-  eval "__wsh_ref_${__wsh_myid}=\"${2}\""
+  eval "__wsh_ref_${__wsh_myid}=\"${2}\"" # TODO: this is very unsafe with regard to quoting
   unset __wsh_myid
 }
 
