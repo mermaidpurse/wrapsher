@@ -11,6 +11,14 @@ module Wrapsher
       @logger.level = level || :DEBUG
     end
 
+    def preamble
+      File.read(File.join(__dir__, 'preamble.sh'))
+    end
+
+    def postamble
+      File.read(File.join(__dir__, 'postamble.sh'))
+    end
+
     def generate(program, filename: '-')
       case program
       when Array
@@ -28,25 +36,6 @@ module Wrapsher
       #{preamble}
       #{nodes.map(&:to_s).join("\n")}
       #{postamble}
-      EOF
-    end
-
-    def preamble
-      <<~EOF
-      __wsh_result='null:'
-      __wsh_error='null:'
-      EOF
-    end
-
-    # Need to get the node tree back and figure out stuff like
-    # if it's a module, but actually for now we assume it's a
-    # program.
-    def postamble
-      <<~EOF
-      # startup code
-      # construct array from raw string array $@
-      __wsh_int_main
-      exit "${__wsh_result#int:}"
       EOF
     end
   end

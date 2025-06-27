@@ -3,6 +3,7 @@ require 'logger'
 require 'parslet'
 require 'wrapsher'
 
+# TODO: conditionals, assignments and loops
 module Wrapsher
   class Syntax < Parslet::Parser
 
@@ -24,9 +25,10 @@ module Wrapsher
 
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { expression >> (eol >> expression).repeat }
-    rule(:expression)               { fun_call | secondary_op | primary_op | term }
-
-    rule(:fun_call)                 { (qualified_word.as(:name) >> lparen >> space? >> fun_args.maybe >> space? >> rparen).as(:fun_call) }
+    rule(:expression)               { postfix_chain | fun_call | secondary_op | primary_op | term }
+    rule(:postfix)                  { str('.') >> fun_call }
+    rule(:postfix_chain)            { (term.as(:receiver) >> str('.').present? >> postfix.repeat.as(:calls)).as(:postfix_chain) }
+    rule(:fun_call)                 { (word.as(:name) >> lparen >> space? >> fun_args.maybe.as(:fun_args) >> space? >> rparen).as(:fun_call) }
     rule(:fun_args)                 { expression >> (comma >> expression).repeat }
 
     rule(:primary_op)               { (term.as(:left) >> space? >> primary_operator.as(:operator) >> space? >> expression.as(:right)).as(:primary_op) }
@@ -36,7 +38,7 @@ module Wrapsher
     rule(:secondary_operator)       { str('*') | str('/') | str('%') }
     rule(:term)                     { lparen >> expression.as(:group) >> rparen | lit_int | var_ref | string_term }
     rule(:lit_int)                  { match('[0-9]').repeat(1).as(:lit_int) >> space? }
-    rule(:var_ref)                  { qualified_word.as(:var_ref) >> space? }
+    rule(:var_ref)                  { word.as(:var_ref) >> space? }
     rule(:string_term)              { string.as(:string_term) >> space? }
 
     rule(:version)                  { match('[0-9.]').repeat(1) }

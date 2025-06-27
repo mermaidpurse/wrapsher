@@ -31,12 +31,14 @@ module Wrapsher
       case @cmd
       when 'help'
         help @argv
+      when 'run'
+        do_run @argv
       when 'compile'
-        compile @argv
+        do_compile @argv
       when 'parse'
-        parse @argv
+        do_parse @argv
       when 'grammar'
-        grammar
+        do_grammar
       else
         help
       end
@@ -53,7 +55,24 @@ Usage:
 EOF
     end
 
-    def compile(args)
+    def do_run(args)
+      args = @file_optparser.parse(*args)
+      compiler = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
+
+      if ! @options[:expr].empty?
+        compiled = compiler.compiletext(@options[:expr].join("\n") + "\n")
+        IO.popen('/bin/sh', 'w') { |sh| sh.write(compiled) }
+      else
+        args.each do |source|
+          output = source.delete_suffix('.wsh')
+          compiled = compiler.compile(source)
+          File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
+          system(output)
+        end
+      end
+    end
+
+    def do_compile(args)
       args      = @file_optparser.parse(*args)
       compiler  = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
 
@@ -69,7 +88,7 @@ EOF
       end
     end
 
-    def parse(args)
+    def do_parse(args)
       args   = @file_optparser.parse(*args)
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
       if ! @options[:expr].empty?
@@ -84,7 +103,7 @@ EOF
       end
     end
 
-    def grammar()
+    def do_grammar()
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
       puts parser.grammar
     end

@@ -14,10 +14,20 @@ module Wrapsher
     end
 
     class VarRef < Node
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @name = slice.to_s
+        @line = slice.line_and_column[0]
+      end
+
+      def to_s
+        "\"${_wshv_#{@name}}\""
+      end
     end
 
     class Module < Node
-      def initialize(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
         @name = slice.to_s
         @line = slice.line_and_column[0]
       end
@@ -25,48 +35,51 @@ module Wrapsher
       def to_s
         <<~EOF
         # module #{@name}
-        __wsh_module_name='#{@name}'
-        __wsh_line='#{@filename}:#{@line}'
+        _wshv_#{@name}='module/#{@name}:#{@filename}'
+        _wsh_line='#{@filename}:#{@line}'
         EOF
       end
     end
 
-    # I really got to think about function dispatch. Maybe I should build
-    # up a table here, by signature, if the receiver is just a syntactic sugar
-    # for the first argument.
-    # io.printf('hello') -> printf(io, 'hello') -> printf_module_io('string:hello') ?
-    # Maybe io shoudl be a variable that's bound to a type. And every module is a
-    # type. type io module. type vector array.
-    # magnitude(vector v) -> 'magnitude:vector'
-    # printf(type io, string s) -> 'printf:io:string'
-    # add(int a, int b) -> 'add:int:int'
     class FunStatement < Node
-      def initialize(slice)
-        @signature = Signature.new(slice[:signature])
-        @body = Body.new(slice[:body])
+      attr_reader :line
+
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @signature = Signature.new(slice[:signature], filename: @filename)
+        @line = @signature.line
+        @body = Body.new(slice[:body], filename: @filename)
       end
 
       def to_s
         <<~EOF
         # #{@signature.type} #{@signature.name}(#{@signature.arg_definitions&.map(&:to_s).join(', ')})
-        #{@signature.function_name}() {
-          __wsh_error='null:'
-          __wsh_result='null:'
+        #{@signature.function_name(:presence)}=1
+        #{@signature.function_name(:definition)}() {
+          _wsh_error='error:'; _wsh_result='null:'; _wsh_line='#{@filename}:#{@line}'
           #{@signature.argument_binding}
+
           #{@body.to_s}
-          #{@signature.unset_bindings}
+          #{@signature.check_return}
         }
         EOF
       end
     end
 
     class Signature < Node
-      attr_reader :type, :name, :arg_definitions
+      attr_reader :type, :name, :arg_definitions, :line
 
-      def initialize(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice[:type].line_and_column[0]
         @type = slice[:type].to_s
         @name = slice[:name].to_s
-        @arg_definitions = slice[:arg_definitions]&.map { |arg| ArgDefinition.new(arg) } || []
+        if !slice[:arg_definitions].nil?
+          arg_definitions = slice[:arg_definitions].is_a?(Array) ? slice[:arg_definitions] : [slice[:arg_definitions]]
+          @arg_definitions = arg_definitions.map { |arg| ArgDefinition.new(arg, filename: @filename) }
+        else
+          @arg_definitions = []
+        end
         @line = slice[:type].line_and_column[0]
       end
 
@@ -74,73 +87,99 @@ module Wrapsher
         @arg_definitions.map.with_index do |arg, i|
           # It's actually a variable binding, complete with evaluation, so this
           # actually isn't right.
-          "__wsh_var_#{arg.name} = \"__wsh_arg#{i}\""
+          [
+            "_wsh_line='#{@filename}:#{arg.line}'",
+            "_wshv_#{arg.name}=\"${_wsh_arg#{i}}\"",
+            "unset _wsh_arg#{i}",
+            "_wsh_check \"${_wshv_#{arg.name}}\" '#{arg.type}' '#{arg.name}' || return 1",
+          ].join("\n  ")
         end.join("\n  ")
       end
 
-      def unset_bindings
-        @arg_definitions.map.with_index do |arg, i|
-          "unset __wsh_arg#{i}"
-        end.join("\n  ")
+      def check_return
+        "_wsh_check \"${_wsh_result}\" '#{type}' '#{name}()' || return 1"
       end
 
-      # Probable needs module
-      def function_name
-        "__wsh_#{@type}_#{@name}"
+      def function_name(nametype = :definition)
+        prefix = nametype == :presence ? '_wshp' : '_wshf'
+        if @arg_definitions.empty?
+          "#{prefix}_#{@name}"
+        else
+          "#{prefix}_#{@name}_#{@arg_definitions[0].type_with_underscore}"
+        end
+      end
+    end
+
+    class ArgDefinition < Node
+      attr_reader :name, :type, :line
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice[:type].line_and_column[0]
+        @name = slice[:name].to_s
+        @type = slice[:type].to_s
+      end
+
+      def type_with_underscore
+        @type.gsub(/[^a-zA-Z0-9_]/, '_')
+      end
+
+      def to_s
+        "#{@type} #{@name}"
       end
     end
 
     class Body < Node
-      def initialize(slice)
-        @node = Node.from_obj(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @node = Node.from_obj(slice, filename: @filename)
       end
 
+      # TODO :This is where we keep track of variables and unset them at the end.
       def to_s
         @node.to_s
       end
     end
 
     class FunCall < Node
-      def initialize(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
         @function_name = slice[:name].to_s
         @line = slice[:name].line_and_column[0]
-        # This definitely isn't right. It should be done by the parser/transforms.
-        @function_args = ([receiver] + slice.except(:name).map { |key, arg| Node.from_obj({ key => arg }) }).compact
+        @function_args = [slice[:fun_args]].flatten.compact.map do |arg|
+          Node.from_obj(arg, filename: @filename)
+        end
       end
 
-      def receiver
-        parts = @function_name.split('.')
-        parts.length > 1 ? parts[0] : nil
-      end
-
-      def function_name
-        # This should be done by the parser
-        parts = @function_name.split('.')
-        name = parts.length > 1 ? parts[-1] : @function_name
-        "  __wsh_#{name}"
+      def function_dispatch
+        if @function_args.empty?
+          "  _wsh_dispatch '#{@function_name}' || return 1"
+        else
+          "  _wsh_dispatch '#{@function_name}' \"${_wsh_arg0}\" || return 1"
+        end
       end
 
       def to_s
         call_bindings = @function_args.map.with_index do |arg, i|
+          # TODO: this is more like a term? test
           if arg.is_a? FunCall
             <<~EOF
             #{arg.to_s}
-            __wsh_arg@#{i}="${__wsh_result}"
+            _wsh_arg@#{i}="${_wsh_result}"
             EOF
           else
-            "__wsh_arg#{i}='#{arg.to_s}'"
+            "_wsh_arg#{i}=#{arg.to_s}"
           end
         end
         <<~EOF
-        #{call_bindings.join("\n  ")}
-        #{function_name}
-        #{call_bindings.length.times.map { |i| "  unset __wsh_arg#{i}" }.join("\n")}
+          #{call_bindings.join("\n  ")}
+          #{function_dispatch}
         EOF
       end
     end
 
     class StringTerm < Node
-      def initialize(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
         string_type = slice.keys.first
         case string_type
         when :single_quoted
@@ -153,12 +192,13 @@ module Wrapsher
       end
 
       def to_s
-        "string:#{@value}"
+        "'string:#{@value}'"
       end
     end
 
     class UseModule < Node
-      def initialize(slice)
+      def initialize(slice, filename: '-')
+        @filename = filename
         @module_name = slice.to_s
         @line = slice.line_and_column[0]
       end
@@ -170,14 +210,15 @@ module Wrapsher
       def to_s
         <<~EOF
         # use module #{@module_name}
-        __wsh_line='#{@filename}:#{@line}'
+        _wsh_line='#{@filename}:#{@line}'
         #{module_code}
-        __wsh_line='#{@filename}:#{@line}'
+        _wsh_line='#{@filename}:#{@line}'
         EOF
       end
     end
 
-    def initialize(slice)
+    def initialize(slice, filename: '-')
+      @filename = filename
       @slice = slice
       @term = false
     end
@@ -186,7 +227,7 @@ module Wrapsher
       raise NotImplementedError, "Subclasses must implement a to_s method"
     end
 
-    attr_accessor :filename
+    attr_reader :filename
 
     @@nodes = {
       module: Module,
@@ -204,13 +245,15 @@ module Wrapsher
       @term || false
     end
 
+    def initialize(slice, filename: '-')
+      @filename = filename
+    end
+
     class << self
       def from_obj(obj, filename: nil)
         type = obj.keys.first
         if @@nodes.key?(type)
-          node = @@nodes[type].new(obj[type])
-          node.filename = filename
-          node
+          @@nodes[type].new(obj[type], filename: filename)
         else
           raise "Unknown node type: #{type}"
         end
