@@ -8,8 +8,6 @@ module Wrapsher
     rule(postfix_chain: { receiver: subtree(:recv), calls: subtree(:chained_calls) }) do
       the_calls = chained_calls.is_a?(Array) ? chained_calls : [chained_calls]
       the_calls.reduce(recv) do |receiver, call|
-        puts "receiver: #{receiver.inspect}"
-        puts "call: #{call.inspect}"
         fun_call = call[:fun_call]
         fun_args = case fun_call[:fun_args]
                    when nil then []

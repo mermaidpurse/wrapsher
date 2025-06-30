@@ -24,8 +24,9 @@ module Wrapsher
     rule(:arg_definition)           { word.as(:type) >> space >> word.as(:name) }
 
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
-    rule(:expressions)              { expression >> (eol >> expression).repeat }
-    rule(:expression)               { postfix_chain | fun_call | secondary_op | primary_op | term }
+    rule(:expressions)              { (expression >> eol).repeat >> expression.maybe }
+    rule(:expression)               { postfix_chain | fun_call | shellcode_call | secondary_op | primary_op | term }
+    rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
     rule(:postfix)                  { str('.') >> fun_call }
     rule(:postfix_chain)            { (term.as(:receiver) >> str('.').present? >> postfix.repeat.as(:calls)).as(:postfix_chain) }
     rule(:fun_call)                 { (word.as(:name) >> lparen >> space? >> fun_args.maybe.as(:fun_args) >> space? >> rparen).as(:fun_call) }
@@ -42,8 +43,9 @@ module Wrapsher
     rule(:string_term)              { string.as(:string_term) >> space? }
 
     rule(:version)                  { match('[0-9.]').repeat(1) }
-    rule(:string)                   { single_quoted }
+    rule(:string)                   { triple_quoted | single_quoted }
     rule(:single_quoted)            { str('\'') >> char.repeat.as(:single_quoted) >> str('\'') }
+    rule(:triple_quoted)            { str("'''") >> (str("'''").absent? >> any).repeat.as(:triple_quoted) >> str("'''") }
 
     rule(:lbrace)                   { str('{') }
     rule(:rbrace)                   { str('}') }
@@ -56,7 +58,7 @@ module Wrapsher
     rule(:whitespace)               { match('\s').repeat(1) }
     rule(:whitespace?)              { whitespace.maybe }
     rule(:qualified_word)           { word >> (str('.') >> word).maybe }
-    rule(:word)                     { match('[a-zA-Z0-9_]').repeat(1) }
+    rule(:word)                     { match('[a-zA-Z0-9_/]').repeat(1) }
     rule(:eol)                      { (match('\n').repeat(1) | str(';')) >> space? }
 
     root(:program)

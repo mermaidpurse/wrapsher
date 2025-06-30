@@ -1,3 +1,4 @@
+# wsh:preamble for scripts
 _wsh_result='null:'
 _wsh_refid=999
 _wsh_error='error:'
@@ -31,12 +32,10 @@ _wsh_typeof_underscore() {
 }
 
 _wsh_check() {
-  echo "+++ checking if '${1}' has type '${2}'"
   case "${2}" in
-    any)     echo '    success (any)' ;;
-    "${1%:*}") echo '    success';;
+    any)       : ;;
+    "${1%:*}") : ;;
     *)       _wsh_error="error:Expected type '${2}', got '${1%:*}': ${3} at $_wsh_line"
-             echo '    failure'
              return 1 ;;
   esac
 }

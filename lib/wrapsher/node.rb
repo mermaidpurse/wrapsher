@@ -3,6 +3,12 @@ require 'wrapsher'
 require 'pry'
 
 module Wrapsher
+
+  WSH_INCLUDE_PATH = [
+    "${ENV['WSH_HOME']}/wsh",
+    './wsh',
+  ].freeze
+
   class Node
     class MetaField < Node
     end
@@ -59,7 +65,9 @@ module Wrapsher
           _wsh_error='error:'; _wsh_result='null:'; _wsh_line='#{@filename}:#{@line}'
           #{@signature.argument_binding}
 
+          # function body
           #{@body.to_s}
+          # end function body
           #{@signature.check_return}
         }
         EOF
@@ -131,12 +139,13 @@ module Wrapsher
     class Body < Node
       def initialize(slice, filename: '-')
         @filename = filename
-        @node = Node.from_obj(slice, filename: @filename)
+        slices = slice.is_a?(Array) ? slice : [slice]
+        @nodes = slices.map { |sl| Node.from_obj(sl, filename: @filename) }
       end
 
       # TODO :This is where we keep track of variables and unset them at the end.
       def to_s
-        @node.to_s
+        @nodes.map(&:to_s).join("\n  ")
       end
     end
 
@@ -177,17 +186,37 @@ module Wrapsher
       end
     end
 
-    class StringTerm < Node
+    class ShellCode < Node
       def initialize(slice, filename: '-')
         @filename = filename
-        string_type = slice.keys.first
-        case string_type
-        when :single_quoted
-          @value = slice[string_type].to_s
-          @line = slice[string_type].line_and_column[0]
-        else
-          raise "Unknown string type: #{string_type}"
-        end
+        @shellcode = StringValue.new(slice, filename: @filename)
+      end
+
+      def to_s
+        @shellcode.to_s
+      end
+    end
+
+    class StringValue < Node
+      attr_reader :value
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @string_type = slice.keys.first
+        @value = slice[@string_type].to_s
+        @line = slice[@string_type].line_and_column[0]
+      end
+
+      def to_s
+        @value
+      end
+    end
+
+    class StringTerm < Node
+      attr_reader :value
+
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @value = StringValue.new(slice, filename: @filename)
         @term = true
       end
 
@@ -196,6 +225,23 @@ module Wrapsher
       end
     end
 
+    class UseExternal < Node
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @external_command = slice.to_s
+        @line = slice.line_and_column[0]
+      end
+
+      def to_s
+        <<~EOF
+        # use external command #{@external_command}
+        _wsh_line="{@filename}:#{@line}"
+        # _wsh_check_external '#{@external_command}' || return 1
+        EOF
+      end
+    end
+
+    # TODO set a flag to see if we've included already.
     class UseModule < Node
       def initialize(slice, filename: '-')
         @filename = filename
@@ -203,17 +249,21 @@ module Wrapsher
         @line = slice.line_and_column[0]
       end
 
-      def module_code
-        File.read("./examples/modules/#{@module_name}.sh")
+      def included
+        WSH_INCLUDE_PATH.flat_map do |loc|
+          module_filename = "#{loc}/#{@module_name}.wsh"
+          if File.exist?(module_filename)
+            return Wrapsher::Compiler.new.compile(module_filename, type: :module)
+          end
+        end
+        raise "Module #{@module_name} not found in include paths: #{WSH_INCLUDE_PATH.join(', ')}"
       end
 
       def to_s
-        <<~EOF
-        # use module #{@module_name}
-        _wsh_line='#{@filename}:#{@line}'
-        #{module_code}
-        _wsh_line='#{@filename}:#{@line}'
-        EOF
+        [
+          "# use module #{@module_name}",
+          included
+        ].join("\n")
       end
     end
 
@@ -224,7 +274,7 @@ module Wrapsher
     end
 
     def to_s
-      raise NotImplementedError, "Subclasses must implement a to_s method"
+      raise NotImplementedError, "Subclasses(#{self.class}) must implement a to_s method: #{self.inspect}"
     end
 
     attr_reader :filename
@@ -236,7 +286,9 @@ module Wrapsher
       type: Type,
       fun_call: FunCall,
       fun_statement: FunStatement,
+      shellcode: ShellCode,
       string_term: StringTerm,
+      use_external: UseExternal,
       use_module: UseModule,
       var_ref: VarRef,
     }.freeze

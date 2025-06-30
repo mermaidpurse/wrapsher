@@ -9,14 +9,14 @@ module Wrapsher
       @logger.level = level || :DEBUG
     end
 
-    def compiletext(text, filename: '-e')
+    def compiletext(text, type: :program, filename: '-e')
       ast = Wrapsher::Parser.new.parsetext(text)
-      Wrapsher::Generator.new.generate(ast, filename: filename)
+      Wrapsher::Generator.new(type: type).generate(ast, filename: filename)
     end
 
-    def compile(filename)
+    def compile(filename, type: :program)
       text = File.read(filename)
-      compiletext(text, filename: filename)
+      compiletext(text, filename: filename, type: type)
     end
 
   end

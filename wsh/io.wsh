@@ -1,0 +1,10 @@
+module io
+
+use external echo
+
+int println(module/io m, string s) {
+  shell '''
+  echo "${_wshv_s#string:}"
+  _wsh_result="int:$((${#_wshv_s} - 7))"
+  '''
+}
