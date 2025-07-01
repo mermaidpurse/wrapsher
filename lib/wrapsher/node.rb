@@ -10,6 +10,32 @@ module Wrapsher
   ].freeze
 
   class Node
+
+    class Assignment < Node
+      attr_reader :line
+
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice[:var].line_and_column[0]
+        @name = slice[:var].to_s
+        @rvalue = Node.from_obj(slice[:rvalue], filename: @filename)
+      end
+
+      def to_s
+        if @rvalue.term?
+          [
+            "_wshv_#{@name}=#{@rvalue.to_s}",
+            "_wsh_result=\"${_wshv_#{@name}}\""
+          ].join("\n  ")
+        else
+          [
+            @rvalue.to_s,
+            "_wshv_#{@name}=\"${_wsh_result}\""
+          ].join("\n  ")
+        end
+      end
+    end
+
     class MetaField < Node
     end
 
@@ -24,6 +50,7 @@ module Wrapsher
         @filename = filename
         @name = slice.to_s
         @line = slice.line_and_column[0]
+        @term = true
       end
 
       def to_s
@@ -170,13 +197,13 @@ module Wrapsher
       def to_s
         call_bindings = @function_args.map.with_index do |arg, i|
           # TODO: this is more like a term? test
-          if arg.is_a? FunCall
+          if arg.term?
+            "_wsh_arg#{i}=#{arg.to_s}"
+          else
             <<~EOF
             #{arg.to_s}
             _wsh_arg@#{i}="${_wsh_result}"
             EOF
-          else
-            "_wsh_arg#{i}=#{arg.to_s}"
           end
         end
         <<~EOF
@@ -280,6 +307,7 @@ module Wrapsher
     attr_reader :filename
 
     @@nodes = {
+      assignment: Assignment,
       module: Module,
       meta_field: MetaField,
       version: Version,

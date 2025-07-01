@@ -68,7 +68,7 @@ EOF
           compiled = compiler.compile(source)
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
           system(output)
-          exit($?.exitstatus)
+          Process.exit($?.exitstatus)
         end
       end
     end

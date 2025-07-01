@@ -16,7 +16,7 @@ module Wrapsher
     rule(:use_external_statement)   { str('use') >> space >> str('external') >> space >> word.as(:use_external) }
     rule(:use_feature_statement)    { str('use') >> space >> str('feature') >> space >> word.as(:use_feature) }
     rule(:module_statement)         { str('module') >> space >> word.as(:module) }
-    rule(:type_statement)           { str('type') >> space >> word.as(:type) >> space >> word.as(:type) }
+    rule(:type_statement)           { str('type') >> space >> word.as(:type) >> (space >> word.as(:store_type)).maybe }
 
     rule(:fun_statement)            { (signature.as(:signature) >> block.as(:body)).as(:fun_statement) }
     rule(:signature)                { word.as(:type) >> space >> word.as(:name) >> lparen >> arg_definitions.as(:arg_definitions) >> rparen }
@@ -25,7 +25,8 @@ module Wrapsher
 
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe }
-    rule(:expression)               { postfix_chain | fun_call | shellcode_call | secondary_op | primary_op | term }
+    rule(:expression)               { assignment | postfix_chain | fun_call | shellcode_call | secondary_op | primary_op | term }
+    rule(:assignment)               { (word.as(:var) >> space? >> str('=') >> space? >> expression.as(:rvalue)).as(:assignment) }
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
     rule(:postfix)                  { str('.') >> fun_call }
     rule(:postfix_chain)            { (term.as(:receiver) >> str('.').present? >> postfix.repeat.as(:calls)).as(:postfix_chain) }

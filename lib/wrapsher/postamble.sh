@@ -12,7 +12,6 @@ done
 _wsh_dispatch main array
 _wsh_exitcode="$?"
 _wsh_check "${_wsh_result}" 'int' 'main()' || _wsh_exitcode=1
-echo "_wsh_result:${_wsh_result}"
 
 # Handle uncaught exceptions
 if [[ "${_wsh_exitcode}" -ne 0 ]]

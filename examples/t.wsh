@@ -1,0 +1,6 @@
+use module io
+
+int main(array args) {
+  s = 'hello world'
+  c = io.println(s)
+}
