@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'json'
 require 'logger'
 require 'optparse'
@@ -33,6 +34,8 @@ module Wrapsher
         help @argv
       when 'run'
         do_run @argv
+      when 'test'
+        do_test @argv
       when 'compile'
         do_compile @argv
       when 'parse'
@@ -73,6 +76,25 @@ EOF
       end
     end
 
+    def do_test(args)
+      args = @file_optparser.parse(*args)
+      compiler = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
+
+      if ! @options[:expr].empty?
+        raise ArgumentError, 'Cannot test expressions directly, please provide a file'
+      else
+        # TODO: Discover test files
+        args.each do |source|
+          output = source.delete_suffix('.wsh')
+          compiled = compiler.compile(source, type: :program) # TODO: change to :test
+          File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
+          system(output)
+          FileUtils.rm_f(output) if $?.exitstatus == 0
+          Process.exit($?.exitstatus)
+        end
+      end
+    end
+
     def do_compile(args)
       args      = @file_optparser.parse(*args)
       compiler  = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
@@ -83,7 +105,7 @@ EOF
       else
         args.each do |source|
           output = source.delete_suffix('.wsh')
-          compiled = compiler.compile(source)
+          compiled = compiler.compile(source, type: :program)
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
         end
       end

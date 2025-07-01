@@ -95,6 +95,20 @@ module Wrapsher
     end
 
     class Type < Node
+      attr_reader :line
+
+      def initialize(slice, filename: '-')
+        @line = slice[:name].line_and_column[0]
+        @name = slice[:name].to_s
+        @store_type = slice[:store_type].to_s if slice[:store_type]
+      end
+
+      def to_s
+        code = []
+        code << "# type #{@name}"
+        code << "_wshv_#{@name}='type/#{@name}:#{@store_type}'"
+        code.join("\n")
+      end
     end
 
     class VarRef < Node
@@ -142,7 +156,7 @@ module Wrapsher
     end
 
     class FunStatement < Node
-      attr_reader :line
+      attr_reader :line, :signature
 
       def initialize(slice, filename: '-')
         @filename = filename
@@ -308,7 +322,6 @@ module Wrapsher
         @filename = filename
         @string_type = slice.keys.first
         @value = slice[@string_type].to_s
-        @line = slice[@string_type].line_and_column[0]
       end
 
       def to_s

@@ -5,7 +5,53 @@ require 'pry'
 module Wrapsher
   class Transform < Parslet::Transform
 
-    rule(boolean_not:{ subject: subtree(:subject) }) do
+    rule(type: { name: simple(:name), store_type: simple(:store_type) }) do
+      code = [
+        {
+          type: {
+            name: name,
+            store_type: store_type,
+          }
+        },
+        {
+          shellcode: { single_quoted: "_wshv_#{name}='type/#{name}:#{store_type}'" }
+        }
+      ]
+      if store_type.to_s != 'builtin'
+        # Create unsafe casts
+        code << {
+          fun_statement: {
+            signature: {
+              type: name.to_s,
+              name: "_as_#{name}",
+              arg_definitions: [{ type: store_type, name: 'v' }]
+            },
+            body: [
+              {
+                shellcode: { single_quoted: "_wsh_result='#{name}:${_wshv_v}'" }
+              }
+            ]
+          }
+        }
+        code << {
+          fun_statement: {
+            signature: {
+              type: store_type.to_s,
+              name: "_as_#{store_type}",
+              arg_definitions: [{ type: name, name: 'v' }]
+            },
+            body: [
+              {
+                shellcode: { single_quoted: "_wsh_result=\"${_wshv_v##{name}:}\"" }
+              }
+            ]
+          }
+        }
+      end
+      code
+    end
+
+    rule(boolean_not: { subject: subtree(:subject) }) do
       {
         fun_call: {
           name: 'not',
@@ -14,7 +60,7 @@ module Wrapsher
       }
     end
 
-    rule(boolean_op:{ left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
+    rule(boolean_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
       fn = case operator.to_s
            when 'and' then 'and'
            when 'or' then 'or'
@@ -39,6 +85,33 @@ module Wrapsher
       fn.reduce([left, right]) do |args, fun|
         { fun_call: { name: fun, fun_args: [left, right] } }
       end
+    end
+
+    rule(primary_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
+      fn = case operator.to_s
+           when '+' then 'plus'
+           when '-' then 'minus'
+           end
+     {
+        fun_call: {
+          name: fn,
+          fun_args: [left, right]
+        }
+      }
+    end
+
+    rule(secondary_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
+      fn = case operator.to_s
+           when '*' then 'times'
+           when '/' then 'div'
+           when '%' then 'mod'
+           end
+      {
+        fun_call: {
+          name: fn,
+          fun_args: [left, right]
+        }
+      }
     end
 
     rule(postfix_chain: { receiver: subtree(:recv), calls: subtree(:chained_calls) }) do

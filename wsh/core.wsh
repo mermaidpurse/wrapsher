@@ -1,5 +1,17 @@
+type bool builtin
+type int builtin
+type string builtin
+
 bool new(type/bool t) {
   false
+}
+
+int as_int(bool p) {
+  if p {
+    1
+  } else {
+    0
+  }
 }
 
 bool not(bool p) {
@@ -10,9 +22,11 @@ bool not(bool p) {
   }
 }
 
-bool gt(int a, int b) {
+bool and(bool p, bool q) {
+  ip = p.as_int()
+  iq = q.as_int()
   shell '''
-  case "$((${_wshv_a#int:} > ${_wshv_b#int:}))" in 1)
+  case "$((${_wshv_ip#int:} && ${_wshv_iq#int:}))" in 1)
     _wsh_result=bool:true
   ;;
   *)
@@ -20,4 +34,84 @@ bool gt(int a, int b) {
   ;;
   esac
   '''
+}
+
+bool or(bool p, bool q) {
+  ip = p.as_int()
+  iq = q.as_int()
+  shell '''
+  case "$((${_wshv_ip#int:} || ${_wshv_iq#int:}))" in 1)
+    _wsh_result=bool:true
+  ;;
+  *)
+    _wsh_result=bool:false
+  ;;
+  esac
+  '''
+}
+
+bool eq(bool p, bool q) {
+  shell '''
+  case "${_wshv_p}" in "${_wshv_q}")
+    _wsh_result=bool:true
+  ;;
+  *)
+    _wsh_result=bool:false
+  ;;
+  esac
+  '''
+}
+
+int new(type/int t) {
+  0
+}
+
+bool _bool_arith_op(int a, int b, string op) {
+  shell '''
+  case "$((${_wshv_a#int:} ${_wshv_op#string:} ${_wshv_b#int:}))" in 1)
+    _wsh_result=bool:true
+  ;;
+  *)
+    _wsh_result=bool:false
+  ;;
+  esac
+  '''
+}
+
+int _arith_op(int a, int b, string op) {
+  shell '''
+  _wsh_result="int:$((${_wshv_a#int:} ${_wshv_op#string:} ${_wshv_b#int:}))"
+  '''
+}
+
+bool eq(int a, int b) {
+  _bool_arith_op(a, b, '==')
+}
+
+bool gt(int a, int b) {
+  _bool_arith_op(a, b, '>')
+}
+
+bool lt(int a, int b) {
+  _bool_arith_op(a, b, '<')
+}
+
+int plus(int a, int b) {
+  _arith_op(a, b, '+')
+}
+
+int minus(int a, int b) {
+  _arith_op(a, b, '-')
+}
+
+int times(int a, int b) {
+  _arith_op(a, b, '*')
+}
+
+int div(int a, int b) {
+  _arith_op(a, b, '/')
+}
+
+int mod(int a, int b) {
+  _arith_op(a, b, '%')
 }

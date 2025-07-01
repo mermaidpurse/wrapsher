@@ -51,8 +51,8 @@ _wsh_have_function_p() {
 _wsh_dispatch_nullary() {
   _wsh_have_function_p "${1}"
   case "${_wsh_have_function}" in
-    1) "$_wshf_${2}" || return 1 ;;
-    *) _wsh_error="error:No such nullary function '${2}' at $_wsh_line"
+    1) "_wshf_${1}" || return 1 ;;
+    *) _wsh_error="error:No such nullary function '${1}' at $_wsh_line"
        return 1 ;;
   esac
 }

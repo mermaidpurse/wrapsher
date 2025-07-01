@@ -1,0 +1,31 @@
+use module io
+
+bool test_bool_new() {
+  b = bool.new()
+  not b
+}
+
+bool test_bool_and() {
+  true and false
+}
+
+int main(array args) {
+  failures = 0
+  r = test_bool_new()
+  if r {
+    io.println('test_bool_new ok')
+  } else {
+    io.println('test_bool_new FAIL')
+    failures = failures + 1
+  }
+
+  r = test_bool_and()
+  if r {
+    io.println('test_bool_and ok')
+  } else {
+    io.println('test_bool_and FAIL')
+    failures = failures + 1
+  }
+
+  failures
+}

@@ -20,6 +20,12 @@ module Wrapsher
       end
     end
 
+    def find_test_functions(nodes)
+      nodes.select do |node|
+        node.is_a?(Wrapsher::Node::FunStatement) && node.signature.name.start_with?('test_')
+      end
+    end
+
     def wsh_preamble
       if @type == :program
         [Wrapsher::Parser.new.parsetext(File.read(File.join(__dir__, 'preamble.wsh')))].flatten
