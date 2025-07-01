@@ -1,0 +1,23 @@
+bool new(type/bool t) {
+  false
+}
+
+bool not(bool p) {
+  if p {
+    false
+  } else {
+    true
+  }
+}
+
+bool gt(int a, int b) {
+  shell '''
+  case "$((${_wshv_a#int:} > ${_wshv_b#int:}))" in 1)
+    _wsh_result=bool:true
+  ;;
+  *)
+    _wsh_result=bool:false
+  ;;
+  esac
+  '''
+}

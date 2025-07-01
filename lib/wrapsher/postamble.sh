@@ -1,17 +1,24 @@
 # wsh:postamble for scripts
 _wsh_arg0='type/array:builtin'
-_wshf_new_type_array
-_wsh_arg0="${_wsh_result}"
+_wsh_line="postamble.sh:4"
+_wsh_dispatch new "${_wsh_arg0}"
+_wsh_exitcode="$?"
+_wshv_argv="${_wsh_result}"
 for _wshi in "$@"
 do
   # lift shtring to string and push onto array
-  _wsh_arg0="string:${_wshi}"
-  _wshf_push_array
-  _wsh_arg0="${_wsh_result}"
+  _wsh_arg0="${_wshv_argv}"
+  _wsh_arg1="string:${_wshi}"
+  _wsh_line="postamble.sh:13"
+  _wsh_dispatch push "${_wsh_arg0}"|| return 1
+  _wshv_argv="${_wsh_result}"
 done
-_wsh_dispatch main array
+
+_wsh_arg0="${_wshv_argv}"
+_wsh_line="postamble.sh:19"
+# TODO: fix
+_wsh_dispatch main 'array:'
 _wsh_exitcode="$?"
-_wsh_check "${_wsh_result}" 'int' 'main()' || _wsh_exitcode=1
 
 # Handle uncaught exceptions
 if [[ "${_wsh_exitcode}" -ne 0 ]]

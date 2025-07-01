@@ -40,21 +40,34 @@ _wsh_check() {
   esac
 }
 
+# Should the function presence predicate be a function which sets
+# the signal variable, and eliminate this eval?
+# _wsh_have_function function_name [arg_type_qualifier]
+_wsh_have_function_p() {
+  eval "_wsh_have_function=\"\${_wshp_${1}${2:+_}${2}}\""
+}
+
+# _wsh_dipatch_null pred function_name
+_wsh_dispatch_nullary() {
+  _wsh_have_function_p "${1}"
+  case "${_wsh_have_function}" in
+    1) "$_wshf_${2}" || return 1 ;;
+    *) _wsh_error="error:No such nullary function '${2}' at $_wsh_line"
+       return 1 ;;
+  esac
+}
+
+# _wsh_dispatch function_name arg_type
 _wsh_dispatch() {
-  case "${2}" in
-    ?*) _wsh_typeof_underscore "${2}"
-        case "_wshp_${1}_${_wsh_type_underscore}" in
-          ?*) "_wshf_${1}_${_wsh_type_underscore}" || return 1 ;;
-          *)  case "_wshp_${1}_any" in
-                ?*) "_wshf_${1}_any" || return 1 ;;
-                *)  _wsh_error="error:No such function '${1}' for type '${2}' at $_wsh_line"
-                    return 1 ;;
-              esac ;;
-        esac ;;
-    *) case "_wshp_${1}" in
-         ?*) "_wshf_${1}" || return 1 ;;
-         *)  _wsh_error="error:No such nonary function '${1}' at $_wsh_line"
-             return 1 ;;
+  _wsh_typeof_underscore "${2}"
+  _wsh_have_function_p "${1}" "${_wsh_type_underscore}"
+  case "${_wsh_have_function}" in
+    1) "_wshf_${1}_${_wsh_type_underscore}" || return 1 ;;
+    *) _wsh_have_function_p "${1}" 'any'
+       case "${_wsh_have_function}" in
+         1) "_wshf_${1}_any" || return 1 ;;
+         *) _wsh_error="error:No such n-ary function '${1}(${2}, ...)' at $_wsh_line"
+            return 1 ;;
        esac ;;
   esac
 }

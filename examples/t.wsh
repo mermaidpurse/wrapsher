@@ -2,5 +2,9 @@ use module io
 
 int main(array args) {
   s = 'hello world'
-  c = io.println(s)
+  if 3 > 4 {
+     io.println(s)
+  } else {
+     io.println('sucka')
+  }
 }

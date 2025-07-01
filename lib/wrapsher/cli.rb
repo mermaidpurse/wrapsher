@@ -94,11 +94,14 @@ EOF
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
       if ! @options[:expr].empty?
         parsed = parser.parsetext(@options[:expr].join("\n") + "\n")
+        pp parsed
         puts JSON.pretty_generate(parsed)
       else
         args.each do |source|
+          ppoutput = source.delete_suffix('.wsh') + '.pp'
           output = source.delete_suffix('.wsh') + '.json'
           parsed = parser.parse(source)
+          File.open(ppoutput, 'w') { |fh| PP.pp(parsed, fh) }
           File.open(output, 'w') { |fh| fh.write(JSON.pretty_generate(parsed)) }
         end
       end

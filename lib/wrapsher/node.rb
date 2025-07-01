@@ -24,15 +24,67 @@ module Wrapsher
       def to_s
         if @rvalue.term?
           [
+            "_wsh_line='#{@filename}:#{@line}'",
             "_wshv_#{@name}=#{@rvalue.to_s}",
             "_wsh_result=\"${_wshv_#{@name}}\""
           ].join("\n  ")
         else
           [
+            "_wsh_line='#{@filename}:#{@line}'",
             @rvalue.to_s,
             "_wshv_#{@name}=\"${_wsh_result}\""
           ].join("\n  ")
         end
+      end
+    end
+
+    class BoolTerm < Node
+      attr_reader :line
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice.line_and_column[0]
+        @value = slice.to_s
+        @term = true
+      end
+
+      def to_s
+        "'bool:#{@value}'"
+      end
+    end
+
+    class Conditional < Node
+      attr_reader :line
+
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice[:keyword_if].line_and_column[0] if slice[:keyword_if].respond_to?(:line_and_column)
+        @else_line = slice[:keyword_else].line_and_column[0] if slice[:keyword_else] && slice[:keyword_else].respond_to?(:line_and_column)
+        @condition = Node.from_obj(slice[:condition], filename: @filename)
+        @then_body = Body.new(slice[:then], filename: @filename)
+        @else_body = Body.new(slice[:else], filename: @filename) if slice[:else]
+      end
+
+      def to_s
+        code = []
+        code << "_wsh_line='#{@filename}:#{@line}'" if @line
+        if @condition.term?
+          code << "_wsh_result=#{@condition.to_s}"
+        else
+          code << @condition.to_s
+        end
+        code << "_wsh_line='#{@filename}:#{@line}'"
+        code << "_wsh_check \"${_wsh_result}\" 'bool' 'if condition' || return 1"
+        code << 'case "${_wsh_result}" in bool:true)'
+        code << @then_body.to_s
+        code << ';;'
+        if @else_body
+          code << '*)'
+          code << "_wsh_line='#{@filename}:#{@else_line}'"
+          code << @else_body.to_s
+          code << ';;'
+        end
+        code << 'esac'
+        code.join("\n  ")
       end
     end
 
@@ -71,6 +123,21 @@ module Wrapsher
         _wshv_#{@name}='module/#{@name}:#{@filename}'
         _wsh_line='#{@filename}:#{@line}'
         EOF
+      end
+    end
+
+    class IntTerm < Node
+      attr_reader :line
+
+      def initialize(slice, filename: '-')
+        @filename = filename
+        @line = slice.line_and_column[0]
+        @value = slice.to_s
+        @term = true
+      end
+
+      def to_s
+        "'int:#{@value}'"
       end
     end
 
@@ -170,9 +237,17 @@ module Wrapsher
         @nodes = slices.map { |sl| Node.from_obj(sl, filename: @filename) }
       end
 
-      # TODO :This is where we keep track of variables and unset them at the end.
+      # TODO: This is where we keep track of variables and unset them at the end.
       def to_s
-        @nodes.map(&:to_s).join("\n  ")
+        code = []
+        @nodes.each do |node|
+          if node.term?
+            code << "_wsh_result=#{node.to_s}"
+          else
+            code << node.to_s
+          end
+        end
+        code.join("\n  ")
       end
     end
 
@@ -180,18 +255,21 @@ module Wrapsher
       def initialize(slice, filename: '-')
         @filename = filename
         @function_name = slice[:name].to_s
-        @line = slice[:name].line_and_column[0]
+        @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
         @function_args = [slice[:fun_args]].flatten.compact.map do |arg|
           Node.from_obj(arg, filename: @filename)
         end
       end
 
       def function_dispatch
+        code = []
+        code << "_wsh_line='#{@filename}:#{@line}'" if @line
         if @function_args.empty?
-          "  _wsh_dispatch '#{@function_name}' || return 1"
+          code << "_wsh_dispatch_nullary '#{@function_name}' || return 1"
         else
-          "  _wsh_dispatch '#{@function_name}' \"${_wsh_arg0}\" || return 1"
+          code << "_wsh_dispatch '#{@function_name}' \"${_wsh_arg0}\" || return 1"
         end
+        code.join("\n  ")
       end
 
       def to_s
@@ -262,7 +340,7 @@ module Wrapsher
       def to_s
         <<~EOF
         # use external command #{@external_command}
-        _wsh_line="{@filename}:#{@line}"
+        _wsh_line="#{@filename}:#{@line}"
         # _wsh_check_external '#{@external_command}' || return 1
         EOF
       end
@@ -308,12 +386,15 @@ module Wrapsher
 
     @@nodes = {
       assignment: Assignment,
+      bool_term: BoolTerm,
+      conditional: Conditional,
       module: Module,
       meta_field: MetaField,
       version: Version,
       type: Type,
       fun_call: FunCall,
       fun_statement: FunStatement,
+      int_term: IntTerm,
       shellcode: ShellCode,
       string_term: StringTerm,
       use_external: UseExternal,
@@ -331,6 +412,7 @@ module Wrapsher
 
     class << self
       def from_obj(obj, filename: nil)
+        PP.pp(obj, $stderr) unless obj.respond_to?(:keys)
         type = obj.keys.first
         if @@nodes.key?(type)
           @@nodes[type].new(obj[type], filename: filename)

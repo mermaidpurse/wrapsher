@@ -3,7 +3,7 @@ require 'logger'
 require 'parslet'
 require 'wrapsher'
 
-# TODO: conditionals, assignments and loops
+# TODO: loops, comments
 module Wrapsher
   class Syntax < Parslet::Parser
 
@@ -23,9 +23,13 @@ module Wrapsher
     rule(:arg_definitions)          { (arg_definition >> (comma >> arg_definition).repeat).maybe }
     rule(:arg_definition)           { word.as(:type) >> space >> word.as(:name) }
 
+
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe }
-    rule(:expression)               { assignment | postfix_chain | fun_call | shellcode_call | secondary_op | primary_op | term }
+    rule(:expression)               { assignment | postfix_chain | conditional | fun_call | shellcode_call | boolean_not | secondary_op | primary_op | comparison | term }
+
+    rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
+
     rule(:assignment)               { (word.as(:var) >> space? >> str('=') >> space? >> expression.as(:rvalue)).as(:assignment) }
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
     rule(:postfix)                  { str('.') >> fun_call }
@@ -35,13 +39,20 @@ module Wrapsher
 
     rule(:primary_op)               { (term.as(:left) >> space? >> primary_operator.as(:operator) >> space? >> expression.as(:right)).as(:primary_op) }
     rule(:secondary_op)             { (term.as(:left) >> space? >> secondary_operator.as(:operator) >> space? >> expression.as(:right)).as(:secondary_op) }
+    rule(:comparison)               { (term.as(:left) >> space? >> comparison_operator.as(:operator) >> space? >> expression.as(:right)).as(:comparison) }
+    rule(:boolean_op)               { (term.as(:left) >> space? >> boolean_operator.as(:operator) >> space? >> expression.as(:right)).as(:boolean_op) }
+    rule(:boolean_not)              { (((str('not') >> space >> space?) | str('!') >> space?) >> expression.as(:subject)).as(:boolean_not) }
+
+    rule(:term)                     { lparen >> expression.as(:group) >> rparen | int_term | bool_term | string_term | var_ref }
+    rule(:int_term)                 { (str('-').maybe >> match('[0-9]').repeat(1)).as(:int_term) >> space? }
+    rule(:bool_term)                { (str('true') | str('false')).as(:bool_term) >> space? }
+    rule(:string_term)              { string.as(:string_term) >> space? }
+    rule(:var_ref)                  { word.as(:var_ref) >> space? }
 
     rule(:primary_operator)         { str('+') | str('-') }
     rule(:secondary_operator)       { str('*') | str('/') | str('%') }
-    rule(:term)                     { lparen >> expression.as(:group) >> rparen | lit_int | var_ref | string_term }
-    rule(:lit_int)                  { match('[0-9]').repeat(1).as(:lit_int) >> space? }
-    rule(:var_ref)                  { word.as(:var_ref) >> space? }
-    rule(:string_term)              { string.as(:string_term) >> space? }
+    rule(:comparison_operator)      { str('==') | str('!=') | str('<') | str('>') | str('<=') | str('>=') }
+    rule(:boolean_operator)         { str('and') | str('or') | str('xor') }
 
     rule(:version)                  { match('[0-9.]').repeat(1) }
     rule(:string)                   { triple_quoted | single_quoted }

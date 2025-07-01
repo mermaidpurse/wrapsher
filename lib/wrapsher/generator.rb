@@ -20,6 +20,14 @@ module Wrapsher
       end
     end
 
+    def wsh_preamble
+      if @type == :program
+        [Wrapsher::Parser.new.parsetext(File.read(File.join(__dir__, 'preamble.wsh')))].flatten
+      else
+        []
+      end
+    end
+
     def postamble
       if @type == :program
         File.read(File.join(__dir__, 'postamble.sh'))
@@ -29,11 +37,8 @@ module Wrapsher
     end
 
     def generate(program, filename: '-')
-      case program
-      when Array
-        nodes = program.map { |obj| Wrapsher::Node.from_obj(obj, filename: filename) }
-      when Hash
-        nodes = [Wrapsher::Node.from_obj(program, filename: filename)]
+      nodes = (wsh_preamble + [program].flatten).map do |obj|
+        Wrapsher::Node.from_obj(obj, filename: filename)
       end
 
       [
