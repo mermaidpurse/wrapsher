@@ -1,6 +1,44 @@
+type type builtin
+type ref builtin
 type bool builtin
 type int builtin
 type string builtin
+type list builtin
+
+type typeof(any i) {
+  shell '''
+  _wsh_typeof "${_wshv_i}"
+  _wsh_result="type/${_wsh_typeof}"
+  '''
+}
+
+ref new(type/ref t) {
+  ref.create(bool.new())
+}
+  
+ref ref(any i) {
+  refid = refid + 1
+  shell '''
+  _wsh_error="error:Couldn't create reference for value <<${_wshv_i}>>"
+  read "_wshr_${_wshv_refid#int:}" <<EOF || return 1
+"${_wshv_i}"
+EOF
+  _wsh_error=error:
+  '''
+  refid
+}
+
+any deref(ref r) {
+  shell '''
+  eval "_wsh_result=\"\${_wshr_${_wshv_r#ref:}}\""
+  '''
+}
+
+bool destroy(ref r) {
+  shell '''
+  unset "_wshr_${_wshv_r#ref:}"
+  '''
+}
 
 bool new(type/bool t) {
   false
@@ -114,4 +152,25 @@ int div(int a, int b) {
 
 int mod(int a, int b) {
   _arith_op(a, b, '%')
+}
+
+string new(type/string t) {
+  ''
+}
+
+list new(type/list t) {
+  shell '''
+  _wsh_result=list:
+  '''
+}
+
+list push(list l, any i) {
+  r = i.ref()
+  shell '''
+  case "${_wshv_l}" in list:)
+    "_wsh_result="list:${_wshv_r}"
+  ;; *)
+    "_wsh_result="${_wshv_l} ${_wshv_r}"
+  esac
+  '''
 }

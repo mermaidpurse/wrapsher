@@ -1,5 +1,0 @@
-use module io
-
-int main(int a, int b) {
-  io.printf("%d", a + b)
-}

@@ -1,5 +1,5 @@
 use module io
 
-int main(array args) {
+int main(list args) {
   io.println('hello world')
 }

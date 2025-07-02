@@ -28,9 +28,7 @@ int println(module/io m, string s)
 
 Conceptually, something similar to this happens:
 ```
-type module/io string
-
-io = _from_string(module/io, 'opaque value')
+io = _as_moduleio(module/io, 'opaque value')
 ```
 
 ## Implementation of Types
@@ -54,56 +52,23 @@ There is no such thing as nullity in Wrapsher: all types have a
 zero-value. You will need to use other mechanisms for optional
 values.
 
-When you do `type vector array`, conceptually this happens:
+When you do `type vector list`, conceptually this happens:
 
 ```
-type type/vector string
+type type/vector something
 
 vector = _from_string(type/vector, 'opaque value')
 
-vector _as_vector(array a) {
+vector _as_vector(list l) {
   ...
 }
 
-array _as_array(vector v) {
+list _as_list(vector v) {
   ...
 }
 ```
 
 You should (must?) also implement a `new` function to create a
 zero-value instance of the new type, and should create guarded
-converters if applicable.
+casts if applicable.
 
-## Internal type implementations
-
-Since Wrapsher is running in a POSIX shell, it uses a simple
-tagged value scheme for tracking type information. Each value
-is tagged like this:
-
-`<type>:<shtringvalue>`
-
-Since only strings are available, it means that something more
-complicated is required for collection types `map` and `array`.
-
-These are actually reference-based, but the reference mechanism
-is internal to Wrapsher and will probably not be exposed. References
-are cleaned up when the collections are modified. Internally,
-a three-member array of strings looks something like this:
-
-`array:ref:1000 ref:1001 ref:1002`
-
-When you access an array member, it is dereferenced (it's a reference
-to a shell variable out there named something like `_wshr_1001`.
-
-References are never shared; this is not subject to garbage collection
-problems. This is only a mechanism to ease handling of data that has
-to occur in shell strings.
-
-When a type is wrapped by declaring a new type, it gets prepended
-to the value. So after we've created our vector, it'll internally
-look something like:
-
-`vector:array:ref:1000 ref:1001 ref:1002`
-
-All `_as_vector(a)` really does is strip the `vector` part,
-exposing the underlying array.

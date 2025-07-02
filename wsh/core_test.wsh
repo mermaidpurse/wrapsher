@@ -6,10 +6,10 @@ bool test_bool_new() {
 }
 
 bool test_bool_and() {
-  true and false
+  true and true
 }
 
-int main(array args) {
+int main(list args) {
   failures = 0
   r = test_bool_new()
   if r {

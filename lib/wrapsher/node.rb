@@ -73,7 +73,7 @@ module Wrapsher
           code << @condition.to_s
         end
         code << "_wsh_line='#{@filename}:#{@line}'"
-        code << "_wsh_check \"${_wsh_result}\" 'bool' 'if condition' || return 1"
+        code << "_wsh_assert \"${_wsh_result}\" 'bool' 'if condition' || return 1"
         code << 'case "${_wsh_result}" in bool:true)'
         code << @then_body.to_s
         code << ';;'
@@ -207,13 +207,13 @@ module Wrapsher
             "_wsh_line='#{@filename}:#{arg.line}'",
             "_wshv_#{arg.name}=\"${_wsh_arg#{i}}\"",
             "unset _wsh_arg#{i}",
-            "_wsh_check \"${_wshv_#{arg.name}}\" '#{arg.type}' '#{arg.name}' || return 1",
+            "_wsh_assert \"${_wshv_#{arg.name}}\" '#{arg.type}' '#{arg.name}' || return 1",
           ].join("\n  ")
         end.join("\n  ")
       end
 
       def check_return
-        "_wsh_check \"${_wsh_result}\" '#{type}' '#{name}()' || return 1"
+        "_wsh_assert \"${_wsh_result}\" '#{type}' '#{name}()' || return 1"
       end
 
       def function_name(nametype = :definition)

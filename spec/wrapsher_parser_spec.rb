@@ -7,7 +7,7 @@ RSpec.describe Wrapsher::Parser do
     module ex
     meta author 'dev@mermaidpurse.org'
     use version 0
-    type vector array
+    type vector list
     EOF
     parser = Wrapsher::Parser.new()
   program = stringify(parser.parsetext(source))
@@ -15,7 +15,7 @@ RSpec.describe Wrapsher::Parser do
           { module: 'ex' },
           { meta_field: 'author', meta_data: { single_quoted: 'dev@mermaidpurse.org' } },
           { version: '0' },
-          { type: 'vector', storage_type: 'array' }
+          { type: 'vector', storage_type: 'list' }
         ])
   end
 

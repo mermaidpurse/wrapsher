@@ -1,6 +1,6 @@
 use module io
 
-int main(array args) {
+int main(list args) {
   s = 'hello world'
   if 3 > 4 {
      io.println(s)

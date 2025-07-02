@@ -1,12 +1,12 @@
 # wsh:postamble for scripts
-_wsh_arg0='type/array:builtin'
+_wsh_arg0='type/list:builtin'
 _wsh_line="postamble.sh:4"
 _wsh_dispatch new "${_wsh_arg0}"
 _wsh_exitcode="$?"
 _wshv_argv="${_wsh_result}"
 for _wshi in "$@"
 do
-  # lift shtring to string and push onto array
+  # lift shtring to string and push onto list argv
   _wsh_arg0="${_wshv_argv}"
   _wsh_arg1="string:${_wshi}"
   _wsh_line="postamble.sh:13"
@@ -16,8 +16,7 @@ done
 
 _wsh_arg0="${_wshv_argv}"
 _wsh_line="postamble.sh:19"
-# TODO: fix
-_wsh_dispatch main 'array:'
+_wsh_dispatch main "${_wsh_arg0}"
 _wsh_exitcode="$?"
 
 # Handle uncaught exceptions
