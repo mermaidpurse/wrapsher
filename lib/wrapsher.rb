@@ -7,6 +7,7 @@ require_relative 'wrapsher/node'
 require_relative 'wrapsher/syntax'
 require_relative 'wrapsher/transform'
 require_relative 'wrapsher/generator'
+require_relative 'wrapsher/program_tables'
 require_relative 'wrapsher/version'
 
 module Wrapsher

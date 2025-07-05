@@ -5,50 +5,24 @@ require 'pry'
 module Wrapsher
   class Transform < Parslet::Transform
 
+    rule(subscript:{ receiver: subtree(:receiver), index: subtree(:index) }) do
+      {
+        fun_call: {
+          name: 'at',
+          fun_args: [receiver, index]
+        }
+      }
+    end
+
     rule(type: { name: simple(:name), store_type: simple(:store_type) }) do
-      code = [
+      [
         {
           type: {
             name: name,
             store_type: store_type,
           }
-        },
-        {
-          shellcode: { single_quoted: "_wshv_#{name}='type/#{name}:#{store_type}'" }
         }
       ]
-      if store_type.to_s != 'builtin'
-        # Create unsafe casts
-        code << {
-          fun_statement: {
-            signature: {
-              type: name.to_s,
-              name: "_as_#{name}",
-              arg_definitions: [{ type: store_type, name: 'v' }]
-            },
-            body: [
-              {
-                shellcode: { single_quoted: "_wsh_result='#{name}:${_wshv_v}'" }
-              }
-            ]
-          }
-        }
-        code << {
-          fun_statement: {
-            signature: {
-              type: store_type.to_s,
-              name: "_as_#{store_type}",
-              arg_definitions: [{ type: name, name: 'v' }]
-            },
-            body: [
-              {
-                shellcode: { single_quoted: "_wsh_result=\"${_wshv_v##{name}:}\"" }
-              }
-            ]
-          }
-        }
-      end
-      code
     end
 
     rule(boolean_not: { subject: subtree(:subject) }) do
@@ -87,7 +61,7 @@ module Wrapsher
       end
     end
 
-    rule(primary_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
+    rule(additive_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
       fn = case operator.to_s
            when '+' then 'plus'
            when '-' then 'minus'
@@ -100,7 +74,7 @@ module Wrapsher
       }
     end
 
-    rule(secondary_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
+    rule(multiplicative_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
       fn = case operator.to_s
            when '*' then 'times'
            when '/' then 'div'

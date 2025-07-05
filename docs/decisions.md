@@ -1,4 +1,117 @@
-# `continue`, `break` and `return`
+# Decisions
+
+These are a collection of design decisions that have been made
+or need to be made, and their rationales.
+
+## Overall Design
+
+Here's some things that aren't important/things wrapsher shouldn't do:
+
+- Readability of resulting shell scripts is not terribly important
+  (you shouldn't arbitrarily make things cryptic unless it means
+  harming the language; e.g., there's no good reason to allow
+  variables that aren't valid sh variables), but while the shell
+  script should pass its tests and maybe `shellcheck` (perhaps with
+  certain style lints turned off) it's not terribly important that the
+  result is a "good" shell script.
+- The compiler/transpiler itself should produce a standalone tool and
+  shouldn't be needed after transpiling/compilation but it's not important
+  that it be self-hosting or anything like that. Wrapsher programs are
+  likely to be pretty slow at text manipulation, unless we elegantly capture
+  `sed`, `awk` and similar capabilities for parsing.[^3]
+- It's definitely not important that it be a good shell or a shell at all,
+  or be used to implement a shell. A REPL would be nice as tooling (this
+
+[^3]: As a principle of design, Wrapsher would actually discourage the arbitrary
+  composition and use of external commands. You should be able to count on and
+  use a library interface rather than wrangle options or worry about what version
+  of `jq` is installed. Wrapsher will try to make this easy, so if it does need
+  to use `sed` for something, it will do all the figuring out for you, and you will
+  interact with a Wrapsher interface, not `sed`'s. That said, something like 
+  `system()` will be provided.
+
+Things I like in various languages that would be nice to incorporate (someday?):
+
+- Set/array/list comprehensions
+
+Some ideas I had that don't seem feasible:
+
+- Pipelines. I do like them in Powershell, I guess I like them in
+  Elixir but they seem complicated and I think they actually result
+  in Elixir being harder to read for a newcomer.
+
+## Tools
+
+Tools to implement:
+- LSP (`wrapsher lsp`) with syntax highlighting
+- Syntax highlighting for github/other tools (regex-based)
+- REPL (probably via `wrapsher` module)
+- Automatic formatting
+- Linting
+
+## Path to Self-hosting
+
+It would be nice to implement more and more of Wrapsher in Wrapsher
+and eventually self-host. Here are some steps:
+
+- Make `wrapsher.wsh` the master driver with subcommands implemented
+  `git`-style (e.g. `wrapsher compile` can be implemented by
+  `wrapsher-compile`, which is a Ruby program.
+- Create a `wrapsher` module and make `wrapsher-compiler` an
+  external dependency driven by the module. Implement `wrapsher-compile`
+  in Wrapsher.
+- Separate the parser into `wrapsher-parser`, `wrapsher-transformer` and
+  use it to implement the parser in the `wrapsher` module. Make
+  `wrapsher-generator` its own tool to do codegen.
+- Implement REPL, LSP and other tooling in Wrapsher.
+- Implement code generation in Wrapsher, replacing `wrapsher-generator`
+- Implement parse tree transformation in Wrapsher, replacing `wrapsher-transformer`
+- Finally, implement a PEG parser in Wrapsher (or use an external one
+  that emits, say, a JSON AST) and rewrite the grammar, removing Ruby.
+
+## Variable Scope
+
+We need variable scopes because as things are, all variables
+are global and they can be stepped on. I'd like to make sure
+variables are never shadowed, so:
+
+Global variables can't be shadowed (e.g., it's an error to
+put one in a function signature and when you assign it
+in a function, you're assigning to the global).
+
+Local variables can't be shadowed because they exist in
+the function namespace somehow (maybe as simple as
+`_wshv_function_type_var`). But then you have to have
+some way for the compiler to detect if there's already a
+global. Actualyl that has to be done at run time. So variable
+references probably need an internal function like function
+dispatching does.
+
+Maybe we have to look real hard at whether POSIX sh offers
+some kind of variable scope. I didn't see `local`.
+
+## Shell Libraries
+
+Some tools (e.g. CircleCI orbs) enforce a certain style
+where you're supposed to provide a library of shell functions
+containing callbacks which are invoked.
+
+To support this use case, we should introduce a new keyword `lower`
+which exposes the function (or item?) to the shell in the typical
+way. In other words, `lower bool build(buildspec bs)` would create a
+shell function actually named `build()` that lifts its shell arguments
+to strings, then calls a wrapper function which converts the arguments
+from strings to the required type (using in our example
+`s.as_buildspec()`, runs the real wrapsher function,
+then converts the return type to a string using `to_string()`
+and prints it.
+
+We should explicitly discourage this usage unless it's absolutely
+necessary: the whole reason for wrapsher's existence is that
+you don't have to write shell scripts, so it should only be used
+for cases where you have no choice.
+
+## `continue`, `break` and `return`
 
 I feel like these are partly redundant. `break` and `return`
 are basically the same thing, aren't they? Can I make `break`
@@ -9,11 +122,20 @@ of these different scopes?
 
 I think I don't want `return` but I need to document how to return.
 
-# Variadic functions?
+## Variadic functions?
 
 - No variadic functions (difficult, inconsistent, requires splatting)
 
-# Elsif? Switch-case?
+## String interpolation?
+
+I've reserved double-quoted syntax for string interpolation as a maybe.
+I'm not sure if it's necessary or desirable. It complicates things quite
+a bit and ends up having this "little language" problem that I don't
+like regexes for, with `#{ }` or stuff. Maybe something like fstrings,
+though again, is that really better than `sprintf`? Or something even
+heavier-weight like mustache?
+
+## Elsif? Switch-case?
 
 Right now you have to do <code>if _cond_ { } else { if _cond_ { ... }
 else { ... } }</code to get multiple case semantics. Nesting the blocks
@@ -25,7 +147,7 @@ block optional, so `else if` works (I like this better than `elsif`, `elif`).
 
 I don't really like switch-case, too much syntax.
 
-# Unions or union types?
+## Interfaces, Unions or union types?
 
 Right now if I want to make a function that accepts more than one
 type of second argument, I need to make it accept `any` and then
@@ -89,9 +211,13 @@ float add(float f, can_float n) {
 }
 ```
 
-That could tie nicely into structs
+That could tie nicely into structs.
 
-# "First class" structs?
+I like the idea that interfaces are automatically implemented. Then again,
+I have runtime type checking all over the place so if the type doesn't implement
+the actual function there will be a failure. Hm.
+
+## "First class" structs?
 
 You can manually implement your own struct, but this seems to be such
 a common case that maybe something like `type foo struct [id: uuid, name: string]`
@@ -182,43 +308,3 @@ but they are coming from different modules?
 `use module [version]` is that a thing? Should it be separate, like
 in a Wrapsherfile or something that controls compilation? Bundle-style/Go-style
 constraints and lockfiles?
-## Design Decisions
-
-The [Decisions](./decisions.md) document captures this in more detail,
-but 
-
-Here's some things that aren't important/things it shouldn't do:
-
-- Readability of resulting shell scripts is not terribly important
-  (you shouldn't arbitrarily make things cryptic unless it means
-  harming the language; e.g., there's no good reason to allow
-  variables that aren't valid sh variables), but while the shell
-  script should pass its tests and maybe `shellcheck` (perhaps with
-  certain style lints turned off) it's not terribly important that the
-  result is a "good" shell script.
-- The compiler/transpiler itself should produce a standalone tool and
-  shouldn't be needed after transpiling/compilation but it's not important
-  that it be self-hosting or anything like that. Wrapsher programs are
-  likely to be pretty slow at text manipulation, unless we elegantly capture
-  `sed`, `awk` and similar capabilities for parsing.[^3]
-- It's definitely not important that it be a good shell or a shell at all,
-  or be used to implement a shell. A REPL would be nice.
-
-[^3]: As a principle of design, Wrapsher would actually discourage the arbitrary
-  composition and use of external commands. You should be able to count on and
-  use a library interface rather than wrangle options or worry about what version
-  of `jq` is installed. Wrapsher will try to make this easy, so if it does need
-  to use `sed` for something, it will do all the figuring out for you, and you will
-  interact with a Wrapsher interface, not `sed`'s. That said, something like 
-  `system()` will be provided.
-
-Things I like in various languages that would be nice to incorporate (someday?):
-
-- Set/array/list comprehensions
-
-Some ideas I had that don't seem feasible:
-
-- Pipelines. I do like them in Powershell, I guess I like them in
-  Elixir but they seem complicated and I think they actually result
-  in Elixir being harder to read for a newcomer.
-

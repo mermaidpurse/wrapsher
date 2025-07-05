@@ -9,6 +9,43 @@ bool test_bool_and() {
   true and true
 }
 
+bool test_string_eq_same() {
+  'same' == 'same'
+}
+
+bool test_string_times_1() {
+  'one' == 'one' * 1
+}
+
+bool test_string_times_2() {
+  'oneone' == 'one' * 2
+}
+
+bool test_string_times_3() {
+  'oneoneone' == 'one' * 3
+}
+
+bool test_string_length() {
+   l = 'one'.length()
+   l == 3
+}
+
+bool test_string_tail() {
+  'ne' == tail('one')
+}
+
+bool test_string_head() {
+  'o' == head('one')
+}
+
+bool test_string_at_0() {
+  'o' == 'one'.at(0)
+}
+
+bool test_string_at_1() {
+  'n' == 'one'.at(1)
+}
+
 int main(list args) {
   failures = 0
   r = test_bool_new()
@@ -24,6 +61,78 @@ int main(list args) {
     io.println('test_bool_and ok')
   } else {
     io.println('test_bool_and FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_eq_same()
+  if r {
+    io.println('test_string_eq_same ok')
+  } else {
+    io.println('test_string_eq_same FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_times_1()
+  if r {
+    io.println('test_string_times_1 ok')
+  } else {
+    io.println('test_string_times_1 FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_times_2()
+  if r {
+    io.println('test_string_times_2 ok')
+  } else {
+    io.println('test_string_times_2 FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_times_3()
+  if r {
+    io.println('test_string_times_3 ok')
+  } else {
+    io.println('test_string_times_3 FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_length()
+  if r {
+    io.println('test_string_length ok')
+  } else {
+    io.println('test_string_length FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_tail()
+  if r {
+    io.println('test_string_tail ok')
+  } else {
+    io.println('test_string_tail FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_head()
+  if r {
+    io.println('test_string_head ok')
+  } else {
+    io.println('test_string_head FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_at_0()
+  if r {
+    io.println('test_string_at_0 ok')
+  } else {
+    io.println('test_string_at_0 FAIL')
+    failures = failures + 1
+  }
+
+  r = test_string_at_1()
+  if r {
+    io.println('test_string_at_1 ok')
+  } else {
+    io.println('test_string_at_1 FAIL')
     failures = failures + 1
   }
 

@@ -5,6 +5,6 @@ int main(list args) {
   if 3 > 4 {
      io.println(s)
   } else {
-     io.println('sucka')
+     io.println(s[0])
   }
 }

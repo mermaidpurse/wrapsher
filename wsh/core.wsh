@@ -1,9 +1,12 @@
+module core
+use global refid 1000
+
 type type builtin
 type ref builtin
 type bool builtin
 type int builtin
 type string builtin
-type list builtin
+type reflist builtin
 
 type typeof(any i) {
   shell '''
@@ -13,35 +16,58 @@ type typeof(any i) {
 }
 
 ref new(type/ref t) {
-  ref.create(bool.new())
+  bool.new().ref()
 }
-  
+
 ref ref(any i) {
   refid = refid + 1
   shell '''
+  _wsh_get_local _reflist _wshrl
   _wsh_error="error:Couldn't create reference for value <<${_wshv_i}>>"
-  read "_wshr_${_wshv_refid#int:}" <<EOF || return 1
-"${_wshv_i}"
-EOF
+  _wsh_get_global refid _wshi
+  _wsh_get_local i _wshr_${_wshi}
   _wsh_error=error:
+  # Need to add to variable cleanup list
+  _wsh_set_local r "ref:${_wshi}"
   '''
-  refid
+  _reflist.push(r)
+  r
 }
 
 any deref(ref r) {
   shell '''
-  eval "_wsh_result=\"\${_wshr_${_wshv_r#ref:}}\""
+  _wsh_get_local r _wshi
+  eval "_wsh_result=\"\${_wshr_${_wshi#ref:}}\""
   '''
 }
 
 bool destroy(ref r) {
   shell '''
-  unset "_wshr_${_wshv_r#ref:}"
+  _wsh_get_local r _wshi
+  unset "_wshr_${_wshi#ref:}"
+  _wsh_result=bool:true
+  '''
+}
+
+bool eq(ref r, ref o) {
+  shell '''
+  _wsh_get_local r _wshi
+  _wsh_get_local o _wshj
+  case "${_wshi}" in "${_wshj}")
+    _wsh_result=bool:true
+  ;; *)
+    _wsh_result=bool:false
+  ;;
+  esac
   '''
 }
 
 bool new(type/bool t) {
   false
+}
+
+bool as_bool(bool p) {
+  p
 }
 
 int as_int(bool p) {
@@ -61,36 +87,18 @@ bool not(bool p) {
 }
 
 bool and(bool p, bool q) {
-  ip = p.as_int()
-  iq = q.as_int()
-  shell '''
-  case "$((${_wshv_ip#int:} && ${_wshv_iq#int:}))" in 1)
-    _wsh_result=bool:true
-  ;;
-  *)
-    _wsh_result=bool:false
-  ;;
-  esac
-  '''
+  _bool_arith_op(p.as_int(), q.as_int(), '&&')
 }
 
 bool or(bool p, bool q) {
-  ip = p.as_int()
-  iq = q.as_int()
-  shell '''
-  case "$((${_wshv_ip#int:} || ${_wshv_iq#int:}))" in 1)
-    _wsh_result=bool:true
-  ;;
-  *)
-    _wsh_result=bool:false
-  ;;
-  esac
-  '''
+  _bool_arith_op(p.as_int(), q.as_int(), '||')
 }
 
 bool eq(bool p, bool q) {
   shell '''
-  case "${_wshv_p}" in "${_wshv_q}")
+  _wsh_get_local p _wshi
+  _wsh_get_local q _wshj
+  case "${_wshi}" in "${_wshj}")
     _wsh_result=bool:true
   ;;
   *)
@@ -104,9 +112,16 @@ int new(type/int t) {
   0
 }
 
+int as_int(int i) {
+  i
+}
+
 bool _bool_arith_op(int a, int b, string op) {
   shell '''
-  case "$((${_wshv_a#int:} ${_wshv_op#string:} ${_wshv_b#int:}))" in 1)
+  _wsh_get_local a _wshi
+  _wsh_get_local b _wshj
+  _wsh_get_local op _wshk
+  case "$((${_wshi#int:} ${_wshk#string:} ${_wshj#int:}))" in 1)
     _wsh_result=bool:true
   ;;
   *)
@@ -118,7 +133,10 @@ bool _bool_arith_op(int a, int b, string op) {
 
 int _arith_op(int a, int b, string op) {
   shell '''
-  _wsh_result="int:$((${_wshv_a#int:} ${_wshv_op#string:} ${_wshv_b#int:}))"
+  _wsh_get_local a _wshi
+  _wsh_get_local b _wshj
+  _wsh_get_local op _wshk
+  _wsh_result="int:$((${_wshi#int:} ${_wshk#string:} ${_wshj#int:}))"
   '''
 }
 
@@ -154,14 +172,193 @@ int mod(int a, int b) {
   _arith_op(a, b, '%')
 }
 
+string to_string(int i) {
+  shell '''
+  _wsh_get_local i _wshi
+  _wsh_result="string:${_wshi#int:}"
+  '''
+}
+
 string new(type/string t) {
   ''
+}
+
+string as_string(string s) {
+  s
+}
+
+bool eq(string s, string o) {
+  shell '''
+  _wsh_get_local o _wshi
+  _wsh_get_local s _wshj
+  case "${_wshi}" in "${_wshj}")
+    _wsh_result='bool:true'
+  ;; *)
+    _wsh_result='bool:false'
+  ;;
+  esac
+  '''
+}
+
+string plus(string s, string o) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local o _wshj
+  _wsh_result="${_wshi}${_wshj#string:}"
+  '''
+}
+
+string times(string s, int i) {
+  if i > 1 {
+    s + times(s, i - 1)
+  } else {
+    s
+  }
+}
+
+int length(string s) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wshj="${_wshi#string:}"
+  _wsh_result="int:${#_wshj}"
+  '''
+}
+
+string head(string s) {
+  len = s.length()
+  tail_len = len - 1
+  pat = '?' * tail_len
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local pat _wshj
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  _wsh_result="string:${_wshi%${_wshj}}"
+  '''
+}
+
+string tail(string s) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wshi="${_wshi#string:}"
+  _wsh_result="string:${_wshi#?}"
+  '''
+}
+
+string at(string s, int i) {
+  if i > 0 {
+    at(s.tail(), i - 1)
+  } else {
+    s.head()
+  }
+}
+
+reflist new(type/reflist t) {
+  shell '''
+  _wsh_result=reflist:
+  '''
+}
+
+reflist push(reflist rl, ref r) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local r _wshj
+  case "${_wshi}" in reflist:)
+    _wsh_result="${_wshi}${_wshj}"
+  ;; *)
+    _wsh_result="${_wshi} ${_wshj}"
+  ;;
+  esac
+  '''
+}
+
+reflist head(reflist rl) {
+  shell '''
+  _wsh_get_local rl _wshi
+  case "${_wshi}" in reflist:)
+    _wsh_error="error:attempted to take head() of []"
+    return 1
+  ;; *)
+    _wshj="${_wshi#reflist:}"
+    _wsh_result="${_wshj%% *}"
+  ;;
+  esac
+  '''
+}
+
+reflist tail(reflist rl) {
+  shell '''
+  _wsh_get_local rl _wshi
+  case "${_wshi}" in reflist:)
+    _wsh_error="error:attempted to take tail() of []"
+    return 1
+  ;; *)
+    _wshj="${_wshi#reflist:}"
+    _wshk="${_wshj#* }"
+    case "${_wshk}" in "${_wshj}")
+      _wsh_result=reflist:
+    ;; *)
+      _wsh_result=reflist:"${_wshk}"
+    ;;
+    esac
+  ;;
+  esac
+  '''
+}
+
+reflist minus(reflist rl, reflist o) {
+  if o.length() > 0 {
+    rl.delete(o.head()).minus(o.tail())
+  } else {
+    rl
+  }
+}
+
+reflist delete(reflist rl, ref r) {
+  _delete3(rl, r, reflist.new())
+}
+
+reflist _delete3(reflist rl, ref r, reflist out) {
+  if rl.length() > 0 {
+    if rl.head() == r {
+      _delete3(rl.tail(), r, out)
+    } else {
+      _delete3(rl.tail(), r, out.push(r))
+    }
+  } else {
+    out
+  }
+}
+
+reflist set_push(reflist rl, ref r) {
+  if !rl.has(r) {
+    rl.push(r)
+  } else {
+    rl
+  }
+}
+
+bool has(reflist rl, ref r) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local r _wshj
+  case "${_wshi#reflist:}" in *"${_wshj}"*)
+    _wsh_result=bool:true
+  ;; *)
+    _wsh_result=bool:false
+  ;;
+  esac
+  '''
 }
 
 list new(type/list t) {
   shell '''
   _wsh_result=list:
   '''
+}
+
+list as_list(list l) {
+  l
 }
 
 list push(list l, any i) {

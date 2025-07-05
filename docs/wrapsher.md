@@ -341,15 +341,16 @@ Functions:
 
 ###### `string`
 
-Strings are single-quoted in single quotation marks (with internal
-quotation mark characters `'` escaped with a backslash `\`) is the
-literal value of of the string.
+Strings literals can be single-quoted in single quotation marks (with
+internal quotation mark characters `'` escaped with a backslash `\`)
+is the literal value of of the string.
 
-**TODO:** Note that it is an open question whether Wrapsher will
-provide string interpolation in double-quoted stringhs or not--it
-isn't a priority. You will need to construct strings by hand using the
-`+` operator to incorporate variable values for now, and/or use
-the **io** module's `sprintf` function.
+The other syntax that is supported are triple-quoted strings, which
+begin and end with three quotation marks `'''`.
+
+Note that there are no such things as double-quoted strings in
+Wrapsher, nor variable interpolation. There are also (currently)
+no escape sequences other than `\\` and `\'` **UNIMPLEMENTED**.
 
 Strings can be subscripted with the `[` operator as this is syntactic
 sugar for `string at(string s, any i)`.
@@ -527,7 +528,7 @@ The folllowing modules comprise the standard library:
 
 - [**core**](wsh/core.wsh) - Core functions and fundamental types--always included
 - [**io**](wsh/io.wsh)     - Basic I/O based on `echo` and `printf`
-- [**math**](wsh/math.wsh) - Floats and math functions based on `bc`
-- [**http**](wsh/http.wsh) - HTTP communication based on `curl`
-- [**sys**](wsh/sys.wsh)   - System shells and platform
-- [**test**](wsh/test.wsh) - Test framework
+- [**test**](wsh/test.wsh) - Test framework **UNIMPLMENTED**
+- [**math**](wsh/math.wsh) - Floats and math functions based on `bc` **UNIMPLEMENTED**
+- [**http**](wsh/http.wsh) - HTTP communication based on `curl` **UNIMPLEMENTED**
+- [**sys**](wsh/sys.wsh)   - System shells and platform **UNIMPLEMENTED**
