@@ -24,7 +24,7 @@ module Wrapsher
           line,
           @rvalue.to_s,
           tables.globals[@name] ? "_wshg_#{@name}=\"${_wsh_result}\"" : "_wsh_set_local #{@name} \"${_wsh_result}\""
-        ].join("\n"  )
+        ].join("\n  ")
       end
     end
 
@@ -148,15 +148,12 @@ module Wrapsher
           "# #{@signature.summary}",
           "#{@signature.function_name(:presence)}=1",
           "#{@signature.function_name(:definition)}() {",
-          "  _wsh_error='error:'; _wsh_result='null:'; _wsh_line='#{@filename}:#{@line}'",
-          "  : $((_wsh_frame++))",
-          "  _wsh_set_local _reflist reflist:",
+          line,
           "  #{@signature.argument_binding}",
           "  # function body",
-          "  #{@body.to_s}",
+          "  #{@body}",
           "  # end function body",
           "  #{@signature.check_return}",
-          "  : $((_wsh_frame--))",
           "}"
         ].join("\n")
       end
@@ -250,7 +247,6 @@ module Wrapsher
         @nodes = slices.map { |sl| Node.from_obj(sl, tables: tables) }
       end
 
-      # TODO: This is where we keep track of variables and unset them at the end.
       def to_s
         code = []
         @nodes.each do |node|
@@ -270,8 +266,6 @@ module Wrapsher
         end
       end
 
-      # Need to establish new stack frame and do ref bookkeeping and 
-      # variable cleanup
       def function_dispatch
         code = []
         code << line

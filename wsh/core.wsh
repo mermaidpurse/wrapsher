@@ -7,6 +7,7 @@ type bool builtin
 type int builtin
 type string builtin
 type reflist builtin
+type list reflist
 
 type typeof(any i) {
   shell '''
@@ -25,10 +26,9 @@ ref ref(any i) {
   _wsh_get_local _reflist _wshrl
   _wsh_error="error:Couldn't create reference for value <<${_wshv_i}>>"
   _wsh_get_global refid _wshi
-  _wsh_get_local i _wshr_${_wshi}
+  _wsh_get_local i _wshr_${_wshi#int:}
   _wsh_error=error:
-  # Need to add to variable cleanup list
-  _wsh_set_local r "ref:${_wshi}"
+  _wsh_set_local r "ref:${_wshi#int:}"
   '''
   _reflist.push(r)
   r
@@ -37,15 +37,8 @@ ref ref(any i) {
 any deref(ref r) {
   shell '''
   _wsh_get_local r _wshi
-  eval "_wsh_result=\"\${_wshr_${_wshi#ref:}}\""
-  '''
-}
-
-bool destroy(ref r) {
-  shell '''
-  _wsh_get_local r _wshi
-  unset "_wshr_${_wshi#ref:}"
-  _wsh_result=bool:true
+  echo "deref ${_wshi}" >&2
+  _wsh_deref_into "${_wshi}" _wsh_result
   '''
 }
 
@@ -306,6 +299,23 @@ reflist tail(reflist rl) {
   '''
 }
 
+int length(reflist rl) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wshk=0
+  case "${_wshi}" in reflist:)
+    _wsh_result='int:0'
+  ;; *)
+    for _wshj in ${_wshi#reflist:}
+    do
+      : $((_wshk++))
+    done
+    _wsh_result="int:${_wshk}"
+  ;;
+  esac
+  '''
+}
+
 reflist minus(reflist rl, reflist o) {
   if o.length() > 0 {
     rl.delete(o.head()).minus(o.tail())
@@ -348,6 +358,13 @@ bool has(reflist rl, ref r) {
     _wsh_result=bool:false
   ;;
   esac
+  '''
+}
+
+string to_string(reflist rl) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_result="string:${_wshi}"
   '''
 }
 

@@ -29,10 +29,39 @@ When a type is wrapped by declaring a new type, it gets prepended
 to the value. So after we've created our vector, it'll internally
 look something like:
 
-`vector:list:ref:1000 ref:1001 ref:1002`
+`vector:list:reflist:ref:1000 ref:1001 ref:1002`
 
 All `_as_vector(l)` really does is strip the `vector` part,
 exposing the underlying list.
+
+## References
+
+Collections (lists) are implemented with underlying data types
+**ref** and **reflist**. The only difference between a **reflist** and
+a **list** is that a **list** dereferences its elements when used.
+
+A **reflist** is simply a list of references. In the Wrapsher internal implementation,
+it's a space-separated list:
+
+```
+reflist:ref:1000 ref:1020 ref:1022
+```
+
+It's not typical to handle references directly in Wrapsher, but it's necessary
+for collections so that collections can be represented as shell strings and
+can be complex (lists of lists).
+
+Since Wrapsher has references, this can lead to garbage. Wrapsher's approach is
+to use a "borrow" approach where each frame is responsible for cleaning up any
+references which are created in its scope and which are _not_ passed outside
+of the frame. It does this by keeping a reference list in the magic local
+variable `_reflist` (it's a Wrapsher variable), which is added to by the
+`ref ref(any i)` function whenever a reference is created, and is automatically
+added to by the VM when a result value from a function call contains references.
+
+This is potentially expensive for large or deeply-nested data, since the Wrapsher
+VM scans every return value for references and imports the result into the calling
+frame's reflist.
 
 ## Function Calls
 
@@ -44,129 +73,46 @@ When a function call occurs:
   to: either `_wshf_function_name_<type>` or `_wshf_function_name_any`,
   using `_wshp_function_name_<type>` and `_wshp_function_name_any` as
   semaphore variables
-- Inside the function, the arguments are popped off the stack one by one and
-  assigned to local variables
+- The function runner (`_wsh_run`) creates a new frame scope and
+  initializes the reflist and list of variable names
+- Inside the function (generated code), the arguments are popped off
+  the stack one by one and assigned to local variables
 - Processing occurs
 - Each expression sets `_wsh_result`, which forms the return value of the
   function
 - Before returning, `_wsh_result` is (deeply) interrogated for refs which are
   added to a temporary protected list.
-- Each variable is deeply destroyed by interrogating it for refs and destroying
-  them unless they're on the protected list
-- The variable is then `unset`
+- Any references which were created were added to the local `_reflist`
+  Wrapsher variable. Any unprotected references are destroyed.
+- Each local variable is then `unset`
 
-**PROBLEM:** This is not sufficient for either variable scopes or fixing reference leaks,
-because the variable scope must be tied to the stack frame. You can't fix this by
-making new global variables named after the function, because recursion. POSIX sh
-just doesn't have true local variables.
+## VM Functions
 
+The Wrapsher "virtual machine" is composed of certain shell functions
+implemented in the [`preamble.sh`](../lib/wrapsher/preamble.sh) and
+`postamble.sh`(../lib/wrapsher/postamble.sh) code snippets included
+every compiled Wrapsher program.
 
-Example using
+Most functions that "return" values actually set a variable whose name
+you pass to the function.
 
-```
-int sum(list l) {
-  if l.length() > 0 {
-    l + sum(l.tail())
-  } else {
-    0
-  }
-}
-```
+Wrapsher convention is to use `_wshi`, `_wshj` as temporary variables
+whose value you use right after setting it. Don't proliferate shell
+variables.
 
-Initial state:
+### <code>_wsh_get_local <i>wrapsher_varname</i> <i>shell_variable</i></code>
 
-```
-_wshr_1001=int:5
-_wshr_1005=int:3
-_wshr_1008=int:1
-_wshv_main_list_mylist=list:ref:1001 ref:1005 ref:1008
-```
+This function retrieves a local variable into the shell varable that you
+provide.
 
-Call 1:
-- `_wsh_stack_push "${_wshv_main_list_mylist}"`
-- `_wsh_main_list_
+### <code>_wsh_set_local <i>wrapsher_varname</i> <i>value</i></code>
 
-### Reflist
+This function sets a local variable (both adds it to the frame's pending
+cleanup list and sets a variable whose value can be retrieved with
+`_wsh_get_local`.
 
-Okay. So I think the stack frames/scopes could be implemented with a `_wsh_scope` variable,
-which is used like this (and this is a better way to reference dynamic variables which are all over
-the place (though setting needs an eval, so the actual API might change)
+### `_wsh_get_global` and `_wsh_set_local`
 
-```
-a = 0
-a
-```
-
-```
-_wsh_set a 'int:0'
-$((_wshv_${_wsh_scope}_a))
-
-_wsh_set() {
-  : $((_wshv_${_wsh_scope}_${1} = "${2}"))
-  # or
-  eval "_wsh_${_wsh_scope}_${1}=\"${2}\""
-}
-```
-
-The compiler, I think, can generate code to clean up local variables.
-
-I think maybe the scopes are just the stack depth, incrementing and decrementing as functions
-are called.
-
-So in the scope, there's a wrapsher variable `_reflist` which keeps a list of
-references that are created in the scope, and that are imported from another scope:
-
-```
-_wshp_ref_any=1
-_wshf_ref_any() {
-  ... make reference
-  # incremenet refid
-  # update current scope's reflist
-  _wsh_set _reflist new-reflist-with-our-reference
-  _wsh_result=ref:${_wsh_refid}
-}
-```
-
-When going out of scope (at a function's end), the variables are cleaned up (the compiler generates
-this list, I think).
-
-Also, the references are all destroyed, EXCEPT for the ones we're passing out of scope. We do this
-by scanning `_wsh_result` for refs (a big question for me is whether we need to do this deeply,
-I think maybe) and protect them by putting them on a protected list. In fact this protected list
-can be set along with `_wsh_result`, like `_wsh_outrefs`.
-
-Then we destroy all the references by unsetting their ref variables.
-
-So then: how do we clean up the references that are passed out of the scope. I think they get
-imported into the `_reflist` of the calling scope. So this happens as part of function
-calling. In fact, the child scope's "protected" reflist is actually there--because we can make
-cleaning _that_ variable up a responsibility of the parent scope. So it doesn't need to rescan
-`_wsh_result`.
-
-So after the funcall, in the parent scope, you import the `_wsh_outrefs` into `_reflist`
-(`_wshv_${scope}__reflist`). And the cycle starts over. Those references are available for
-cleanup, _unless_ they're passed out of the scope into a parent scope.
-
-Does this work?
-
-Note that globals don't get cleaned up, and somehow their refs, _if referenced_, need to not be as well. I'm
-not 100% sure. Maybe global assignment removes the references from the current scope, preventing
-them from being cleaned up. But in the case like setting a module value:
-
-```
-bool set_sync(module/file m, bool flag) {
-  file = m.set('sync', flag)
-}
-```
-
-Somehow the assignment to a global variable needs to also protect the refs. Also, the child scope
-is not responsible for cleaning up refs that get passed in, but what about the ref that's the old
-value of `sync`, above? Maybe you just get garbage with globals, and shouldn't use them very much!
-
-But you still need a way to pass them out of scope by protecting them; but without importing them
-into a calling scope. I think maybe they just get removed from the scope-local `_reflist`. This means
-that global variable assignment is special. I think the compiler can know about globals, maybe
-they're their own kind of thing.
-
-Another possibility is that globals can only have immediate values. This suggests there might be
-a simplified kind of list with immediate values that aren't fully strings or something.
+These operate similarly to their local equivalents. Note that in general,
+Wrapsher compiled code does not need `_wsh_set_global` since the compiler
+arranges to call the direct assignment operation.

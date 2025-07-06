@@ -46,6 +46,29 @@ bool test_string_at_1() {
   'n' == 'one'.at(1)
 }
 
+bool test_ref_count_init() {
+  _reflist.length() == 0
+}
+
+bool test_ref_count_add() {
+  i = 10.ref() 
+  _reflist.length() == 1
+}
+
+ref _make_ref() {
+  i = 10.ref()
+}
+
+bool test_ref_deref() {
+  i = 10.ref()
+  i.deref() == 10
+}
+
+bool test_ref_count_import() {
+  i = _make_ref()
+  _reflist.length() == 1
+}
+
 int main(list args) {
   failures = 0
   r = test_bool_new()
@@ -134,6 +157,34 @@ int main(list args) {
   } else {
     io.println('test_string_at_1 FAIL')
     failures = failures + 1
+  }
+
+  r = test_ref_count_init()
+  if r {
+    io.println('test_ref_count_init ok')
+  } else {
+    io.println('test_ref_count_init FAIL')
+  }
+
+  r = test_ref_count_add()
+  if r {
+    io.println('test_ref_count_add ok')
+  } else {
+    io.println('test_ref_count_add FAIL')
+  }
+
+  r = test_ref_deref()
+  if r {
+    io.println('test_ref_deref ok')
+  } else {
+    io.println('test_ref_deref FAIL')
+  }
+
+  r = test_ref_count_import()
+  if r {
+    io.println('test_ref_count_import ok')
+  } else {
+    io.println('test_ref_count_import FAIL')
   }
 
   failures
