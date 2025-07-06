@@ -528,7 +528,7 @@ The folllowing modules comprise the standard library:
 
 - [**core**](wsh/core.wsh) - Core functions and fundamental types--always included
 - [**io**](wsh/io.wsh)     - Basic I/O based on `echo` and `printf`
-- [**test**](wsh/test.wsh) - Test framework **UNIMPLMENTED**
+- [**test**](wsh/test.wsh) - Test framework
 - [**math**](wsh/math.wsh) - Floats and math functions based on `bc` **UNIMPLEMENTED**
 - [**http**](wsh/http.wsh) - HTTP communication based on `curl` **UNIMPLEMENTED**
 - [**sys**](wsh/sys.wsh)   - System shells and platform **UNIMPLEMENTED**

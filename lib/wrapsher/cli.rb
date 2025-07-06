@@ -53,8 +53,10 @@ Usage:
   wrapsher COMMAND [options...]
 
   Run wrapsher COMMAND --help for help:
+    wrapsher compile
+    wrapsher run
+    wrapsher test
     wrapsher parse
-    wrapsher grammar
 EOF
     end
 

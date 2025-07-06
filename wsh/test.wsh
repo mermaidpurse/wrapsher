@@ -1,5 +1,30 @@
 module test
 
+meta doc '''
+# test
+
+Wrapsher test framework
+
+## Usage
+
+Create a program with a suite of tests in it called (by convention)
+<code><i>something</i>_test.wsh</code>. You can call it anything,
+but you usually might want to organize it as one file per suite,
+or one file per program or module.
+
+In this source file, `use module test`. Do not write a `main`
+function: the **test** module provides the `main` function.
+
+Any functions in your program that begin with `test_` will
+be run. They are expected to be of type **bool** and return
+`true` on success and `false` on failure.
+
+**UNIMPLEMENTED:** In the future, instead of nullary functions
+**returning bool**, you will accept a **case** argument and return an
+****expectation**.
+
+'''
+
 type expectation bool
 
 int main(list args) {

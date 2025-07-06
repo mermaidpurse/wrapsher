@@ -10,7 +10,7 @@ module Wrapsher
     rule(:program)                  { statement.repeat }
     rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol }
     rule(:use_statement)            { use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement }
-    rule(:meta_statement)           { str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data) }
+    rule(:meta_statement)           { (str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data)).as(:meta) }
     rule(:use_version_statement)    { str('use') >> space >> str('version') >> space >> version.as(:use_version) }
     rule(:use_module_statement)     { str('use') >> space >> str('module') >> space >> word.as(:use_module) }
     rule(:use_external_statement)   { str('use') >> space >> str('external') >> space >> word.as(:use_external) }

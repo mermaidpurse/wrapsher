@@ -72,7 +72,29 @@ module Wrapsher
       end
     end
 
-    class MetaField < Node
+    class Meta < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:meta_field].line_and_column[0] if slice[:meta_field].respond_to?(:line_and_column)
+        @field = slice[:meta_field].to_s
+        case @field
+        when 'doc'
+          @doc = StringValue.new(slice[:meta_data], tables: tables)
+        else
+          raise "Unknown meta field: #{@field} at #{@filename}:#{@line}"
+        end
+      end
+
+      # TODO: Probably shouldn't include documentation for included modules
+      def to_s
+        code = []
+        if @doc
+          code << ": <<'WSH_DOCUMENTATION'"
+          code << @doc.to_s
+          code << 'WSH_DOCUMENTATION'
+        end
+        code.join("\n")
+      end
     end
 
     class Version < Node
@@ -448,7 +470,7 @@ module Wrapsher
       bool_term: BoolTerm,
       conditional: Conditional,
       module: Module,
-      meta_field: MetaField,
+      meta: Meta,
       version: Version,
       type: Type,
       fun_call: FunCall,
