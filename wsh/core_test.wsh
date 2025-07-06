@@ -69,6 +69,34 @@ bool test_ref_count_import() {
   _reflist.length() == 1
 }
 
+bool test_list_new() {
+  l = list.new()
+  l.length() == 0
+}
+
+list _make_list() {
+  l = list.new()
+  l = l.push('one')
+  l = l.push('two')
+}
+
+bool test_list_push() {
+  l = _make_list()
+  l.length() == 2
+}
+
+bool test_list_head() {
+  l = _make_list()
+  s = l.head()
+  s == 'one'
+}
+
+bool test_list_tail() {
+  l = _make_list()
+  t = l.tail()
+  t.at(0) == 'two'
+}
+  
 int main(list args) {
   failures = 0
   r = test_bool_new()
@@ -185,6 +213,34 @@ int main(list args) {
     io.println('test_ref_count_import ok')
   } else {
     io.println('test_ref_count_import FAIL')
+  }
+
+  r = test_list_new()
+  if r {
+    io.println('test_list_new ok')
+  } else {
+    io.println('test_list_new FAIL')
+  }
+
+  r = test_list_push()
+  if r {
+    io.println('test_list_push ok')
+  } else {
+    io.println('test_list_push FAIL')
+  }
+
+  r = test_list_head()
+  if r {
+    io.println('test_list_head ok')
+  } else {
+    io.println('test_list_head FAIL')
+  }
+
+  r = test_list_tail()
+  if r {
+    io.println('test_list_tail ok')
+  } else {
+    io.println('test_list_tail FAIL')
   }
 
   failures

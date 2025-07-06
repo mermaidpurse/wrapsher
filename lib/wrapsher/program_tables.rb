@@ -12,6 +12,21 @@ module Wrapsher
       @included = included
     end
 
+    def to_nodes
+      filename = Node::UseGlobal.new(
+        {
+          name: '_filename',
+          value: {
+            string_term: {
+              single_quoted: @filename
+            }
+          }
+        },
+        tables: self
+      )
+      [filename]
+    end
+
     def to_s
       lines = []
       lines << "filename: #{filename}"

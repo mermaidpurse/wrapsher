@@ -47,6 +47,19 @@ module Wrapsher
         Wrapsher::Node.from_obj(obj, tables: tables)
       end
 
+      errors = nodes.map(&:errors).flatten
+      if errors.any?
+        @logger.error "Compilation errors:"
+        errors.each do |error|
+          @logger.error "  - #{error}"
+        end
+        raise Wrapsher::CompilationError, "Compilation failed with #{errors.size} errors"
+      end
+
+      if @type == :program
+        nodes = tables.to_nodes + nodes
+      end
+
       [
         shebang,
         @type == :program ? showtables(tables) : '',

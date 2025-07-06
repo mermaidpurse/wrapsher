@@ -198,3 +198,19 @@ _wsh_dispatch() {
        esac ;;
   esac
 }
+
+_wsh_panic() {
+  _wsh_exitcode="${1}"
+  if [[ "${_wsh_error#error:}" ]]
+  then
+    # the one place we unconditionally use I/O
+    # and the echo command. Even though it's external,
+    # this is basically a panic, so we have to
+    # bootstrap it. Maybe someday we can be smarter
+    # about this.
+    echo "${_wsh_error#error:}" >&2
+  else
+    echo "error:Unspecified, ${2} exited"
+  fi
+  exit "${_wsh_exitcode}"
+}

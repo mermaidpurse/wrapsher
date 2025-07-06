@@ -274,6 +274,7 @@ module Wrapsher
         else
           code << "_wsh_dispatch '#{@function_name}' || return 1"
         end
+        code << line
         code.join("\n  ")
       end
 
@@ -352,7 +353,7 @@ module Wrapsher
     class UseGlobal < Node
       def initialize(slice, tables:)
         super
-        @line = slice[:name].line_and_column[0]
+        @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
         @global_name = slice[:name].to_s
         @initial_value = Node.from_obj(slice[:value], tables: tables)
         tables.globals[@global_name] = true
@@ -406,7 +407,6 @@ module Wrapsher
       end
     end
 
-    # Maybe this should be a FunCall
     class VarRef < Node
       def initialize(slice, tables:)
         super
@@ -431,6 +431,10 @@ module Wrapsher
 
     def line
       @line ? "_wsh_line='#{@filename}:#{@line}'" : ''
+    end
+
+    def errors
+      []
     end
 
     def to_s

@@ -9,10 +9,61 @@ type string builtin
 type reflist builtin
 type list reflist
 
-type typeof(any i) {
+any typeof(any i) {
   shell '''
-  _wsh_typeof "${_wshv_i}"
-  _wsh_result="type/${_wsh_typeof}"
+  _wsh_get_local i _wshi
+  _wsh_typeof "${_wshi}"
+  _wsh_get_global "${_wsh_type}" _wsh_result
+  '''
+}
+
+any _as(any i, any as) {
+  in = typeof(i)
+  shell '''
+  _wsh_get_local in _wshi  # 'type/list:reflist'
+  _wsh_get_local as _wshl  # 'type/reflist:builtin'
+
+  case "${_wshl%%:*}" in type/*)
+    :
+  ;; *)
+    _wsh_error="error:Expected a type (e.g. 'type/list:reflist'), got '${_wshl}'"
+    return 1
+  ;;
+  esac
+
+  _wshj="${_wshi#type/*:}" # 'reflist' - parent type (bare)
+  _wshk="${_wshi%%:*}"
+  _wshk="${_wshk#type/}"   # 'list' - own type (bare)
+
+  _wshm="${_wshl#type/*:}" # 'builtin' - target type's parent
+  _wshn="${_wshl%%:*}"
+  _wshn="${_wshn#type/}"   # 'reflist' - target type (bare)
+  _wsh_get_local i _wsho
+  case "${_wshn}" in "${_wshk}")
+    # target bare type is own bare type--noop
+    _wsh_result="${_wsho}"
+  ;; "${_wshj}")
+    # target bare type is own parent bare type--unwrap
+    _wsh_result="${_wsho#${_wshk}:}"
+    _wsh_assert "${_wsh_result}" "${_wshn}" || return 1
+  ;; *)
+    case "${_wshk}" in "${_wshm}")
+      # own bare type is target parent type--wrap
+      _wsh_result="${_wshn}:${_wsho}"
+    ;; *)
+      _wsh_error="error:Can't cast ${_wshk} value to ${_wshn}"
+      return 1
+    ;;
+    esac
+  ;;
+  esac
+  '''
+}
+
+string _raw(any i) {
+  shell '''
+  _wsh_get_local i _wshi
+  _wsh_result="string:${_wshi}"
   '''
 }
 
@@ -37,7 +88,6 @@ ref ref(any i) {
 any deref(ref r) {
   shell '''
   _wsh_get_local r _wshi
-  echo "deref ${_wshi}" >&2
   _wsh_deref_into "${_wshi}" _wsh_result
   '''
 }
@@ -265,7 +315,7 @@ reflist push(reflist rl, ref r) {
   '''
 }
 
-reflist head(reflist rl) {
+ref head(reflist rl) {
   shell '''
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
@@ -294,6 +344,30 @@ reflist tail(reflist rl) {
       _wsh_result=reflist:"${_wshk}"
     ;;
     esac
+  ;;
+  esac
+  '''
+}
+
+ref at(reflist rl, int i) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local i _wshj
+  _wshj="${_wshj#int:}"
+  _wshm='notfound'
+  : $((_wshk=0))
+  for _wshl in ${_wshi#reflist:}
+  do
+    case $((_wshk == _wshj)) in 1)
+      _wsh_result="${_wshl}"
+      _wshm='found'
+      break
+    ;;
+    esac
+  done
+  case "${_wshm}" in notfound)
+    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk}"
+    return 1
   ;;
   esac
   '''
@@ -368,23 +442,38 @@ string to_string(reflist rl) {
   '''
 }
 
-list new(type/list t) {
-  shell '''
-  _wsh_result=list:
-  '''
+list as_list(reflist rl) {
+  rl._as(list)
+}
+
+reflist as_reflist(list l) {
+  l._as(reflist)
 }
 
 list as_list(list l) {
   l
 }
 
+list new(type/list t) {
+  reflist.new().as_list()
+}
+
 list push(list l, any i) {
-  r = i.ref()
-  shell '''
-  case "${_wshv_l}" in list:)
-    "_wsh_result="list:${_wshv_r}"
-  ;; *)
-    "_wsh_result="${_wshv_l} ${_wshv_r}"
-  esac
-  '''
+  l.as_reflist().push(i.ref()).as_list()
+}
+
+any head(list l) {
+  l.as_reflist().head().deref()
+}
+
+list tail(list l) {
+  l.as_reflist().tail().as_list()
+}
+
+any at(list l, int i) {
+  l.as_reflist().at(i).deref()
+}
+
+int length(list l) {
+  l.as_reflist().length()
 }
