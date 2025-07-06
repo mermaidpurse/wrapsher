@@ -1,6 +1,51 @@
 module test
 
-type case bool
-type expectation map
+type expectation bool
 
-
+int main(list args) {
+  failures = 0
+  shell '''
+  # TODO: very ugly raw quick and dirty, with anon funcs and
+  # other stuff we can do more reflection in wrapsher
+  _wsh_get_global _functions _wsh_funcs
+  _wsh_tests=0
+  for _wsh_ref in ${_wsh_funcs#list:reflist:}
+  do
+    # Manually dereferencing
+    eval "_wsh_val=\"\${_wshr_${_wsh_ref#ref:}}\""
+    # Making our own non-wrapsher list
+    case "${_wsh_val#string:}" in test_*)
+      _wsh_test_funcs="${_wsh_test_funcs} ${_wsh_val#string:}"
+      : $((_wsh_tests++))
+    ;;
+    esac
+  done
+  # Doing our own I/O
+  echo "1..${_wsh_tests}"
+  _wsh_test=0
+  _wsh_fails=0
+  for _wsh_test_func in ${_wsh_test_funcs}
+  do
+    : $((_wsh_test++))
+    # Blindly calling the nullary form
+    # and catching the error, which we don't
+    # have yet
+    _wsh_dispatch_nullary "${_wsh_test_func}"
+    case $? in 0)
+      case "${_wsh_result}" in 'bool:true')
+        echo "ok ${_wsh_test} - ${_wsh_test_func}"
+      ;; *)
+        echo "not ok ${_wsh_test} - ${_wsh_test_func}"
+        : $((_wsh_fails++))
+      ;;
+      esac
+    ;; *)
+      echo "not ok ${_wsh_test} - ${_wsh_test_func} # ${_wsh_error}"
+        : $((_wsh_fails++))
+    ;;
+    esac
+  done
+  _wsh_set_local 'failures' "int:${_wsh_fails}"
+  '''
+  failures
+}

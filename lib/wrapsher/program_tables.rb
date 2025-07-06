@@ -13,7 +13,8 @@ module Wrapsher
     end
 
     def to_nodes
-      filename = Node::UseGlobal.new(
+      nodes = []
+      nodes << Node::UseGlobal.new(
         {
           name: '_filename',
           value: {
@@ -24,7 +25,56 @@ module Wrapsher
         },
         tables: self
       )
-      [filename]
+      nodes << Node::UseGlobal.new(
+        {
+          name: '_globals',
+          value: {
+            bool_term: 'false'
+          }
+        },
+        tables: self
+      )
+      nodes << Node::UseGlobal.new(
+        {
+          name: '_functions',
+          value: {
+            bool_term: 'false'
+          }
+        },
+        tables: self
+      )
+      nodes << Node::FunStatement.new(
+        {
+          signature: {
+            name: '_init',
+            type: 'bool',
+            arg_definitions: []
+          },
+          body: [
+            {
+              assignment: {
+                var: '_functions',
+                rvalue: functions.keys.uniq.reduce({
+                    fun_call: {
+                      name: 'new',
+                      fun_args: [ {var_ref: 'list'} ]
+                    }
+                  }) do |acc, fn_name|
+                  {
+                    fun_call: {
+                      name: 'push',
+                      fun_args: [acc, { string_term: { single_quoted: fn_name } }]
+                    }
+                  }
+                end
+              }
+            },
+            { bool_term: 'true' }
+          ],
+        },
+        tables: self
+      )
+      nodes
     end
 
     def to_s

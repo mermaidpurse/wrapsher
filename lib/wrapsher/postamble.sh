@@ -1,4 +1,6 @@
 # wsh:postamble for scripts
+_wsh_dispatch_nullary _init || _wsh_panic $? "init()"
+
 _wsh_get_global list _wshi
 _wsh_stack_push "${_wshi}"
 _wsh_line="postamble.sh:5"

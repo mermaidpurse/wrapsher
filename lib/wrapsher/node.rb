@@ -14,7 +14,7 @@ module Wrapsher
     class Assignment < Node
       def initialize(slice, tables:)
         super
-        @line = slice[:var].line_and_column[0]
+        @line = slice[:var].line_and_column[0] if slice[:var].respond_to?(:line_and_column)
         @name = slice[:var].to_s
         @rvalue = Node.from_obj(slice[:rvalue], tables: tables)
       end
@@ -164,7 +164,7 @@ module Wrapsher
 
       def initialize(slice, tables:)
         super
-        @line = slice[:type].line_and_column[0]
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
         @type = slice[:type].to_s
         @name = slice[:name].to_s
         if !slice[:arg_definitions].nil?
@@ -173,7 +173,7 @@ module Wrapsher
         else
           @arg_definitions = []
         end
-        @line = slice[:type].line_and_column[0]
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
       end
 
       def summary
