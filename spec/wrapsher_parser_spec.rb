@@ -1,22 +1,138 @@
 # frozen_string_literal: true
 
-RSpec.describe Wrapsher::Parser do
+def test_fun(body)
+  body = [body] unless body.is_a?(Array)
+  [{
+    fun_statement: {
+      signature: {
+        type: 'bool',
+        name: 'test',
+        arg_definitions: nil,
+      },
+      body: body
+    }
+  }]
+end
 
-  it "parses some wrapsher" do
+RSpec.describe Wrapsher::Parser do
+  it "parses a subscript" do
     source = <<~EOF
-    module ex
-    meta author 'dev@mermaidpurse.org'
-    use version 0
-    type vector list
+    bool test() {
+      x[0]
+    }
     EOF
-    parser = Wrapsher::Parser.new()
-  program = stringify(parser.parsetext(source)).flatten
-  expect(program).to eq([
-          { module: 'ex' },
-          { meta: { meta_field: 'author', meta_data: { single_quoted: 'dev@mermaidpurse.org' } } },
-          { use_version: '0' },
-          { type: {name: 'vector', store_type: 'list' } }
-        ])
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'at',
+              fun_args: [{var_ref: 'x'}, {int_term: '0'}]
+            }
+          }
+        ]))
+  end
+
+  it "parses an empty list" do
+    source = <<~EOF
+    bool test(){
+      []
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'new',
+              fun_args: [{var_ref: 'list'}]
+            }
+          }
+        ]))
+  end
+
+  it "parses a list literal" do
+    source = <<~EOF
+    bool test() {
+      [1, 2, 3]
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'push',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'push',
+                    fun_args: [
+                      {
+                        fun_call: {
+                          name: 'push',
+                          fun_args: [
+                            {
+                              fun_call: {
+                                name: 'new',
+                                fun_args: [
+                                  { var_ref: 'list' }
+                                ]
+                              }
+                            },
+                            { int_term: '1' }
+                          ]
+                        }
+                      },
+                      { int_term: '2' }
+                    ]
+                  }
+                },
+                { int_term: '3' }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a list with expressions" do
+    source = <<~EOF
+    bool test() {
+      x = [0, a.to_string(), not b, 3 - 4]
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue:
+              {:fun_call=>
+                {:fun_args=>
+                  [{:fun_call=>
+                      {:fun_args=>
+                        [{:fun_call=>
+                            {:fun_args=>
+                              [{:fun_call=>
+                                  {:fun_args=>
+                                    [{:fun_call=>
+                                        {:fun_args=>[{:var_ref=>"list"}],
+                                          :name=>"new"}},
+                                      {:int_term=>"0"}],
+                                    :name=>"push"}},
+                                {:fun_call=>
+                                  {:fun_args=>[{:var_ref=>"a"}],
+                                    :name=>"to_string"}}],
+                              :name=>"push"}},
+                          {:fun_call=>{:fun_args=>[{:var_ref=>"b"}], :name=>"not"}}],
+                        :name=>"push"}},
+                    {:fun_call=>
+                      {:fun_args=>[{:int_term=>"3"}, {:int_term=>"4"}],
+                        :name=>"minus"}}],
+                  :name=>"push"}}
+            }
+          }]))
   end
 
   it "parses a function definition" do
@@ -25,7 +141,7 @@ RSpec.describe Wrapsher::Parser do
       a + b
     }
     EOF
-    parser = Wrapsher::Parser.new()
+    parser = Wrapsher::Parser.new
     program = stringify(parser.parsetext(source)).flatten
     expect(program).to eq([
       {
@@ -59,4 +175,22 @@ RSpec.describe Wrapsher::Parser do
       }
     ])
   end
+
+  it "parses some wrapsher" do
+    source = <<~EOF
+    module ex
+    meta author 'dev@mermaidpurse.org'
+    use version 0
+    type vector list
+    EOF
+    parser = Wrapsher::Parser.new()
+  program = stringify(parser.parsetext(source)).flatten
+  expect(program).to eq([
+          { module: 'ex' },
+          { meta: { meta_field: 'author', meta_data: { single_quoted: 'dev@mermaidpurse.org' } } },
+          { use_version: '0' },
+          { type: {name: 'vector', store_type: 'list' } }
+        ])
+  end
+
 end

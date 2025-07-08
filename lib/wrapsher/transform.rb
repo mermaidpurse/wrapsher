@@ -5,6 +5,29 @@ require 'pry'
 module Wrapsher
   class Transform < Parslet::Transform
 
+    rule(list_term: subtree(:elements)) do
+      the_elements = elements
+      if the_elements.nil?
+        the_elements = []
+      end
+
+      new_list = {
+        fun_call: {
+          name: 'new',
+          fun_args: [{var_ref: 'list'}]
+        }
+      }
+
+      the_elements.reduce(new_list) do |acc, el|
+        {
+          fun_call: {
+            name: 'push',
+            fun_args: [acc, el]
+          }
+        }
+      end
+    end
+
     rule(subscript:{ receiver: subtree(:receiver), index: subtree(:index) }) do
       {
         fun_call: {

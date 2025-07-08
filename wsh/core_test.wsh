@@ -98,3 +98,7 @@ bool test_list_tail() {
   t = l.tail()
   t.at(0) == 'two'
 }
+
+bool test_list_length() {
+  ['one', 'two', 'three'].length() == 3
+}

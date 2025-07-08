@@ -20,8 +20,10 @@ def stringify(item)
     item.map { |e| stringify(e) }
   elsif item.respond_to?(:to_hash)
     Hash[item.map { |k, v| [k, stringify(v)] }]
-  else
+  elsif item.respond_to?(:to_str)
     item.to_str
+  else
+    item
   end
 end
 

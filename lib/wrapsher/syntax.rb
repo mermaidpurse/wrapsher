@@ -48,7 +48,8 @@ module Wrapsher
     rule(:fun_call)                 { (word.as(:name) >> lparen >> space? >> fun_args.maybe.as(:fun_args) >> space? >> rparen).as(:fun_call) }
     rule(:fun_args)                 { expression >> (comma >> expression).repeat }
 
-    rule(:term)                     { group | int_term | bool_term | string_term | var_ref }
+    rule(:term)                     { group | int_term | bool_term | string_term | list_term | var_ref }
+    rule(:list_term)                { lbracket >> (expression >> (comma >> expression).repeat).maybe.as(:list_term) >> rbracket >> space? }
     rule(:group)                    { lparen >> expression.as(:group) >> rparen >> space? }
     rule(:int_term)                 { (str('-').maybe >> match('[0-9]').repeat(1)).as(:int_term) >> space? }
     rule(:bool_term)                { (str('true') | str('false')).as(:bool_term) >> space? }
