@@ -15,6 +15,197 @@ def test_fun(body)
 end
 
 RSpec.describe Wrapsher::Parser do
+  it "evaluates != as a chain" do
+    source = <<~EOF
+    bool test() {
+      a != b
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'not',
+              fun_args: {
+                fun_call: {
+                  name: 'eq',
+                  fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                }
+              }
+            }
+          }
+        ]))
+  end
+
+  it "evaluates >= as a chain" do
+    source = <<~EOF
+    bool test() {
+      a >= b
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'not',
+              fun_args: {
+                fun_call: {
+                  name: 'lt',
+                  fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                }
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses an anonymous function" do
+    source = <<~EOF
+    bool test() {
+      bool fun (int a, int b) {
+        a == b
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            lambda: {
+              signature: {
+                type: 'bool',
+                arg_definitions: [
+                  { type: 'int', name: 'a' },
+                  { type: 'int', name: 'b' }
+                ]
+              },
+              body: [
+                {
+                  fun_call: {
+                    name: 'eq',
+                    fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses an anonymous function in a single line" do
+    source = <<~EOF
+    bool test() {
+      bool fun (int a, int b) { a + b; a == b }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            lambda: {
+              signature: {
+                type: 'bool',
+                arg_definitions: [
+                  { type: 'int', name: 'a' },
+                  { type: 'int', name: 'b' }
+                ]
+              },
+              body: [{
+                  fun_call: {
+                    name: 'plus',
+                    fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                  }
+                }, {
+                  fun_call: {
+                    name: 'eq',
+                    fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses an anonymous function in an assignment" do
+    source = <<~EOF
+    bool test() {
+      f = bool fun (int a, int b) { a == b }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'f',
+              rvalue: {
+                lambda: {
+                  signature: {
+                    type: 'bool',
+                    arg_definitions: [
+                      { type: 'int', name: 'a' },
+                      { type: 'int', name: 'b' }
+                    ]
+                  },
+                  body: {
+                    fun_call: {
+                      name: 'eq',
+                      fun_args: [{ var_ref: 'a' }, { var_ref: 'b' }]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses an anonymous function in an expression" do
+    source = <<~EOF
+    bool test() {
+      l.filter(bool fun (string s) { s.length() > 0 }, other)
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'filter',
+              fun_args: [
+                { var_ref: 'l' },
+                {
+                  lambda: {
+                    signature: {
+                      type: 'bool',
+                      arg_definitions: { type: 'string', name: 's' }
+                    },
+                    body: {
+                      fun_call: {
+                        name: 'gt',
+                        fun_args: [
+                          {
+                            fun_call: {
+                              name: 'length',
+                              fun_args: [{ var_ref: 's' }]
+                            }
+                          },
+                          { int_term: '0' }
+                        ]
+                      }
+                    }
+                  }
+                },
+                { var_ref: 'other' }
+              ]
+            }
+          }
+        ]))
+  end
+
   it "parses a subscript" do
     source = <<~EOF
     bool test() {

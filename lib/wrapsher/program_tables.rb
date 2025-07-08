@@ -2,14 +2,28 @@ require 'wrapsher'
 
 module Wrapsher
   class ProgramTables
-    attr_accessor :filename, :functions, :globals, :external, :included
+    attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds
 
-    def initialize(filename: '-', functions: {}, globals: {}, external: {}, included: {})
+    def initialize(
+        filename: '-',
+        functions: {},
+        globals: {},
+        external: {},
+        included: {},
+        compiler_refid: 1000,
+        adds: [])
       @filename = filename
       @functions = functions
       @globals = globals
       @external = external
       @included = included
+      @compiler_refid = compiler_refid
+      @adds = adds
+    end
+
+    def refid
+      @compiler_refid += 1
+      @compiler_refid
     end
 
     def to_nodes
@@ -74,6 +88,7 @@ module Wrapsher
         },
         tables: self
       )
+      nodes += self.adds
       nodes
     end
 

@@ -93,6 +93,18 @@ bool test_list_head() {
   s == 'one'
 }
 
+bool test_list_eq_empty() {
+  [] == []
+}
+
+bool test_list_eq_same() {
+  ['one', 'two', 'three'] == ['one', 'two', 'three']
+}
+
+bool test_list_eq_different() {
+  ['one', 'two', 'three'] != ['one', 'two']
+}
+
 bool test_list_tail() {
   l = _make_list()
   t = l.tail()
@@ -101,4 +113,13 @@ bool test_list_tail() {
 
 bool test_list_length() {
   ['one', 'two', 'three'].length() == 3
+}
+
+bool test_fun_call() {
+  f = int fun (int i) { 2 * i }
+  f.call().with(2) == 4
+}
+
+bool test_list_map() {
+  [0, 1, 2].map(int fun (int i) { 2 * i }) == [0, 2, 4]
 }

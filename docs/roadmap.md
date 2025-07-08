@@ -2,17 +2,36 @@
 
 ## Issues
 
+- Function signatures must be verified in the compiler
+- Global variables must be protectable, which probably means
+  some kind of file scoping or override assignment so that
+  module settings can work. It can cause very very strange
+  things to re-assign `list` to a different type for
+  example.
+- For dispatch, the types `list_string` and `list/string`
+  are equivalent. Revise dispatch to figure this out. This
+  needs some kind of identifier escaping. Maybe this just needs
+  to apply to types, so we could just decide that wrapsher
+  types can't have `__` in them, and `/` is represented by
+  `__`. So `type list_string` yields `_wshg_list_string`
+  and `_wshf_join_list_string`, `type list/string` yields
+  `_wshg_list__string` and `_wshf_join_list__string`,
+  `type list__string` is illegal, and `type list/_string`
+  yields `_wshg_list___string` and `_wshf_join_list___string`.
+- Local variables must be tracked by the compiler (probably
+  with a list in `tables`) so that variable capture can
+  occur in closures.
+
 ## MVP
 
-- Implement array and map literals and subscript notation
-- Implement anonymous functions
+- Implement pair and map type, literals
 - Implement escaped quotes in strings
-- Implement map
+- Implement module _init(), cohere with **test** module
 - Implement/document throw/catch error handling
 - Github actions for testing (clean up parser tests)
+- Implement docs
 - Implement versions, version constraints (compiler and modules)
 - Implement while loop maybe? and control keywords maybe?
-- Implement docs
 
 ## Next Steps
 

@@ -16,6 +16,10 @@ commands like `echo` and `printf`. Wrapsher calls these commands
 POSIX-compliant shells do build these in, so requiring them doesn't
 actually activate the `external` feature.
 
+## Status
+
+Wrapsher is pre-alpha software.
+
 ## Getting Started -- The Basics
 
 The Wrapsher build tool, `wrapsher`, is written in Ruby. The result is
@@ -118,6 +122,9 @@ Top-level statements in Wrapsher can be:
     Note that _type_ is used as _storage_ here, this is not any
     form of inheritance. See [Modules and Types](./modules-types.md)
     for how to implement a type.
+
+Throughout, comments introduced with a pound character (`#`)
+are ignored **UNIMPLEMENTED**.
 
 A block is a list of expressions enclosed by curly braces. All
 expressions have values, and the value of the last expression is the
@@ -288,13 +295,13 @@ s)`) must be used to read types from input strings or implement
 an optional value.
 
 
-| Type     | Zero            | Example literal values         |
-| -------- | --------------- | ------------------------------ |
-| `bool`   | `false`         | `true`, `false`                |
-| `int`    | `0`             | `0`, `99`, `-22`, `0xa8`       |
-| `string` | `''`            | `'bob'`, `'café'`              |
-| `list`   | `[]`            | `['one', 2, false, [0, 1, 2]]` |
-| `map`    | `[:]`           | `['one': 1, 'two': 2]`         |
+| Type     | Zero             | Example literal values         |
+| -------- | ---------------- | ------------------------------ |
+| `bool`   | `false`          | `true`, `false`                |
+| `int`    | `0`              | `0`, `99`, `-22`, `0xa8`       |
+| `string` | `''`             | `'bob'`, `'café'`              |
+| `list`   | `[]`             | `['one', 2, false, [0, 1, 2]]` |
+| `map`    | `[:]`            | `['one': 1, 'two': 2]`         |
 | `fun`    | `any fun () {}`  | `bool fun (int i) { i == 0 }` |
 
 Each of these fundamental types has a way of writing literal values
@@ -380,7 +387,7 @@ need to agree on type (you can implement a type which does have this
 characteristic, though).
 
 Arrays can be subscripted like strings: `mylist[n]` is syntactic sugar
-for `mylist.at(n)`. **UNIMPLEMENTED**
+for `mylist.at(n)`.
 
 - `list new(type/list) { [] }`
 - `list as_list(list l) { l }`
@@ -397,8 +404,8 @@ for `mylist.at(n)`. **UNIMPLEMENTED**
 - `list map(list l, fun f)`
 - `any reduce(list l, fun f, any i)`
 - `string to_string(list l)`
-- `bool any(list l)`
-- `bool all(list l)`
+- `bool any(list l, fun f)`
+- `bool all(list l, fun f)`
 - `any head(list l)`
 - `any tail(list l)`
 - `list join(list l, string s)`
@@ -421,6 +428,8 @@ is syntactic sugar for `m.at(key)`.
 - `map map(map m, fun f)`
 - `int length(map m)`
 
+Like lists, map literals are written 
+
 ##### `any`
 
 In some cases, a function may return any type of value, represented
@@ -429,12 +438,37 @@ element or map value.
 
 ##### `fun`
 
-An anonymous function item.
+An anonymous function item. These are formed by expressions
+of the form <code><i>type</i> fun (<i>argument_list</i>)</code>.
+The argument list of types and variable names is the same as
+in function definitions.
 
-- `fun new(type/fun) { fun () {} }`
-- `fun as_fun(fun f) { f }`
-- `any call(fun f, ...)`
-- `string to_string(fun f)`
+The result of the expression is of the type `fun`, which you
+can use the call function:
+
+```
+fun/<i>opaque</i> call(fun f)
+any with(fun/<i>opaque</i>, ...)
+```
+
+Note that in order to call the function, you need to use the
+`with` function. The invocation looks like this:
+
+```
+f = bool fun (int i) { i % 2 == 0 }
+f.call().with(2) == true
+f.call().with(1) == false
+
+l1 = [0, 1, 2, 3, 4]
+l2 = [2, 4, 6, 8]
+# All evens
+l1.all(bool fun (int i) { i % 2 == 0 }) == false
+l2.all(bool fun (int i) { i % 2 == 0 }) == true
+```
+
+Note that the `list` functions, in combination with `fun`
+items, make for a powerful way to express iteration through
+recursion.
 
 ### Variables
 
@@ -476,6 +510,14 @@ bool set_is_syncio(module/file m, bool p) {
 }
 ```
 
+### Errors
+
+**UNIMPLEMENTED**
+
+### Loops
+
+**UNIMPLEMENTED**
+
 ### Programs vs. Modules - `main`
 
 A program is simply the file that the Wrapsher compiler compiles,
@@ -492,9 +534,13 @@ searches for the module in its module include path--a file named
 The `main` function in a command must return an `int`. Further, it
 must accept a list of arguments (they are strings).
 
-You should probably use `optparse` to parse the options.
+You should probably use **optparse** to parse the options.
 
 See [Modules and Types](./modules-types.md) for more.
+
+### Testing
+
+Wrapsher includes a TAP-compatible test framework in the **test** module.
 
 ### External Dependencies
 
@@ -526,9 +572,12 @@ a fatal error is produced.
 
 The folllowing modules comprise the standard library:
 
-- [**core**](wsh/core.wsh) - Core functions and fundamental types--always included
-- [**io**](wsh/io.wsh)     - Basic I/O based on `echo` and `printf`
-- [**test**](wsh/test.wsh) - Test framework
-- [**math**](wsh/math.wsh) - Floats and math functions based on `bc` **UNIMPLEMENTED**
-- [**http**](wsh/http.wsh) - HTTP communication based on `curl` **UNIMPLEMENTED**
-- [**sys**](wsh/sys.wsh)   - System shells and platform **UNIMPLEMENTED**
+| Module | Description | Status |
+| :===== | :========== | :===== |
+| [**core**](wsh/core.wsh) | Core functions and fundamental types--always included | pre-alpha |
+| [**io**](wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
+| [**test**](wsh/test.wsh) | Test framework | pre-alpha |
+| [**math**](wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
+| [**http**](wsh/http.wsh) - HTTP communication based on `curl` | **UNIMPLEMENTED** |
+| [**sys**](wsh/sys.wsh)           - System shells and platform | **UNIMPLEMENTED** |
+| [**optparse**](wsh/optparse.wsh) - Parse command-line options | **UNIMPLEMENTED** |

@@ -1,6 +1,7 @@
 module core
 use global refid 1000
 
+type fun builtin
 type type builtin
 type ref builtin
 type bool builtin
@@ -89,6 +90,13 @@ any deref(ref r) {
   shell '''
   _wsh_get_local r _wshi
   _wsh_deref_into "${_wshi}" _wsh_result
+  '''
+}
+
+any call(fun f) {
+  shell '''
+  _wsh_get_local f _wshi
+  _wsh_result="${_wshi#fun:}"
   '''
 }
 
@@ -476,4 +484,28 @@ any at(list l, int i) {
 
 int length(list l) {
   l.as_reflist().length()
+}
+
+bool eq(list l, list o) {
+  if l.length() == 0 and o.length() == 0 {
+    true
+  } else {
+    if l.length() != o.length() {
+      false
+    } else {
+      l.tail().eq(o.tail())
+    }
+  }
+}
+
+list map(list l, fun f) {
+  _map2(l, f, [])
+}
+
+list _map2(list l, fun f, list acc) {
+  if l == [] {
+    acc
+  } else {
+    _map2(l.tail(), f, acc.push(f.call().with(l.head())))
+  }
 }

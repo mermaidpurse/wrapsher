@@ -153,6 +153,40 @@ module Wrapsher
       end
     end
 
+    # - Create a unique type for the lambda that is
+    #   a subtype of `fun`.
+    # - Define a call function for that unique type
+    # TODO: variable capture - probably adding assignments
+    # to the body for current local variables.
+    class Lambda < Node
+      attr_reader :signature, :refid
+
+      def initialize(slice, tables:)
+        super
+        @signature = slice[:signature]
+        @line = @signature[:type].line_and_column[0] if @signature[:type].respond_to?(:line_and_column)
+        @body = slice[:body]
+        @refid = tables.refid
+        @signature[:arg_definitions] = [@signature[:arg_definitions]].compact.flatten
+        @signature[:name] = 'with'
+        @signature[:arg_definitions].unshift({
+            name: '_wsh_context',
+            type: "fun/#{@refid}"
+          })
+        # The type doesn't need to be explictly referenced, so we don't actually need a
+        # global to be bound to type/fun/#{@refid}, at least for now.
+        # tables.adds << Type.new({ name: "fun/#{@refid}", store_type: 'string' }, tables: tables)
+        tables.adds << FunStatement.new({ signature: @signature, body: @body }, tables: tables)
+      end
+
+      def to_s
+        [
+          line,
+          "_wsh_result='fun:fun/#{refid}:fun:fun@#{@filename}:#{@line}'"
+        ].join("\n  ")
+      end
+    end
+
     class FunStatement < Node
       attr_reader :signature
 
@@ -182,13 +216,14 @@ module Wrapsher
     end
 
     class Signature < Node
-      attr_reader :type, :name, :arg_definitions
+      attr_accessor :name
+      attr_reader :type, :arg_definitions
 
       def initialize(slice, tables:)
         super
         @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
         @type = slice[:type].to_s
-        @name = slice[:name].to_s
+        @name = slice[:name].to_s if slice.key?(:name)
         if !slice[:arg_definitions].nil?
           arg_definitions = slice[:arg_definitions].is_a?(Array) ? slice[:arg_definitions] : [slice[:arg_definitions]]
           @arg_definitions = arg_definitions.map { |arg| ArgDefinition.new(arg, tables: tables) }
@@ -198,8 +233,8 @@ module Wrapsher
         @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
       end
 
-      def summary
-        "#{type} #{name}(#{arg_definitions&.map(&:to_s).join(', ')})"
+      def summary(use_name=nil)
+        "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s).join(', ')})"
       end
 
       def arity
@@ -229,8 +264,8 @@ module Wrapsher
         end.join("\n  ")
       end
 
-      def check_return
-        "_wsh_assert \"${_wsh_result}\" '#{type}' '#{name}()' || return 1"
+      def check_return(use_name=nil)
+        "_wsh_assert \"${_wsh_result}\" '#{type}' '#{use_name || name}()' || return 1"
       end
 
       def function_name(nametype = :definition)
@@ -248,7 +283,7 @@ module Wrapsher
 
       def initialize(slice, tables:)
         super
-        @line = slice[:type].line_and_column[0]
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
         @name = slice[:name].to_s
         @type = slice[:type].to_s
       end
@@ -301,6 +336,9 @@ module Wrapsher
       end
 
       def to_s
+        # TODO: We have to verify the function signature so
+        # we verify that the correct number of things are
+        # pushed onto the stack.
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
@@ -469,19 +507,20 @@ module Wrapsher
       assignment: Assignment,
       bool_term: BoolTerm,
       conditional: Conditional,
-      module: Module,
-      meta: Meta,
-      version: Version,
-      type: Type,
+      lambda: Lambda,
       fun_call: FunCall,
       fun_statement: FunStatement,
       int_term: IntTerm,
+      module: Module,
+      meta: Meta,
       shellcode: ShellCode,
       string_term: StringTerm,
+      type: Type,
       use_external: UseExternal,
       use_global: UseGlobal,
       use_module: UseModule,
       var_ref: VarRef,
+      version: Version,
     }.freeze
 
     class << self

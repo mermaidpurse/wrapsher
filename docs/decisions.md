@@ -20,7 +20,9 @@ Here's some things that aren't important/things wrapsher shouldn't do:
   likely to be pretty slow at text manipulation, unless we elegantly capture
   `sed`, `awk` and similar capabilities for parsing.[^3]
 - It's definitely not important that it be a good shell or a shell at all,
-  or be used to implement a shell. A REPL would be nice as tooling (this
+  or be used to implement a shell. A REPL would be nice as tooling. This is
+  somewhat complicated by the prohibition against bare expressions at
+  the top-level.
 
 [^3]: As a principle of design, Wrapsher would actually discourage the arbitrary
   composition and use of external commands. You should be able to count on and
@@ -69,27 +71,6 @@ and eventually self-host. Here are some steps:
 - Finally, implement a PEG parser in Wrapsher (or use an external one
   that emits, say, a JSON AST) and rewrite the grammar, removing Ruby.
 
-## Variable Scope
-
-We need variable scopes because as things are, all variables
-are global and they can be stepped on. I'd like to make sure
-variables are never shadowed, so:
-
-Global variables can't be shadowed (e.g., it's an error to
-put one in a function signature and when you assign it
-in a function, you're assigning to the global).
-
-Local variables can't be shadowed because they exist in
-the function namespace somehow (maybe as simple as
-`_wshv_function_type_var`). But then you have to have
-some way for the compiler to detect if there's already a
-global. Actualyl that has to be done at run time. So variable
-references probably need an internal function like function
-dispatching does.
-
-Maybe we have to look real hard at whether POSIX sh offers
-some kind of variable scope. I didn't see `local`.
-
 ## Shell Libraries
 
 Some tools (e.g. CircleCI orbs) enforce a certain style
@@ -124,7 +105,7 @@ I think I don't want `return` but I need to document how to return.
 
 ## Variadic functions?
 
-- No variadic functions (difficult, inconsistent, requires splatting)
+- No variadic functions (difficult, inconsistent, requires splatting).
 
 ## String interpolation?
 
@@ -221,52 +202,63 @@ the actual function there will be a failure. Hm.
 
 You can manually implement your own struct, but this seems to be such
 a common case that maybe something like `type foo struct [id: uuid, name: string]`
-should be accepted, and it will generate stuff like:
+should be accepted (or maybe it's actually the zero value, and therefore also defines
+the types: `type foo struct [id: uuid.new(), name: '']` and it will generate stuff like:
 
 ```
-# Pseudocode
-foo = wrap(type/foo, list)
-
-list _as_list(foo i) {
-  i.unwrap(foo)
-}
-
-foo _as_foo(list i) {
-  i.wrap(foo)
-}
-# End pseudocode
-
-foo new() {
+foo new(type/foo t) {
   [
     uuid.new(),
-    string.new()
-  ]
+    ''
+  ]._as(foo)
 }
 
 uuid id(foo i) {
-  i._as_list().at(0)
+  i._as(list).at(0)
 }
 
 foo set_id(foo i, uuid j) {
-  i._as_list().set(0, j)
+  i._as(list).set(0, j)._as(foo)
 }
 
 string name(foo i) {
-  i._as_list().at(1)
+  i._as(list).at(1)
 }
 
-foo set_name(foo i, string j) {
-  i._as_list().set(1, j)
+foo set_name(foo i, string s) {
+  i._as(list).set(1, s)
 }
 ```
 
-## I think I like this:
+## Top-level expressions
+
+Right now, the top-level kind of doesn't have expressions, or it does in certain contexts but the VM
+implementation based on `return` doesn't really work. For eval, a REPL, and certain things like
+above where you want initial global values to have collection values, that doesn't really work.
+
+## Weird syntax ideas
+
+### More operator overloading
 
 'stringtwo,andthis,other' / ',' => list split(string s, string d) => ['stringtwo', 'andthis', 'other']
 
 is s / ',' better than s.split(',')? Is this necessary?
 
-## Pairs as their own thing
+### Assignment operators
+
+`+=` is very popular: implement? What about `*=`, `-=`, etc.? I don't want `++` due to not making
+mutation clear.
+
+### `?` to test presence/nonzero
+
+What if `x?` meant `x.is_zero()` and tested if `x` is equal to the
+type's zero value? Does this over-encourage in-band semaphore values
+as a substitute for optionality/error checking? Is it even useful?
+Will I want a ternary operator later? If so, I don't think I'd want it
+based on ` ... ? ... : ... ` because `:` is probably bound for
+maps/pairs. `... && ... || ...` perhaps?
+
+### Pairs as their own thing
 
 What if a map really is a list of pairs, and pairs are their own thing, that can be used in function
 signatures and stuff. So like
@@ -281,7 +273,18 @@ Or even destructuring in the assignment/function call?
 
 key: value = mymap.head()
 
-## Safety and "Namespaces"
+In fact: probably going to implement maps this way. Pairs are their own thing, and pairlists
+based directly on reflists are probably the storage type, and then `map` is kind of thin alias
+over pairlists. In the future, you could have a `map` based on a different implementation.
+
+### Lambda calls
+
+How about `f.(...)` as syntactic sugar for `f.call().with(...)`? or
+`f->(...)`?
+
+### 
+
+## Safety, "Namespaces" and modules
 
 - Implement various warnings, lints and (overrideable errors), like:
     - Exactly one `module` for modules
@@ -305,6 +308,37 @@ then what if you _want_ it to be an alternate-but-exclusive implementation?
 Like `jq/json` and `pureshell/json`, where you can do `json` types
 but they are coming from different modules?
 
-`use module [version]` is that a thing? Should it be separate, like
-in a Wrapsherfile or something that controls compilation? Bundle-style/Go-style
-constraints and lockfiles?
+Since modules imply global variables with a module value, it's possible
+to declare alternative implementations and replace them, perhaps. So you
+could do:
+
+`use module io`
+`use module better/io`
+
+bool init() {
+  io = module/better/io.new() # or something
+}
+
+Now, types are not replaceable because you can't redefine a global with
+a second type, but again you could alias them:
+
+```
+module better/file
+
+type betterfile int
+
+init() {
+  file = type/betterfile.new() # or something
+}
+
+betterfile open(string filename) {
+  ...
+}
+```
+
+<code>use module _version_</code> should be the one way you declare version
+constraints. I don't want there to be a Wrapsherfile or separate dependency
+solver outside of the language. If you have a dependency and you need a version
+pin, that's a code dependency and belongs in the code.
+
+

@@ -74,13 +74,13 @@ module Wrapsher
       fn = case operator.to_s
            when '==' then ['eq']
            when '!=' then ['eq', 'not']
-           when '<' then ['lt']
-           when '>' then ['gt']
            when '<=' then ['gt', 'not']
            when '>=' then ['lt', 'not']
+           when '<' then ['lt']
+           when '>' then ['gt']
            end
       fn.reduce([left, right]) do |args, fun|
-        { fun_call: { name: fun, fun_args: [left, right] } }
+        { fun_call: { name: fun, fun_args: args } }
       end
     end
 

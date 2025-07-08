@@ -3,7 +3,7 @@ require 'logger'
 require 'parslet'
 require 'wrapsher'
 
-# TODO: loops, comments, errors
+# TODO: maps, loops, comments, errors
 module Wrapsher
   class Syntax < Parslet::Parser
 
@@ -24,14 +24,25 @@ module Wrapsher
     rule(:arg_definitions)          { (arg_definition >> (comma >> arg_definition).repeat).maybe }
     rule(:arg_definition)           { word.as(:type) >> space >> word.as(:name) }
 
-
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
     rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
 
-    rule(:expression)               { (assignment | shellcode_call | conditional | boolean_op) }
+    rule(:expression)               { (assignment | shellcode_call | lambda | conditional | boolean_op) }
 
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
+
+    rule(:lambda)                   do
+      (
+        (
+          word.as(:type) >> space >>
+          str('fun') >> space? >>
+          lparen >> arg_definitions.as(:arg_definitions) >> rparen >> space?
+        ).as(:signature) >>
+        block.as(:body)
+      ).as(:lambda)
+    end
+    rule(:lambda_signature)         { word.as(:type) >> space >> str('fun') >> space? >> lparen >> arg_definitions.as(:arg_definitions) >> paren >> space? }
 
     rule(:assignment)               { (word.as(:var) >> space? >> str('=') >> space? >> expression.as(:rvalue)).as(:assignment) >> space? }
 
@@ -58,7 +69,7 @@ module Wrapsher
 
     rule(:additive_operator)        { str('+') | str('-') }
     rule(:multiplicative_operator)  { str('*') | str('/') | str('%') }
-    rule(:comparison_operator)      { str('==') | str('!=') | str('<') | str('>') | str('<=') | str('>=') }
+    rule(:comparison_operator)      { str('==') | str('!=') | str('>=') | str('<=') | str('<') | str('>') }
     rule(:boolean_operator)         { str('and') | str('or') }
 
     rule(:version)                  { match('[0-9.]').repeat(1) }
