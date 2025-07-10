@@ -27,3 +27,7 @@ def stringify(item)
   end
 end
 
+# make a ruby string into a parsed Wrapsher structure of a string
+def string_term(item)
+  { string_term: { single_quoted: item } }
+end

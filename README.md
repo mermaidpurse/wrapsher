@@ -4,7 +4,7 @@
 
 [Wrapsher](./docs/wrapsher.md) is a shell wrapping language[^1] which takes a
 programmer-friendly, typed language and renders (transpiles) it to
-[POSIX-compliant sh](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html).
+[POSIX-compliant sh](https://pubs.opengroup.org/onlinepubs/9799919799/)
 
 [^1]: The name comes from some munging of "things which wrap a shell",
   "**wrap sh**ell thing**er**" even though what it's doing isn't

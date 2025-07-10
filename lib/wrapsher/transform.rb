@@ -3,6 +3,30 @@ require 'parslet'
 require 'pry'
 
 module Wrapsher
+  class TransformUtil
+    class << self
+      # This should maybe be done further
+      # in the compiler, when there's more type
+      # information and we can make this guess
+      # based on the types of the expressions
+      # in the list (because there could be
+      # other ways of construcing a map. Somewhere, a list of pairs
+      # from the parser needs to be promoted to
+      # a map, and for now, that's here.
+      #
+      # Is this pair.from_kv(...)?
+      def transformed_pair?(p)
+        if p[:fun_call] && p[:fun_call][:name] == 'from_kv' &&
+            p[:fun_call][:fun_args][0] == { var_ref: 'pair' }
+          result = true
+        else
+          result = false
+        end
+        result
+      end
+    end
+  end
+
   class Transform < Parslet::Transform
 
     rule(list_term: subtree(:elements)) do
@@ -11,6 +35,9 @@ module Wrapsher
         the_elements = []
       end
 
+      is_map = false
+      is_map = true if !the_elements.empty? && the_elements.all? { |p| TransformUtil.transformed_pair?(p) }
+
       new_list = {
         fun_call: {
           name: 'new',
@@ -18,7 +45,7 @@ module Wrapsher
         }
       }
 
-      the_elements.reduce(new_list) do |acc, el|
+      the_list = the_elements.reduce(new_list) do |acc, el|
         {
           fun_call: {
             name: 'push',
@@ -26,6 +53,42 @@ module Wrapsher
           }
         }
       end
+
+      if is_map
+        {
+          fun_call: {
+            name: 'from_pairlist',
+            fun_args: [
+              { var_ref: 'map' },
+              the_list
+            ]
+          }
+        }
+      else
+        the_list
+      end
+    end
+
+    rule(pair: subtree(:pair)) do
+      {
+        fun_call: {
+          name: 'from_kv',
+          fun_args: [
+            { var_ref: 'pair' },
+            pair[:key],
+            pair[:value]
+          ]
+        }
+      }
+    end
+
+    rule(empty_map_term: simple(:empty_map)) do
+      {
+        fun_call: {
+          name: 'new',
+          fun_args: [{ var_ref: 'map' }]
+        }
+      }
     end
 
     rule(subscript:{ receiver: subtree(:receiver), index: subtree(:index) }) do

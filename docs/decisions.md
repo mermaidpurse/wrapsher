@@ -198,6 +198,36 @@ I like the idea that interfaces are automatically implemented. Then again,
 I have runtime type checking all over the place so if the type doesn't implement
 the actual function there will be a failure. Hm.
 
+### Function Interfaces
+
+This would solve the somewhat clunky double-call required for funs. Right now
+when you construct a lambda, it returns an item of time fun, the result of
+calling `call()` on which is an item whose value is of
+a unique type associated with the lambda, and accepts the right arguments.
+
+If instead you could define an interface like `callable` or `filter_thunk`,
+you could control the signature of the items passed into the function.
+
+```
+interface callable {
+  any call(self item) # Is this literally what needs to be implemented
+                  # or would the existence of 
+}
+```
+
+```
+interface stringfilter {
+  bool call(string s)
+}
+
+stringlist filter(stringlist sl, stringfilter f) {
+  sl._as(list).filter(bool fun (any e) { f.call(e) })
+}
+```
+
+Something like that?
+
+
 ## "First class" structs?
 
 You can manually implement your own struct, but this seems to be such

@@ -17,6 +17,10 @@ module Wrapsher
         @line = slice[:var].line_and_column[0] if slice[:var].respond_to?(:line_and_column)
         @name = slice[:var].to_s
         @rvalue = Node.from_obj(slice[:rvalue], tables: tables)
+        if tables.context
+          # We're in a function context, so we're keeping track of locals we create
+          tables.push_local(@name)
+        end
       end
 
       def to_s
@@ -39,6 +43,19 @@ module Wrapsher
           line,
           "_wsh_result='bool:#{@value}'"
         ].join("\n  ")
+      end
+    end
+
+    # TODO: Needs to get smarter
+    # Probably all these methods should return an array of lines
+    # So it can be truly empty if needed.
+    class Comment < Node
+      def initialize(slice, tables:)
+        super
+      end
+
+      def to_s
+        ''
       end
     end
 
@@ -176,12 +193,17 @@ module Wrapsher
         # The type doesn't need to be explictly referenced, so we don't actually need a
         # global to be bound to type/fun/#{@refid}, at least for now.
         # tables.adds << Type.new({ name: "fun/#{@refid}", store_type: 'string' }, tables: tables)
-        tables.adds << FunStatement.new({ signature: @signature, body: @body }, tables: tables)
+        tables.adds << FunStatement.new({ signature: @signature, body: @body, }, tables: tables)
       end
 
       def to_s
         [
           line,
+          # We need to build a context here that is retrievable when
+          # this value is passed to `fun/<refid> call(fun f)`. `call`
+          # needs to take the value of `f` and read the context from
+          # it. This means taking all the local variables and putting
+          # them in something in the value. Sounds like I need a map.
           "_wsh_result='fun:fun/#{refid}:fun:fun@#{@filename}:#{@line}'"
         ].join("\n  ")
       end
@@ -369,7 +391,13 @@ module Wrapsher
       def initialize(slice, tables:)
         super
         @string_type = slice.keys.first
-        @value = slice[@string_type].to_s
+        case @string_type
+        when :single_quoted
+          s = slice[@string_type].to_s
+          @value = s.gsub(/\\(.)/) { |m| m[1] }
+        else
+          @value = slice[@string_type].to_s
+        end
       end
 
       def to_s
@@ -388,7 +416,12 @@ module Wrapsher
       def to_s
         [
           line,
-          "_wsh_result='string:#{@value}'"
+          "read -r -d '' _wshi <<'EOSTRING'
+#{@value}
+_wsh_eof
+EOSTRING
+",
+          '_wsh_result="string:${_wshi%$\'\\n\'_wsh_eof}"'
         ].join("\n  ")
       end
     end
@@ -506,6 +539,7 @@ module Wrapsher
     @@nodes = {
       assignment: Assignment,
       bool_term: BoolTerm,
+      comment: Comment,
       conditional: Conditional,
       lambda: Lambda,
       fun_call: FunCall,

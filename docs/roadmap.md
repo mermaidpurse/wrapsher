@@ -2,7 +2,18 @@
 
 ## Issues
 
-- Function signatures must be verified in the compiler
+- Local variables must be tracked by the compiler (probably
+  with a list in `tables`) so that variable capture can
+  occur in closures (using a map, likely)
+- Once that is the case, the compiler can do the variable
+  cleanup
+- The pair operator's precedence is wrong, it should bind tighter
+  than everything but boolean not (e.g. `x == k: v` current means
+  `false: v` and it should mean `x.eq(k: v)`.
+- Need negative ints
+- You can't chain operators of the same precedence
+- Function signatures must be verified in the compiler to
+  avoid stack corruption
 - Global variables must be protectable, which probably means
   some kind of file scoping or override assignment so that
   module settings can work. It can cause very very strange
@@ -18,9 +29,12 @@
   `_wshg_list__string` and `_wshf_join_list__string`,
   `type list__string` is illegal, and `type list/_string`
   yields `_wshg_list___string` and `_wshf_join_list___string`.
-- Local variables must be tracked by the compiler (probably
-  with a list in `tables`) so that variable capture can
-  occur in closures.
+- Comments can't end the file?
+- Only line comments are allowed
+- And only at the top-level (not in functions)
+- You can't compile the core module because it tries to `use` itself
+  due to the wsh preamble.
+- Trailing spaces after `}` cause a parse error
 
 ## MVP
 
@@ -37,3 +51,4 @@
 
 - stdlib modules
 - improve test framework
+- better syntax errors

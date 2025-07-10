@@ -8,7 +8,7 @@ use global stdout 1
 int println(module/io m, string s) {
   shell '''
   _wsh_get_local s _wshi
-  echo "${_wshi#string:}"
+  printf '%s\n' "${_wshi#string:}"
   _wsh_result="int:$((${#_wshi} - 7))"
   '''
 }
@@ -17,7 +17,7 @@ int println(int fd, string s) {
   shell '''
   _wsh_get_local fd _wshi
   _wsh_get_local s _wshj
-  echo "${_wshj#string:}" >&"${_wshi#int:}"
+  printf '%s\n' "${_wshj#string:}" >&"${_wshi#int:}"
   _wsh_result="int:$((${#_wshi} - 7))"
   '''
 }

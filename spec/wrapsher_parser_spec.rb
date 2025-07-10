@@ -15,6 +15,261 @@ def test_fun(body)
 end
 
 RSpec.describe Wrapsher::Parser do
+  it "parses line comments at the top level" do
+    source = <<~'EOF'
+    # Intro to function
+    # Second comment
+    bool test() {
+      false
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      [
+        { comment: ' Intro to function' },
+        { comment: ' Second comment' }
+      ] + test_fun([{ bool_term: 'false' }])
+      )
+  end
+
+  it "parses strings" do
+    source = <<~'EOF'
+    bool test() {
+      '\''
+      '\\back'
+      '\'\''
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          string_term("\\'"),
+          string_term("\\\\back"),
+          string_term("\\'\\'")
+        ]))
+  end
+
+  it "parses an empty map" do
+    source = <<~EOF
+    bool test() {
+      [:]
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'new',
+              fun_args: [{ var_ref: 'map' }]
+            }
+          }
+        ]))
+  end
+
+  it "parses an empty map in a function call" do
+    source = <<~'EOF'
+    bool test() {
+      y._x(p, [:])
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: '_x',
+              fun_args: [
+                { var_ref: 'y' },
+                { var_ref: 'p' },
+                {
+                  fun_call: {
+                    name: 'new',
+                    fun_args: [{ var_ref: 'map' }]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a pair in an expression" do
+    source = <<~'EOF'
+    bool test() {
+      p = 'key1': 'value1'
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+         {
+            assignment: {
+              var: 'p',
+              rvalue: {
+                fun_call: {
+                  name: 'from_kv',
+                  fun_args: [
+                    { var_ref: 'pair' },
+                    string_term('key1'),
+                    string_term('value1')
+                  ]
+                }
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a pair in a complex expression", skip: 'TODO: fix precedence of pair operator' do
+    source = <<~'EOF'
+    bool test() {
+      p == 'key1': 'value1'
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'eq',
+              fun_args: [
+                { var_ref: 'p' },
+                {
+                  fun_call: {
+                    name: 'from_kv',
+                    fun_args: [
+                      { var_ref: 'pair' },
+                      string_term('key1'),
+                      string_term('value1')
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a pair in an expression with chains", skip: 'TODO: fix pair operator precedence' do
+    source = <<~'EOF'
+    bool test() {
+      m.head() == 'key1': 'value1'
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'eq',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'head',
+                    fun_args: [
+                      { var_ref: 'm' }
+                    ]
+                  }
+                },
+                {
+                  fun_call: {
+                    name: 'from_kv',
+                    fun_args: [
+                      { var_ref: 'pair' },
+                      string_term('key1'),
+                      string_term('value1')
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a pair" do
+    source = <<~EOF
+    bool test() {
+      'key1': 'value1'
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'from_kv',
+              fun_args: [
+                { var_ref: 'pair' },
+                string_term('key1'),
+                string_term('value1')
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a map" do
+    source = <<~EOF
+    bool test() {
+      ['key1': 'value1', 'key2': 'value2']
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'from_pairlist',
+              fun_args: [
+                { var_ref: 'map' },
+                {
+                  fun_call: {
+                    name: 'push',
+                    fun_args: [
+                      {
+                        fun_call: {
+                          name: 'push',
+                          fun_args: [
+                            {
+                              fun_call: {
+                                name: 'new',
+                                fun_args: [{ var_ref: 'list' }]
+                              }
+                            },
+                            {
+                              fun_call: {
+                                name: 'from_kv',
+                                fun_args: [
+                                  { var_ref: 'pair' },
+                                  string_term('key1'),
+                                  string_term('value1')
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        fun_call: {
+                          name: 'from_kv',
+                          fun_args: [
+                            { var_ref: 'pair' },
+                            string_term('key2'),
+                            string_term('value2')
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+          ]))
+    end
+
   it "evaluates != as a chain" do
     source = <<~EOF
     bool test() {
@@ -227,7 +482,7 @@ RSpec.describe Wrapsher::Parser do
   it "parses an empty list" do
     source = <<~EOF
     bool test(){
-      []
+      [ ]
     }
     EOF
     program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
@@ -237,6 +492,50 @@ RSpec.describe Wrapsher::Parser do
             fun_call: {
               name: 'new',
               fun_args: [{var_ref: 'list'}]
+            }
+          }
+        ]))
+  end
+
+  it "parses an additive expression", skip: 'TODO: chain operators' do
+    source = <<~'EOF'
+    bool test() {
+      x.to_string() + ' ' + ' '
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    # plus(plus(to_string(x), string_term(' ')), to_string(y))
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'plus',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'plus',
+                    fun_args: [
+                      {
+                        fun_call: {
+                          name: 'to_string',
+                          fun_args: [
+                            {var_ref: 'x'}
+                          ]
+                        }
+                      },
+                      string_term(' ')
+                    ]
+                  }
+                },
+                {
+                  fun_call: {
+                    name: 'to_string',
+                    fun_args: [
+                      { var_ref: 'y' }
+                    ]
+                  }
+                }
+              ]
             }
           }
         ]))

@@ -3,7 +3,6 @@ _wsh_stackp=0
 _wsh_frame=0
 
 _wsh_typeof() {
-  _wsh_type=''
   _wsh_type="${1%%:*}"
 }
 
@@ -39,11 +38,15 @@ _wsh_assert() {
   esac
 }
 
-# Should these evals be reads?
 # or : ((_wsh_stack${_wsh_stackp}="${1}"))
 # _wsh_stack_push arg
 _wsh_stack_push() {
   _wsh_stackp=$((_wsh_stackp + 1))
+  case "$((_wsh_stackp > 10000))" in 1)
+    _wsh_error="error:Stack overflow at $_wsh_line"
+    _wsh_panic 1 "_wsh_stack_push"
+  ;;
+  esac
   eval "_wsh_stack${_wsh_stackp}=\"\${1}\""
 }
 
@@ -111,7 +114,6 @@ _wsh_run() {
   unset ${_wsh_cleanup}
   _wsh_cleanup=''
   # find refs to be protected
-  _wsh_outrefs=''
   _wsh_scan_refs "${_wsh_result}"
   _wsh_get_local _reflist _wshi
   # clean up refs that we aren't passing out
@@ -128,30 +130,61 @@ _wsh_run() {
   esac
 }
 
-# _wsh_scan_refs value
+# _wsh_scan_refs value => _wsh_outrefs
 _wsh_scan_refs() {
-  _wsh_typeof "${1}"
-  _wsh_get_global "${_wsh_type}" _wsh_typeof_type
-  case "${_wsh_typeof_type#type/${_wsh_type}:}" in builtin)
-    case "${_wsh_type}" in ref)
-      _wsh_outrefs="${_wsh_outrefs} ${1}"
-      _wsh_deref_into "${1}" _wshi
-      _wsh_scan_refs "${_wshi}"
-    ;; reflist)
-      for _wshi in ${1#reflist:}
+  _wsh_scan_val="${1}"
+  _wsh_outrefs=''
+  _wsh_refs_to_scan=''
+  _wsh_iter=0
+  while : $((_wsh_iter++))
+  do
+    case "${_wsh_scan_val}" in type/*)
+      # It's a type value, it can't contain refs
+      _wsh_scan_val=''
+      continue
+    ;; ?*)
+      # A value to scan for refs
+      # strip it until it's down to a builtin type, then
+      # see if it's a ref or reflist--the other builtins
+      # can't contain refs
+      _wsh_inner=0
+      while : $((_wsh_inner++))
       do
-        _wsh_outrefs="${_wsh_outrefs} ${_wshi}"
+        _wsh_scan_bare="${_wsh_scan_val%%:*}"
+        _wsh_get_global "${_wsh_scan_bare}" _wsh_scan_type
+        case "${_wsh_scan_type#type/${_wsh_scan_bare}:}" in builtin)
+          case "${_wsh_scan_bare}" in reflist)
+            for _wshi in ${_wsh_scan_val#reflist:}
+            do
+              _wsh_outrefs="${_wsh_outrefs} ${_wshi}"
+              _wsh_refs_to_scan="${_wsh_refs_to_scan}${_wsh_refs_to_scan:+ }${_wshi}"
+            done
+          ;; ref)
+            _wsh_outrefs="${_wsh_outrefs} ${_wsh_scan_val}"
+            _wsh_refs_to_scan="${_wsh_refs_to_scan}${_wsh_refs_to_scan:+ }${_wsh_scan_val}"
+          esac
+          _wsh_scan_val=''
+          break
+        ;; *)
+          _wsh_scan_val="${_wsh_scan_val#${_wsh_scan_bare}:}"
+        ;;
+        esac
       done
-    ;;
+    ;; *)
+      # No value to scan, see if there are refs left to scan
+      case "${_wsh_refs_to_scan}" in ?*)
+        # unshift the next ref to scan, and make it the
+        # next value to scan
+        _wshi="${_wsh_refs_to_scan%% *}"
+        _wsh_refs_to_scan="${_wsh_refs_to_scan#${_wshi}}"
+        _wsh_refs_to_scan="${_wsh_refs_to_scan# }"
+        _wsh_deref_into "${_wshi}" _wsh_scan_val
+      ;; *)
+        # No refs to scan, either--we're done
+        break
+      esac
     esac
-  ;; '')
-    _wsh_error="error:Unknown type '${_wsh_type}' at $_wsh_line"
-    return 1
-  ;; *)
-    # scan wrapped value
-    _wsh_scan_refs "${1#${_wsh_type}:}"
-  ;;
-  esac
+  done
 }
 
 # _wsh_cleanup_refs _reflist raw_outrefs

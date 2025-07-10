@@ -7,7 +7,7 @@ require 'wrapsher'
 module Wrapsher
   class Syntax < Parslet::Parser
 
-    rule(:program)                  { statement.repeat }
+    rule(:program)                  { (comment | statement).repeat }
     rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol }
     rule(:use_statement)            { use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement }
     rule(:meta_statement)           { (str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data)).as(:meta) }
@@ -28,7 +28,7 @@ module Wrapsher
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
     rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
 
-    rule(:expression)               { (assignment | shellcode_call | lambda | conditional | boolean_op) }
+    rule(:expression)               { (assignment | shellcode_call | lambda | conditional | pair) }
 
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
 
@@ -46,10 +46,12 @@ module Wrapsher
 
     rule(:assignment)               { (word.as(:var) >> space? >> str('=') >> space? >> expression.as(:rvalue)).as(:assignment) >> space? }
 
+    rule(:pair)                     { (boolean_op.as(:key) >> space? >> colon >> space? >> boolean_op.as(:value)).as(:pair) | boolean_op }
     rule(:boolean_op)               { (comparison.as(:left) >> space? >> boolean_operator.as(:operator) >> space? >> comparison.as(:right)).as(:boolean_op) | comparison }
     rule(:comparison)               { (additive_op.as(:left) >> space? >> comparison_operator.as(:operator) >> space? >> additive_op.as(:right)).as(:comparison) | additive_op }
     rule(:additive_op)              { (multiplicative_op.as(:left) >> space? >> additive_operator.as(:operator) >> space? >> multiplicative_op.as(:right)).as(:additive_op) | multiplicative_op }
     rule(:multiplicative_op)        { (subscript.as(:left) >> space? >> multiplicative_operator.as(:operator) >> space? >> subscript.as(:right)).as(:multiplicative_op) | subscript }
+
     rule(:subscript)                { (chain.as(:receiver) >> lbracket >> expression.as(:index) >> rbracket).as(:subscript) | chain }
     rule(:chain)                    { postfix_chain | fun_call | boolean_not }
     rule(:boolean_not)              { ((str('not') >> space | str('!') >> space?) >> expression.as(:subject)).as(:boolean_not) | term }
@@ -59,8 +61,9 @@ module Wrapsher
     rule(:fun_call)                 { (word.as(:name) >> lparen >> space? >> fun_args.maybe.as(:fun_args) >> space? >> rparen).as(:fun_call) }
     rule(:fun_args)                 { expression >> (comma >> expression).repeat }
 
-    rule(:term)                     { group | int_term | bool_term | string_term | list_term | var_ref }
-    rule(:list_term)                { lbracket >> (expression >> (comma >> expression).repeat).maybe.as(:list_term) >> rbracket >> space? }
+    rule(:term)                     { group | int_term | bool_term | string_term | empty_map_term | list_term | var_ref }
+    rule(:empty_map_term)           { (lbracket >> space? >> colon >> space? >> rbracket).as(:empty_map_term) >> space? }
+    rule(:list_term)                { lbracket >> whitespace? >> (expression >> (comma >> expression).repeat).maybe.as(:list_term) >> whitespace? >> rbracket >> space? }
     rule(:group)                    { lparen >> expression.as(:group) >> rparen >> space? }
     rule(:int_term)                 { (str('-').maybe >> match('[0-9]').repeat(1)).as(:int_term) >> space? }
     rule(:bool_term)                { (str('true') | str('false')).as(:bool_term) >> space? }
@@ -74,9 +77,17 @@ module Wrapsher
 
     rule(:version)                  { match('[0-9.]').repeat(1) }
     rule(:string)                   { triple_quoted | single_quoted }
-    rule(:single_quoted)            { str('\'') >> char.repeat.as(:single_quoted) >> str('\'') }
+    rule(:single_quoted) do
+      str('\'') >>
+      (
+        match('[^\'\\\\]') |
+        (str('\\') >> any) | (str('\'').absent? >> any)
+      ).repeat.as(:single_quoted) >> str('\'')
+    end
     rule(:triple_quoted)            { str("'''") >> (str("'''").absent? >> any).repeat.as(:triple_quoted) >> str("'''") }
+    rule(:comment)                  { str('#') >> match('[^\n]').repeat.as(:comment) >> str("\n") }
 
+    rule(:colon)                    { str(':') }
     rule(:lbracket)                 { str('[') }
     rule(:rbracket)                 { str(']') }
     rule(:lbrace)                   { str('{') }
@@ -84,7 +95,6 @@ module Wrapsher
     rule(:lparen)                   { str('(') }
     rule(:rparen)                   { str(')') }
     rule(:comma)                    { str(',') >> whitespace? }
-    rule(:char)                     { str('\\\'') | (str('\'').absent? >> any) }
     rule(:space)                    { match(' ').repeat(1) }
     rule(:space?)                   { space.maybe }
     rule(:whitespace)               { match('\s').repeat(1) }

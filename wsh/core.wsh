@@ -9,8 +9,10 @@ type int builtin
 type string builtin
 type reflist builtin
 type list reflist
+type pair reflist
+type map reflist
 
-any typeof(any i) {
+any _typeof(any i) {
   shell '''
   _wsh_get_local i _wshi
   _wsh_typeof "${_wshi}"
@@ -18,41 +20,51 @@ any typeof(any i) {
   '''
 }
 
+# Wrap or unwrap a value, coercing it to its derived type (by wrapping
+# it, as the target derived type is the storage_type for the target
+# type; or by unwrapping it, as the value is of the storage_type of
+# the target type; or by leaving it alone, if the value is already of
+# the target type. The 'as' argument is a global variable with a type
+# value such as `type/list:reflist`. The 'i' is a (type-tagged) value
+# to be coerced.
 any _as(any i, any as) {
-  in = typeof(i)
+  in = _typeof(i)
   shell '''
-  _wsh_get_local in _wshi  # 'type/list:reflist'
-  _wsh_get_local as _wshl  # 'type/reflist:builtin'
+  _wsh_get_local i _wsh_i    # 'list:reflist:...'
+  _wsh_get_local in _wsh_in  # 'type/list:reflist'
+  _wsh_get_local as _wsh_as  # 'type/reflist:builtin'
 
-  case "${_wshl%%:*}" in type/*)
+  case "${_wsh_as%%:*}" in type/*)
     :
   ;; *)
-    _wsh_error="error:Expected a type (e.g. 'type/list:reflist'), got '${_wshl}'"
+    _wsh_error="error:_as expected a type (e.g. 'type/list:reflist'), got '${_wshl}' at ${_wsh_line}"
     return 1
   ;;
   esac
 
-  _wshj="${_wshi#type/*:}" # 'reflist' - parent type (bare)
-  _wshk="${_wshi%%:*}"
-  _wshk="${_wshk#type/}"   # 'list' - own type (bare)
+  # Reduce type types to words
+  _wsh_in_storage_type="${_wsh_in#*:}"
+  _wsh_in="${_wsh_in%%:*}"
+  _wsh_in="${_wsh_in#type/}"
 
-  _wshm="${_wshl#type/*:}" # 'builtin' - target type's parent
-  _wshn="${_wshl%%:*}"
-  _wshn="${_wshn#type/}"   # 'reflist' - target type (bare)
-  _wsh_get_local i _wsho
-  case "${_wshn}" in "${_wshk}")
-    # target bare type is own bare type--noop
-    _wsh_result="${_wsho}"
-  ;; "${_wshj}")
-    # target bare type is own parent bare type--unwrap
-    _wsh_result="${_wsho#${_wshk}:}"
-    _wsh_assert "${_wsh_result}" "${_wshn}" || return 1
+  _wsh_as_storage_type="${_wsh_as#*:}"
+  _wsh_as="${_wsh_as%%:*}"
+  _wsh_as="${_wsh_as#type/}"
+
+  case "${_wsh_in}" in "${_wsh_as}")
+    # target type (${_wsh_in}) is our type (${_wsh_as})--noop
+    _wsh_result="${_wsh_i}"
+  ;; "${_wsh_as_storage_type}")
+    # our type is target's storage type--wrap
+    # by adding our type to the value
+    _wsh_result="${_wsh_as}:${_wsh_i}"
   ;; *)
-    case "${_wshk}" in "${_wshm}")
-      # own bare type is target parent type--wrap
-      _wsh_result="${_wshn}:${_wsho}"
+    case "${_wsh_in_storage_type}" in "${_wsh_as}")
+      # our type's storage type is the target's type--unwrap
+      # by removing our type from value
+      _wsh_result="${_wsh_i#${_wsh_in}:}"
     ;; *)
-      _wsh_error="error:Can't cast ${_wshk} value to ${_wshn}"
+      _wsh_error="error: Can't cast ${_wsh_in} value to ${_wsh_as}"
       return 1
     ;;
     esac
@@ -263,7 +275,11 @@ string times(string s, int i) {
   if i > 1 {
     s + times(s, i - 1)
   } else {
-    s
+    if i == 1 {
+      s
+    } else {
+      ''
+    }
   }
 }
 
@@ -327,7 +343,7 @@ ref head(reflist rl) {
   shell '''
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
-    _wsh_error="error:attempted to take head() of []"
+    _wsh_error="error:attempted to take head() of [] at ${_wsh_line}"
     return 1
   ;; *)
     _wshj="${_wshi#reflist:}"
@@ -341,7 +357,7 @@ reflist tail(reflist rl) {
   shell '''
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
-    _wsh_error="error:attempted to take tail() of []"
+    _wsh_error="error:attempted to take tail() of [] at ${_wsh_line}"
     return 1
   ;; *)
     _wshj="${_wshi#reflist:}"
@@ -372,9 +388,10 @@ ref at(reflist rl, int i) {
       break
     ;;
     esac
+    : $((_wshk++))
   done
   case "${_wshm}" in notfound)
-    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk}"
+    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk} at ${_wsh_line}"
     return 1
   ;;
   esac
@@ -395,6 +412,26 @@ int length(reflist rl) {
     _wsh_result="int:${_wshk}"
   ;;
   esac
+  '''
+}
+
+reflist set(reflist rl, int i, ref r) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local i _wshj
+  _wsh_get_local r _wshk
+  _wshl=0
+  _wshm=''
+  for _wshn in ${_wshi#reflist:}
+  do
+    case $((_wshl == "${_wshj#int:}")) in 1)
+      _wshm="${_wshm}${_wshm:+ }${_wshk}"
+    ;; *)
+      _wshm="${_wshm}${_wshm:+ }${_wshn}"
+    ;;
+    esac
+  done
+  _wsh_result="reflist:${_wshm}"
   '''
 }
 
@@ -507,5 +544,111 @@ list _map2(list l, fun f, list acc) {
     acc
   } else {
     _map2(l.tail(), f, acc.push(f.call().with(l.head())))
+  }
+}
+
+any find(list l, fun f, any d) {
+  if l == [] {
+    d
+  } else {
+    h = l.head()
+    if f.call().with(h) {
+      h
+    } else {
+      l.tail().find(f, d)
+    }
+  }
+}
+
+pair new(type/pair t) {
+  t.from_kv(false, false)
+}
+
+pair from_kv(type/pair t, any k, any v) {
+  reflist.new().push(k.ref()).push(v.ref())._as(pair)
+}
+
+any key(pair p) {
+  p._as(reflist).at(0).deref()
+}
+
+any value(pair p) {
+  p._as(reflist).at(1).deref()
+}
+
+bool eq(pair p, pair o) {
+  p.key() == o.key() and p.value() == o.value()
+}
+
+string to_string(pair p) {
+  p.key().to_string().plus(': ').plus(p.value().to_string())
+}
+
+map new(type/map t) {
+  reflist.new()._as(map)
+}
+
+int length(map m) {
+  m._as(reflist).length()
+}
+
+map from_pairlist(type/map t, list pl) {
+  pl._as(reflist)._as(map)
+}
+
+pair head(map m) {
+  m._as(reflist).head().deref()._as(pair)
+}
+
+map tail(map m) {
+  m._as(reflist).tail()._as(map)
+}
+
+map push(map m, pair p) {
+  m._as(reflist).push(p.ref())._as(map)
+}
+
+any at(map m, any k) {
+  if m.length() == 0 {
+    shell '''
+    _wsh_get_local k _wshi
+    _wsh_error="error:No such key in map: ${_wshi} at ${_wsh_line}"
+    return 1
+    '''
+  }
+  h = m.head()
+  if h.key() == k {
+    h.value()
+  } else {
+    m.tail().get(k)
+  }
+}
+
+bool has(map m, any k) {
+  if m.length() == 0 {
+    false
+  } else {
+    if m.head().key() == k {
+      true
+    } else {
+      m.tail().has(k)
+    }
+  }
+}
+
+map set(map m, pair p) {
+  m._set3(p, [:])
+}
+
+map _set3(map m, pair p, map acc) {
+  if m.length() == 0 {
+    acc.push(p)
+  } else {
+    h = m.head()
+    if h.key() == p.key() {
+      acc.push(p) + m.tail()
+    } else {
+      acc.push(m.head()) + m.tail()
+    }
   }
 }

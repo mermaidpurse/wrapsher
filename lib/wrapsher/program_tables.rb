@@ -2,7 +2,8 @@ require 'wrapsher'
 
 module Wrapsher
   class ProgramTables
-    attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds
+    attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds,
+                  :context, :locals
 
     def initialize(
         filename: '-',
@@ -19,6 +20,16 @@ module Wrapsher
       @included = included
       @compiler_refid = compiler_refid
       @adds = adds
+      @context = nil
+    end
+
+    def push_local(name)
+      @locals ||= []
+      @locals << name
+    end
+
+    def clear_locals
+      @locals = []
     end
 
     def refid
