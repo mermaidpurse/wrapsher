@@ -11,20 +11,23 @@ dependencies, including commands that are often built-ins (but aren't
 required by POSIX to be built-in), are only available in optional modules.
 
 Note that `io` is one of these optional modules, because it requires
-commands like `echo` and `printf`. Wrapsher calls these commands
-`external` because they aren't required to be built-in; in reality, most
-POSIX-compliant shells do build these in, so requiring them doesn't
-actually activate the `external` feature.
+commands like `echo` and `printf`, which are not guaranteed by POSIX
+to be built-in. Wrapsher calls these commands `external` because they
+aren't required to be built-in; in reality, most POSIX-compliant
+shells do build these in, so requiring them doesn't actually activate
+the `external` feature.
 
 ## Status
 
-Wrapsher is pre-alpha software.
+Wrapsher is pre-alpha software, and not feature-complete.
 
 ## Getting Started -- The Basics
 
-The Wrapsher build tool, `wrapsher`, is written in Ruby. The result is
-portable pure `sh`, though, and neither `wrapsher` nor Ruby are required
-to run any compiled Wrapsher program.
+The Wrapsher build tool, `wrapsher`, is written in Ruby. The resulting
+compiled program is portable pure `sh`, though, and neither `wrapsher`
+nor Ruby are required to run any compiled Wrapsher program--it's standalone,
+and requires no dependencies (except for external commands, which it
+will exit cleanly if not present).
 
 Wrapsher source code files conventionally have a `.wsh` file extension.
 
@@ -53,11 +56,13 @@ signature, so the `main` function must accept a list.
 
 Create a file `hello.wsh` and run `wrapsher compile hello.wsh`. This will
 produce an output file `hello`, which starts with `#!/bin/sh` and contains
-ugly but straightforward shell code.
+(voluminous, ugly) shell code.
 
 You'll see that one of Wrapsher's design goals is explicitly _not_ to
 produce readable or maintainable shell scripts--they are intended to
-be opaque, and maintained as Wrapsher programs.
+be opaque, and maintained as Wrapsher programs only. Wrapsher compiles
+to a kind of shell-based assembly language which is (intended to be)
+safe and correct but isn't terribly readable.
 
 ## Language
 
@@ -87,7 +92,7 @@ Top-level statements in Wrapsher can be:
       that the **core** module is always implicitly included.
 - A `meta` statement providing metadata which is available to programs
   loading the module (**UNIMPLEMENTED**):
-    - `meta version`: the module version
+    - `meta version`: the module or program version
     - `meta source`: the source URL
     - `meta author`: the author
     - `meta docs`: help documentation. When the program is at the
@@ -172,8 +177,7 @@ Block expressions accept blocks:
   and, if true, executes the provided block. If false, executes
   the `else` block.
 - <code>while _expression_ _block_</code>: evaluates the `bool` _expression_
-  and, as long as it's true, executes the _block_. **UNIMPLEMENTED,MAYBE**
-
+  and, as long as it's true, executes the _block_. **UNIMPLEMENTED**
 
 #### Operators
 
@@ -301,8 +305,9 @@ an optional value.
 | `int`    | `0`              | `0`, `99`, `-22`, `0xa8`       |
 | `string` | `''`             | `'bob'`, `'café'`              |
 | `list`   | `[]`             | `['one', 2, false, [0, 1, 2]]` |
+| `pair`   | `false: false`   | `'one': 1`                     |
 | `map`    | `[:]`            | `['one': 1, 'two': 2]`         |
-| `fun`    | `any fun () {}`  | `bool fun (int i) { i == 0 }` |
+| `fun`    | `any fun () {}`  | `bool fun (int i) { i == 0 }`  |
 
 Each of these fundamental types has a way of writing literal values
 in that type:
@@ -390,25 +395,37 @@ Arrays can be subscripted like strings: `mylist[n]` is syntactic sugar
 for `mylist.at(n)`.
 
 - `list new(type/list) { [] }`
-- `list as_list(list l) { l }`
 - `any at(list l, int i)`
 - `bool has(list l, any e)`
 - `int index(list l, any e)`
-- `int length(list a)`
+- `int length(list l)`
 - `list slice(list l, int i, int len)`
-- `list push(list l, any e)`
 - `list set(list l, int i, any e)`
+- `list push(list l, any e)`
+- `list pop(list l)`
 - `list unshift(list l, any e)`
 - `list delete(list l, int i)`
-- `list plus(list l, list l)`
+- `list plus(list l, list o)`
+- `list minus(list l, list o)`
 - `list map(list l, fun f)`
 - `any reduce(list l, fun f, any i)`
+- `list select(list l, fun f)`
 - `string to_string(list l)`
 - `bool any(list l, fun f)`
 - `bool all(list l, fun f)`
 - `any head(list l)`
 - `any tail(list l)`
 - `list join(list l, string s)`
+
+##### `pair`
+
+A pair is a couple, or a single association between a key and a value.
+The key and value can be of any type.
+
+- `pair new(type/pair)`
+- `any key(pair p)`
+- `any value(pair p)`
+- `string to_string(pair p)`
 
 ##### `map`
 
@@ -417,18 +434,48 @@ and strings, it can be subscripted using the `[]` operator: `m[key]`
 is syntactic sugar for `m.at(key)`.
 
 - `map new(type/map) { [:] }`
-- `map as_map(map m) { m }`
 - `any at(map m, any k)`
-- `bool has(map m, string key)`
-- `string index(map m, any e)`
-- `map set(map m, string key, any e)`
+- `bool has(map m, any k)`
+- `any index(map m, any v)`
+- `map set(map m, pair p)`
 - `map slice(map m, list l)`
 - `string to_string(map m)`
-- `map filter(map m, fun f)`
+- `map select(map m, fun f)`
 - `map map(map m, fun f)`
 - `int length(map m)`
 
-Like lists, map literals are written 
+Like lists, map literals are written in square brackets `[` and `]`.
+Within the brackets is a list of pairs. The fact that all members
+of a list literal are pairs is what signals that it is a map to
+the compiler; if they aren't, then you will get a list instead
+(a heterogeneous list).
+
+For example, the following is a map:
+
+```
+m = [
+  'id': 2992,
+  'name': 'Harold'
+]
+
+m['id'] == 2992
+```
+
+While the following is a list (of which one
+element is pair):
+
+```
+l = [
+  2992,
+  'name': 'Harold'
+]
+
+try { m['id'] } catch e { e.has("expected an 'int'") }
+try { m['name'] } catch e { e.has("expected an 'int'") }
+m[0] == 2992
+m[1] == 'name': 'Harold'
+m[1].key() == 'name'
+```
 
 ##### `any`
 
@@ -443,7 +490,7 @@ of the form <code><i>type</i> fun (<i>argument_list</i>)</code>.
 The argument list of types and variable names is the same as
 in function definitions.
 
-The result of the expression is of the type `fun`, which you
+The result of the expression is of the type `fun`, on which you
 can use the call function:
 
 ```
@@ -467,16 +514,24 @@ l2.all(bool fun (int i) { i % 2 == 0 }) == true
 ```
 
 Note that the `list` functions, in combination with `fun`
-items, make for a powerful way to express iteration through
-recursion.
+items, make for a powerful way to express iteration.
+
+`fun` items are closures, and capture local variables in
+their context. This allows you to do things like:
+
+```
+factor = 10
+[10, 15, 20, 25, 30].select(bool fun (int i) { i % factor == 0 }) == [10, 20, 30]
+```
 
 ### Variables
 
 Wrapsher has no separate variable declaration syntax, and variables
-have no types. Data in Wrapsher is immutable, but variables are
-rebindable, so when you update a value, you need to assign the new
-value. You can assign the new value to the same variable. This is
-how you make "updates" to collections, for example:
+have no types (values have types, not variables). Data in Wrapsher is
+immutable, but variables are rebindable, so when you update a value,
+you need to assign the new value. You can assign the new value to the
+same variable. This is how you make "updates" to collections, for
+example:
 
 ```
 s = 'hello'
@@ -490,23 +545,26 @@ s = s.set(0, 'H')
 s == 'Hello'
 ```
 
-Variables are created upon initial assignment, and are cleaned up at the
-end of the function they are in. Only local variables are created in this way.
+Variables are created upon initial assignment, and are cleaned up at
+the end of the function they are in. Only local variables are created
+in this way.  Variables that are captured by a closure exist inside
+that closure when called.
 
-Global variables exist but they are not created by top-level assignments, but
-only through special statements like `module`, `type` and `use`. They
-are referenced just like other variables and in fact are rebindable (this is
-how "mutable" global objects like module settings can be implemented):
+Global variables exist but they are not created by top-level
+assignments. They are only created through special statements like
+`module`, `type` and `use`. They are referenced just like other
+variables and in fact are rebindable (this is how "mutable" global
+objects like module settings can be implemented):
 
 ```
 module file
 
 bool is_syncio(module/file m) {
-  m._as_map['synchronous']
+  m._as(map)['synchronous']
 }
 
 bool set_is_syncio(module/file m, bool p) {
-  file = m._as_map.set('synchronous', p)._as_moduleio()
+  file = m._as(map).set('synchronous': p)._as(typeof(m))
 }
 ```
 
@@ -514,9 +572,24 @@ bool set_is_syncio(module/file m, bool p) {
 
 **UNIMPLEMENTED**
 
+Wrapsher discourages the use of "in-band" error signaling requiring
+error checks (for example, returning a zero or invalid value and
+expecting that this will signal an error). Use the keyword `throw` to
+throw an error. The argument to `throw` is then used to prevent
+further execution.  Uncaught errors bubble all the way up to the
+top-level and the program panics.
+
+You can catch errors using a <code>try { } catch _var_ { }</code>
+block. The _var_ variable is set to the error inside the `catch`
+block. If you want to test for error type or condition, use `if`. 
+You can re-throw the error explicitly using `throw` again, or
+you can ignore it.
+
 ### Loops
 
 **UNIMPLEMENTED**
+
+Wrapsher has `while` loops of the form <code>while _condition_ { }</code
 
 ### Programs vs. Modules - `main`
 
@@ -578,6 +651,7 @@ The folllowing modules comprise the standard library:
 | [**io**](wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
 | [**test**](wsh/test.wsh) | Test framework | pre-alpha |
 | [**math**](wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
-| [**http**](wsh/http.wsh) - HTTP communication based on `curl` | **UNIMPLEMENTED** |
-| [**sys**](wsh/sys.wsh)           - System shells and platform | **UNIMPLEMENTED** |
-| [**optparse**](wsh/optparse.wsh) - Parse command-line options | **UNIMPLEMENTED** |
+| [**http**](wsh/http.wsh) | HTTP communication based on `curl` | **UNIMPLEMENTED** |
+| [**sys**](wsh/sys.wsh) | System shells and platform | **UNIMPLEMENTED** |
+| [**optparse**](wsh/optparse.wsh) | Parse command-line options | **UNIMPLEMENTED** |
+| [**crypto**](wsh/crypto.wsh) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |

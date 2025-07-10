@@ -40,11 +40,16 @@ Some ideas I had that don't seem feasible:
 
 - Pipelines. I do like them in Powershell, I guess I like them in
   Elixir but they seem complicated and I think they actually result
-  in Elixir being harder to read for a newcomer.
+  in Elixir being harder to read for a newcomer. I don't think they
+  match Wrapsher's other syntax constructs very well, and since it
+  has method chaining, that's pretty clear in terms of transformations,
+  it just doesn't end with the variable being assigned, if the intent
+  is a binding.
 
 ## Tools
 
 Tools to implement:
+- Emacs mode for basic electric editing and syntax highlighting for me
 - LSP (`wrapsher lsp`) with syntax highlighting
 - Syntax highlighting for github/other tools (regex-based)
 - REPL (probably via `wrapsher` module)
@@ -69,7 +74,9 @@ and eventually self-host. Here are some steps:
 - Implement code generation in Wrapsher, replacing `wrapsher-generator`
 - Implement parse tree transformation in Wrapsher, replacing `wrapsher-transformer`
 - Finally, implement a PEG parser in Wrapsher (or use an external one
-  that emits, say, a JSON AST) and rewrite the grammar, removing Ruby.
+  that emits, say, a JSON AST, and a `json` module which surely exists
+  by then; which if it's native may have been implemented with a PEG
+  parser) and rewrite the grammar, removing Ruby.
 
 ## Shell Libraries
 
@@ -96,12 +103,20 @@ for cases where you have no choice.
 
 I feel like these are partly redundant. `break` and `return`
 are basically the same thing, aren't they? Can I make `break`
-take an argument and `break` from a function or is that too werd?
+take an argument and `break` from a function or is that too weird?
 Maybe I just make them synonyms. I guess the expectation is that
 `return` has a different scope, but do I really want to keep track
 of these different scopes?
 
-I think I don't want `return` but I need to document how to return.
+It's probably not that bad. Loops will probably be implemented
+with `while :` and a continue variable, so `continue` and
+`break` are pretty easy.
+
+`return` is not that hard _if_ the compiler generates the
+function postamble, which it doesn't (it's in `_wsh_run`).
+I'm still not sure I want `return`. I guess people probably
+want it for fail-fast guards (so the whole function body isn't wrapped
+in `if { } else { if { } else { } } ...`.
 
 ## Variadic functions?
 
@@ -126,7 +141,27 @@ or if-else style or both?
 If if-elseif-else style, what's the keyword? Or do we just make the enclosing
 block optional, so `else if` works (I like this better than `elsif`, `elif`).
 
-I don't really like switch-case, too much syntax.
+I don't really like switch-case, too much syntax. It's powerful when combined
+with pattern-matching/destructuring, but the purposeful inclusion of assignment
+expressions in `if` statements is probably good enough:
+
+```
+any find(list l, k, d) {
+  if not l? {
+    return d
+  }
+
+  if (h = l.head()).key() == k {
+    h.value()
+  } else {
+    l.tail().find(k)
+  }
+}
+```
+
+Note in the above pseudocode I used the `?` syntax which might be neat.
+It's the same logic as `== typeof(l).new` but might be implemented
+differently for each type.
 
 ## Interfaces, Unions or union types?
 
@@ -262,9 +297,11 @@ foo set_name(foo i, string s) {
 
 ## Top-level expressions
 
-Right now, the top-level kind of doesn't have expressions, or it does in certain contexts but the VM
-implementation based on `return` doesn't really work. For eval, a REPL, and certain things like
-above where you want initial global values to have collection values, that doesn't really work.
+Right now, the top-level kind of doesn't have expressions, or it does
+in certain contexts but the VM implementation based on `return`
+doesn't really work, in particular for list or map constants. For
+eval, a REPL, and certain things like above where you want initial
+global values to have collection values, that doesn't really work.
 
 ## Weird syntax ideas
 
@@ -288,31 +325,47 @@ Will I want a ternary operator later? If so, I don't think I'd want it
 based on ` ... ? ... : ... ` because `:` is probably bound for
 maps/pairs. `... && ... || ...` perhaps?
 
-### Pairs as their own thing
-
-What if a map really is a list of pairs, and pairs are their own thing, that can be used in function
-signatures and stuff. So like
-
-`map map(map m, fun f)`
-
-```
-newmap = oldmap.map(fun (pair p) { p.key(): transform(p.value()) }
-```
-
-Or even destructuring in the assignment/function call?
-
-key: value = mymap.head()
-
-In fact: probably going to implement maps this way. Pairs are their own thing, and pairlists
-based directly on reflists are probably the storage type, and then `map` is kind of thin alias
-over pairlists. In the future, you could have a `map` based on a different implementation.
-
 ### Lambda calls
 
 How about `f.(...)` as syntactic sugar for `f.call().with(...)`? or
 `f->(...)`?
 
-### 
+I think the other alternative (when I get there) is to use interfaces
+so that functions can accept "objects with a call method that match this
+signature" which is probably even better. Maybe not incompatible. But if
+I want to encourage people on this path, we should probably leave the current
+syntax clunky.
+
+## Pairs for in-band errors
+
+Basically we only have errors and they're not checked (at least not
+now): there's no requirement to declare the errors you might throw
+nor opportunity to see if you're doing something with them. They're
+true error conditions--no valid value could be produced.
+
+Wrapsher's design is that nullity and invalid values are impossible:
+you can have an error but not a wrong answer. However, what about
+results of varying validity, or things which are expected but unusual,
+or unexpected but not invalid? Some possible patterns are
+a well-known interface for maybes/optionals, or using pairs for
+this with a convention for the pair's key (this would be particularly
+good with destructuring in an assignment; or at least, fairly common).
+
+I don't want to go full golang with the `ok, err` type stuff, but
+a little
+
+```
+pair find(map m, any k, any d) {
+  if m.has(k) {
+    'found': m[k]
+  } else {
+    'notfound': d
+  }
+}
+```
+
+This tells you that the default was used _because it is the default_,
+and it's not in your collection.
 
 ## Safety, "Namespaces" and modules
 
@@ -322,7 +375,6 @@ How about `f.(...)` as syntactic sugar for `f.call().with(...)`? or
     - "Foreign" module functions in a file without a `module` declaration
     - Override probably a pragma like `use ...`
     - `use feature` in a module
-
 
 What about module namespaces? Maybe this is very simple and we can
 just do `other/io`. So you do:
@@ -366,9 +418,54 @@ betterfile open(string filename) {
 }
 ```
 
+But it's probably generally better to just implement a `file`-like
+interface.
+
 <code>use module _version_</code> should be the one way you declare version
 constraints. I don't want there to be a Wrapsherfile or separate dependency
 solver outside of the language. If you have a dependency and you need a version
 pin, that's a code dependency and belongs in the code.
 
+Another thing to consider is how remote or third-party modules get loaded,
+and the possibility of signed modules. Would it make sense to control
+access to third-party modules via code-signing of some kind? Or is it
+enough to rely on DNS and HTTPS security to verify the source location
+is accurate? Does code-signing add any actual security?
 
+## Serialization
+
+For a variety of use cases, we should be able to round-trip serialized
+constant terms. This ties in with being able to substitute parser components
+(so that a wrapsher program can read complex data from an external program),
+concurrency (so that wrapsher processes can communicate with each other)
+and saving/restoring values. This might not be much more complicated than
+re-escaping strings (which is easy because escaping is very simple) and
+dumping them, possibly with decoration for wrapping.
+
+## Concurrency/External Drivers
+
+Part of using external programs efficiently is, when possible, not forking
+for command substitution for every call. For example, it should be possible
+to base the **math** module on `bc` (choosing `bc` over `dc` basically
+for trig functions, so maybe it should be `dc` and there should be a **trig**
+module) where maybe you get a calculator handle back (which represents
+a persistent connection to a `bc` process). Need to think carefully because
+it introduces a lot of complexity (what happens when it dies; prompting and
+I/O deadlocks; reading from its stderr and stdout both) when maybe you
+could get a lot of the way there by just crafting a very smart expression
+in the first place.
+
+But if you need to IPC with `bc` then you need the ability to IPC with other
+wrapsher processes, so maybe there should be a **multiprocess** module
+which forks and keeps handles (sets of fds, probably) open to communicating
+subprocesses, waits for them, etc. You could even do a supervision
+tree, queues and stuff. (This requires serialization for message-passing
+on pipes). This could be useful enough on its own.
+
+This goes beyond safe subprocesses (i.e. doing the `fork`, `exec` and
+redirection properly). But lots of useful programs work only that way
+so it's probably the first stop (e.g. `jq`).
+
+So the priority is: safe command invocation and reading of output (required),
+then multiprocessing, then seeing if multiprocessing can be leveraged for
+persistent "command drivers" (are there any others than `bc`? Maybe `openssl`)
