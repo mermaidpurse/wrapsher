@@ -86,6 +86,7 @@ ref new(type/ref t) {
 
 ref ref(any i) {
   refid = refid + 1
+  r = false
   shell '''
   _wsh_get_local _reflist _wshrl
   _wsh_error="error:Couldn't create reference for value <<${_wshv_i}>>"
@@ -617,6 +618,7 @@ any at(map m, any k) {
     '''
   }
   h = m.head()
+
   if h.key() == k {
     h.value()
   } else {

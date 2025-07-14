@@ -19,7 +19,10 @@ module Wrapsher
         @rvalue = Node.from_obj(slice[:rvalue], tables: tables)
         if tables.context
           # We're in a function context, so we're keeping track of locals we create
+          tables.log("In context '#{tables.context&.summary}' - Adding local variable #{@name}")
           tables.push_local(@name)
+        else
+          tables.log("Skipping local variable #{@name}, not in a function context")
         end
       end
 
@@ -98,7 +101,7 @@ module Wrapsher
         when 'doc'
           @doc = StringValue.new(slice[:meta_data], tables: tables)
         else
-          raise "Unknown meta field: #{@field} at #{@filename}:#{@line}"
+          raise Wrapsher::CompilationError, "Unknown meta field: #{@field} at #{@filename}:#{@line}"
         end
       end
 
@@ -122,7 +125,7 @@ module Wrapsher
         super
         @name = slice[:name].to_s
         @store_type = slice[:store_type].to_s if slice[:store_type]
-        raise "error:redefinition of global variable #{@name} at #{@filename}:#{@line}" if tables.globals.key?(@name)
+        raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}" if tables.globals.key?(@name)
 
         tables.globals[@name] = true
       end
@@ -141,7 +144,7 @@ module Wrapsher
         super
         @name = slice.to_s
         if tables.globals[@name]
-          raise "error:Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
+          raise "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
         end
 
         tables.globals[@name] = true
@@ -170,41 +173,118 @@ module Wrapsher
       end
     end
 
-    # - Create a unique type for the lambda that is
-    #   a subtype of `fun`.
-    # - Define a call function for that unique type
-    # TODO: variable capture - probably adding assignments
-    # to the body for current local variables.
+    # - Create a unique type for the lambda that has
+    #   a storage type of `map`. The value of the anonymous
+    #   function contains a map which is the context: the
+    #   local variables that were captured in the closure.
+    # - The any call(fun f) function in the core module
+    #   strips the fun: from
     class Lambda < Node
-      attr_reader :signature, :refid
+      attr_reader :signature, :refid, :closure
 
       def initialize(slice, tables:)
         super
         @signature = slice[:signature]
         @line = @signature[:type].line_and_column[0] if @signature[:type].respond_to?(:line_and_column)
-        @body = slice[:body]
         @refid = tables.refid
         @signature[:arg_definitions] = [@signature[:arg_definitions]].compact.flatten
         @signature[:name] = 'with'
         @signature[:arg_definitions].unshift({
             name: '_wsh_context',
-            type: "fun/#{@refid}"
+            type: "_fun#{@refid}"
           })
-        # The type doesn't need to be explictly referenced, so we don't actually need a
-        # global to be bound to type/fun/#{@refid}, at least for now.
-        # tables.adds << Type.new({ name: "fun/#{@refid}", store_type: 'string' }, tables: tables)
-        tables.adds << FunStatement.new({ signature: @signature, body: @body, }, tables: tables)
+        summary = "#{@signature[:name]}(" + @signature[:arg_definitions].map { |arg| "#{arg[:type]} #{arg[:name]}" }.join(', ') + ')'
+        tables.log("Creating lambda #{@refid} with signature: #{summary}, capturing #{tables.locals.inspect}")
+        variable_capture = tables.locals.reduce({
+            fun_call: {
+              name: 'new',
+              fun_args: [ { var_ref: 'map' } ]
+            }
+          }) do |arg, var|
+          {
+            fun_call: {
+              name: 'push',
+              fun_args: [
+                arg,
+                {
+                  fun_call: {
+                    name: 'from_kv',
+                    fun_args: [
+                      { var_ref: 'pair' },
+                      { string_term: { single_quoted: var } },
+                      { var_ref: var }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        end
+        @closure = Node.from_obj({
+          fun_call: {
+            name: '_as',
+            fun_args: [
+              variable_capture,
+              { var_ref: "_fun#{@refid}" }
+            ]
+          }
+        }, tables: tables)
+
+        get_context = [
+          {
+            assignment: {
+              var: '_wsh_context_map',
+              rvalue: {
+                fun_call: {
+                  name: '_as',
+                  fun_args: [
+                    { var_ref: '_wsh_context' },
+                    { var_ref: 'map' }
+                  ]
+                }
+              }
+            }
+          }
+        ] + tables.locals.map do |var|
+          {
+            assignment: {
+              var: var,
+              rvalue: {
+                fun_call: {
+                  name: 'at',
+                  fun_args: [
+                    { var_ref: '_wsh_context_map' },
+                    { string_term: { single_quoted: var } }
+                  ]
+                }
+              }
+            }
+          }
+        end
+        @body = get_context + [slice[:body]].flatten
+
+        # We need to declare the type for _as to work, since we're casting a map as our
+        # special type. Since the prototype of call() in the core module is any, and that
+        # function is written to unconditonally strip the type instead of using `_as` (for now)
+        # we don't need to worry about the fact that _as restricts casting to or from storage_types.
+        saved_context = tables.context
+        saved_locals = tables.locals
+        tables.clear_locals!
+        tables.context = nil
+        # Back at the top-level temporarily, for function definition and type declaration
+        tables.adds << Type.new({ name: "_fun#{@refid}", store_type: 'map' }, tables: tables)
+        tables.adds << FunStatement.new({ signature: @signature, body: @body }, tables: tables)
+        # Restore the function context
+        tables.context = saved_context
+        tables.locals = saved_locals
       end
 
       def to_s
+        # Unchecked cast to fun--will be uncast in call()
         [
           line,
-          # We need to build a context here that is retrievable when
-          # this value is passed to `fun/<refid> call(fun f)`. `call`
-          # needs to take the value of `f` and read the context from
-          # it. This means taking all the local variables and putting
-          # them in something in the value. Sounds like I need a map.
-          "_wsh_result='fun:fun/#{refid}:fun:fun@#{@filename}:#{@line}'"
+          @closure.to_s,
+          "_wsh_result=\"fun:${_wsh_result}\""
         ].join("\n  ")
       end
     end
@@ -216,9 +296,26 @@ module Wrapsher
         super
         @signature = Signature.new(slice[:signature], tables: tables)
         @line = @signature.line
+        tables.log("Entering context '#{@signature.summary}'")
+        tables.context = @signature
+        # Argument binding introduces locals into the context
+        @signature.arg_definitions.each do |arg|
+          tables.push_local(arg.name)
+        end
+        # Since we have set a context, any assignments that
+        # occur in the body will add to locals
         @body = Body.new(slice[:body], tables: tables)
+        tables.log("Exiting context '#{@signature.summary}'")
+        tables.context = nil
+        @locals = tables.locals.dup
+        tables.log("Found locals: #{@locals.inspect}; clearing (outside of context)")
+        tables.clear_locals!
         tables.functions[@signature.name] ||= {}
         tables.functions[@signature.name][@signature.dispatch_type] = @signature
+      end
+
+      def cleanup_locals
+        "unset " + @locals.map { |v| "\"_wshv_${_wsh_frame}_#{v}\"" }.join(' ')
       end
 
       def to_s
@@ -230,6 +327,7 @@ module Wrapsher
           "  #{@signature.argument_binding}",
           "  # function body",
           "  #{@body}",
+          "  #{cleanup_locals}",
           "  # end function body",
           "  #{@signature.check_return}",
           "}"
@@ -358,9 +456,6 @@ module Wrapsher
       end
 
       def to_s
-        # TODO: We have to verify the function signature so
-        # we verify that the correct number of things are
-        # pushed onto the stack.
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
@@ -504,6 +599,16 @@ EOSTRING
       def initialize(slice, tables:)
         super
         @name = slice.to_s
+      end
+
+      def errors
+        return ["variable '#{@name}' does not exist (not global, local or builtin) at #{line}"] unless ok
+
+        []
+      end
+
+      def ok
+        @name == '_reflist' || tables.globals.key?(@name) || tables.locals.include?(@name)
       end
 
       def to_s

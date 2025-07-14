@@ -114,6 +114,7 @@ _wsh_run() {
   unset ${_wsh_cleanup}
   _wsh_cleanup=''
   # find refs to be protected
+  [[ -n ${WSH_DEBUG} ]] && _wsh_debug "  <= ${_wsh_result}"
   _wsh_scan_refs "${_wsh_result}"
   _wsh_get_local _reflist _wshi
   # clean up refs that we aren't passing out
@@ -203,15 +204,15 @@ _wsh_cleanup_refs() {
 }
 
 _wsh_debug() {
-  echo "Debug: ${1}" >&2
+  echo "${_wsh_line} Debug: ${1}" >&2
   _wsh_debug_stack >&2
 }
 
 _wsh_debug_stack() {
-  echo "Stack: "
+  echo "                    Stack: " >&2
   for ((i=_wsh_stackp; i > 0; i--))
   do
-    eval "echo \"  _wsh_stack${i}='\${_wsh_stack${i}}'\" >&2"
+    eval "echo \"                      _wsh_stack${i}='\${_wsh_stack${i}}'\" >&2"
   done
 }
 

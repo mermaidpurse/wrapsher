@@ -12,7 +12,9 @@ module Wrapsher
         external: {},
         included: {},
         compiler_refid: 1000,
-        adds: [])
+        adds: [],
+        logger: Logger.new($stderr)
+        )
       @filename = filename
       @functions = functions
       @globals = globals
@@ -21,6 +23,13 @@ module Wrapsher
       @compiler_refid = compiler_refid
       @adds = adds
       @context = nil
+      @locals = []
+      @logger = logger
+      @logger.debug("ProgramTables initialized with logger level: #{@logger.level}, filename: #{@filename}, refid: #{@compiler_refid}")
+    end
+
+    def log(message)
+      @logger.debug(message)
     end
 
     def push_local(name)
@@ -28,7 +37,7 @@ module Wrapsher
       @locals << name
     end
 
-    def clear_locals
+    def clear_locals!
       @locals = []
     end
 

@@ -71,7 +71,11 @@ EOF
         args.each do |source|
           source = File.expand_path(source)
           output = source.delete_suffix('.wsh')
-          compiled = compiler.compile(source, tables: Wrapsher::ProgramTables.new(filename: source), type: :program)
+          compiled = compiler.compile(
+            source,
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger),
+            type: :program
+          )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
           system(output)
           Process.exit($?.exitstatus)
@@ -90,7 +94,11 @@ EOF
         args.each do |source|
           output = source.delete_suffix('.wsh')
           # TODO: change to :test ?
-          compiled = compiler.compile(source, type: :program, tables: Wrapsher::ProgramTables.new(filename: source))
+          compiled = compiler.compile(
+            source,
+            type: :program,
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger)
+          )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
           system(output)
           FileUtils.rm_f(output) if $?.exitstatus == 0
@@ -109,7 +117,11 @@ EOF
       else
         args.each do |source|
           output = source.delete_suffix('.wsh')
-          compiled = compiler.compile(source, type: :program, tables: Wrapsher::ProgramTables.new(filename: source))
+          compiled = compiler.compile(
+            source,
+            type: :program,
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger)
+          )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
         end
       end

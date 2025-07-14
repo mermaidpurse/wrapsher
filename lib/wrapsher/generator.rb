@@ -42,7 +42,7 @@ module Wrapsher
       end
     end
 
-    def generate(program, tables: Wrapsher::ProgramTables.new)
+    def generate(program, tables: nil)
       nodes = (wsh_preamble + [program].flatten).map do |obj|
         Wrapsher::Node.from_obj(obj, tables: tables)
       end

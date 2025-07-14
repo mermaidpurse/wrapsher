@@ -138,7 +138,6 @@ bool test_list_map() {
   [0, 1, 2].map(int fun (int i) { 2 * i }) == [0, 2, 4]
 }
 
-# TODO: Need negative ints
 bool test_list_find_present() {
   r = [0, 1, 2, 4].find(bool fun (int i) { i == 1 }, 10)
   r == 1
@@ -182,4 +181,13 @@ bool test_map_set_simple() {
   m = m.set('key1': 'value1')
   x = 'key1': 'value1'
   m.length() == 1 and m.head() == x
+}
+
+fun multiplier(int i) {
+  int fun (int j) { i * j }
+}
+
+bool test_closure() {
+  f = multiplier(3)
+  [0, 1, 3].map(f) == [0, 3, 9]
 }
