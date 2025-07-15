@@ -16,6 +16,7 @@ module Wrapsher
         super
         @line = slice[:var].line_and_column[0] if slice[:var].respond_to?(:line_and_column)
         @name = slice[:var].to_s
+
         @rvalue = Node.from_obj(slice[:rvalue], tables: tables)
         if tables.context
           # We're in a function context, so we're keeping track of locals we create
@@ -121,11 +122,21 @@ module Wrapsher
     end
 
     class Type < Node
+      attr_reader :errors
+
       def initialize(slice, tables:)
         super
         @name = slice[:name].to_s
         @store_type = slice[:store_type].to_s if slice[:store_type]
-        raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}" if tables.globals.key?(@name)
+        if @name !~ /^[a-z_][a-z0-9_\/]*$/ || @name.include?('__')
+          raise \
+            Wrapsher::CompilationError,
+            "Invalid type name '#{@name}' at #{@filename}:#{@line} - must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes"
+        end
+
+        if tables.globals.key?(@name)
+          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
+        end
 
         tables.globals[@name] = true
       end
@@ -143,8 +154,10 @@ module Wrapsher
       def initialize(slice, tables:)
         super
         @name = slice.to_s
-        if tables.globals[@name]
-          raise "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
+        if tables.globals.key?(@name)
+          raise \
+            Wrapsher::CompilationError,
+            "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
         end
 
         tables.globals[@name] = true
@@ -391,9 +404,9 @@ module Wrapsher
       def function_name(nametype = :definition)
         prefix = nametype == :presence ? '_wshp' : '_wshf'
         if @arg_definitions.empty?
-          "#{prefix}_#{@name}"
+          "#{prefix}_#{@name}_0"
         else
-          "#{prefix}_#{@name}_#{@arg_definitions[0].type_with_underscore}"
+          "#{prefix}_#{@name}_#{@arg_definitions.length}_#{@arg_definitions[0].type_with_underscore}"
         end
       end
     end
@@ -409,7 +422,7 @@ module Wrapsher
       end
 
       def type_with_underscore
-        @type.gsub(/[^a-zA-Z0-9_]/, '_')
+        @type.gsub(/[^a-zA-Z0-9_]/, '__')
       end
 
       def to_s
@@ -443,14 +456,19 @@ module Wrapsher
         end
       end
 
+      def errors
+        return ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
+        if @function_args.length == 0 && !tables.functions[@function_name].key?(:nullary)
+          return ["No nullary function '#{@function_name}()' at #{line}"]
+        end
+        # We can't actually check for the right arity functions which accept an argument
+        # because we don't (yet) know the type of the first argument.
+      end
+
       def function_dispatch
         code = []
         code << line
-        if @function_args.empty?
-          code << "_wsh_dispatch_nullary '#{@function_name}' || return 1"
-        else
-          code << "_wsh_dispatch '#{@function_name}' || return 1"
-        end
+        code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
         code << line
         code.join("\n  ")
       end
@@ -584,7 +602,9 @@ EOSTRING
             return compiled_nodes
           end
         end
-        raise "Module #{@module_name} not found in include paths: #{WSH_INCLUDE_PATH.join(', ')}"
+        raise \
+          Wrapsher::CompilationError,
+          "Module #{@module_name} not found in include paths: #{WSH_INCLUDE_PATH.join(', ')}"
       end
 
       def to_s
@@ -599,6 +619,7 @@ EOSTRING
       def initialize(slice, tables:)
         super
         @name = slice.to_s
+        @defined_locals = tables.locals.dup
       end
 
       def errors
@@ -608,7 +629,7 @@ EOSTRING
       end
 
       def ok
-        @name == '_reflist' || tables.globals.key?(@name) || tables.locals.include?(@name)
+        @@builtin_locals.include?(@name) || tables.globals.key?(@name) || @defined_locals.include?(@name)
       end
 
       def to_s
@@ -620,7 +641,6 @@ EOSTRING
     end
 
     def initialize(slice, tables:)
-      binding.pry unless tables.respond_to? :filename
       @filename = tables.filename
       @tables = tables
       @slice = slice
@@ -662,11 +682,13 @@ EOSTRING
       version: Version,
     }.freeze
 
+    @@builtin_locals = %w[_reflist].freeze
+
     class << self
       def from_obj(obj, tables:)
         PP.pp(obj, $stderr) unless obj.respond_to?(:keys)
         type = obj.keys.first
-        raise "Unknown node type: #{type}" unless @@nodes.key?(type)
+        raise NotImplementedError, "Unknown node type: #{type}" unless @@nodes.key?(type)
 
         @@nodes[type].new(obj[type], tables: tables)
       end

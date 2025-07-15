@@ -55,7 +55,7 @@ int main(list args) {
     # Blindly calling the nullary form
     # and catching the error, which we don't
     # have yet
-    _wsh_dispatch_nullary "${_wsh_test_func}"
+    _wsh_dispatch "${_wsh_test_func}" 0
     case $? in 0)
       case "${_wsh_result}" in 'bool:true')
         echo "ok ${_wsh_test} - ${_wsh_test_func}"

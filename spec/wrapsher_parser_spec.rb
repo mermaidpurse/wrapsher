@@ -32,6 +32,47 @@ RSpec.describe Wrapsher::Parser do
       )
   end
 
+  it "parses line comments in a function", skip: 'TODO: fix line comments in blocks' do
+    source = <<~'EOF'
+    bool test() {
+      # Intro to function
+      false
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          { comment: ' Intro to function' },
+          { bool_term: 'false'}
+        ]))
+  end
+
+  it "parses block ends with trailing whitespace", skip: 'TODO: fix blocks with trailing whitespace' do
+    source = <<~'EOF'
+    bool test() {
+      false
+    } 
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          { bool_term: 'false' }
+        ]))
+  end
+
+  it "parses negative ints", skip: 'TODO: fix parsing negative ints' do
+    source = <<~'EOF'
+    bool test() {
+      -10
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          { int_term: '-10' }
+        ]))
+  end
+
   it "parses strings" do
     source = <<~'EOF'
     bool test() {
