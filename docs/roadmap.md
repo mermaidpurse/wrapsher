@@ -2,16 +2,17 @@
 
 ## Issues
 
-- Global variables must be protectable, which probably means
-  some kind of file scoping or override assignment so that
-  module settings can work. It can cause very very strange
-  things to re-assign `list` to a different type for
-  example.
+- Global variables should be protectable, which probably means some
+  kind of file scoping or override assignment so that module settings
+  can work (in other words, you should be able to assign a global
+  "when you really mean to"). But it can cause very strange
+  things to re-assign `list` to a different type for example. But
 
 ## MVP
 
-- Implement module _init(), cohere with **test** module
-- Implement/document throw/catch error handling
+- Implement module _init(), cohere with **test** module (probably
+  where externals checks happen).
+- Implement if-else-if
 - Reimplement test framework
 - Github actions for testing
 - Implement docs

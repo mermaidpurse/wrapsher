@@ -26,9 +26,11 @@ module Wrapsher
 
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
+    rule(:throw_call)               { str('throw') >> space >> expression.as(:throw) }
     rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
+    rule(:try_block)                { (str('try').as(:keyword_try) >> space >> block.as(:try_body) >> whitespace? >> (str('catch').as(:keyword_catch) >> space >> word.as(:var) >> space? >> block.as(:catch_body)).as(:catch)).as(:try_block) }
 
-    rule(:expression)               { (assignment | shellcode_call | lambda | conditional | pair) }
+    rule(:expression)               { (assignment | throw_call | shellcode_call | lambda | conditional | try_block | pair) }
 
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
 

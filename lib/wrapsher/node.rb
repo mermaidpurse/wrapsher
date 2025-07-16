@@ -10,7 +10,6 @@ module Wrapsher
   ].freeze
 
   class Node
-
     class Assignment < Node
       def initialize(slice, tables:)
         super
@@ -147,6 +146,68 @@ module Wrapsher
         code << "# type #{@name}"
         code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
         code.join("\n")
+      end
+    end
+
+    ##
+    # Rewrite the try block:
+    # - Create a nullary bool fun with the try_body + 'true'
+    # - Call but use a fun_call that doesn't check the sh return value (because we'll do it)
+    # - Instead, if rv !=0, invoke the catch body with an assignment from the
+    #   current_error() function
+    class TryBlock < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:keyword_try].line_and_column[0] if slice[:keyword_try].respond_to?(:line_and_column)
+        @try_lambda = Node.from_obj(
+          {
+            fun_call: {
+              name: 'with',
+              no_check: true,
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'call',
+                    fun_args: [
+                      {
+                        lambda: {
+                          signature: {
+                            type: 'bool',
+                            arg_definitions: []
+                          },
+                          body: slice[:try_body]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }, tables: tables)
+        @catch_body = Body.new([
+              {
+                assignment: {
+                  var: slice[:catch][:var],
+                  rvalue: {
+                    fun_call: {
+                      name: 'current_error',
+                      fun_args: []
+                    }
+                  }
+                }
+              }
+            ] + slice[:catch][:catch_body], tables: tables)
+      end
+
+      def to_s
+        code = []
+        code << @try_lambda.to_s
+        code << 'case ${_wsh_rv} in 0)'
+        code << '  :'
+        code << ';; *)'
+        code << '  ' + @catch_body.to_s
+        code << ';;'
+        code << 'esac'
       end
     end
 
@@ -450,6 +511,7 @@ module Wrapsher
       def initialize(slice, tables:)
         super
         @function_name = slice[:name].to_s
+        @no_check = slice[:no_check] if slice.key?(:no_check)
         @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
         @function_args = [slice[:fun_args]].flatten.compact.map do |arg|
           Node.from_obj(arg, tables: tables)
@@ -469,6 +531,9 @@ module Wrapsher
         code = []
         code << line
         code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
+        code << "_wsh_rv=$?"
+        code << "_wsh_check_return ${_wsh_rv} \"in #{@function_name} at #{@filename}:#{@line}\" || return 1" \
+          unless @no_check
         code << line
         code.join("\n  ")
       end
@@ -526,15 +591,21 @@ module Wrapsher
         @value = StringValue.new(slice, tables: tables)
       end
 
+      def sh_value
+        @value.to_s
+      end
+
       def to_s
         [
           line,
           "read -r -d '' _wshi <<'EOSTRING'
-#{@value}
+_wsh_bof#{sh_value}
 _wsh_eof
 EOSTRING
 ",
-          '_wsh_result="string:${_wshi%$\'\\n\'_wsh_eof}"'
+          "_wshi=\"${_wshi%$'\\n'_wsh_eof}\"",
+          '_wshi="${_wshi#_wsh_bof}"',
+          '_wsh_result="string:${_wshi}"'
         ].join("\n  ")
       end
     end
@@ -674,6 +745,7 @@ EOSTRING
       meta: Meta,
       shellcode: ShellCode,
       string_term: StringTerm,
+      try_block: TryBlock,
       type: Type,
       use_external: UseExternal,
       use_global: UseGlobal,

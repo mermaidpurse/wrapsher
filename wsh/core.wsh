@@ -1,6 +1,7 @@
 module core
 use global refid 1000
 
+type error builtin
 type fun builtin
 type type builtin
 type ref builtin
@@ -37,7 +38,7 @@ any _as(any i, any as) {
   case "${_wsh_as%%:*}" in type/*)
     :
   ;; *)
-    _wsh_error="error:_as expected a type (e.g. 'type/list:reflist'), got '${_wshl}' at ${_wsh_line}"
+    _wsh_error="error:_as expected a type (e.g. 'type/list:reflist'), got '${_wshl}'"
     return 1
   ;;
   esac
@@ -80,6 +81,56 @@ string _raw(any i) {
   '''
 }
 
+string quote(any i) {
+  i.to_string().quote()
+}
+
+error new() {
+  shell '''
+  _wsh_result='error:'
+  '''
+}
+
+error as_error(error x) {
+  x
+}
+
+error as_error(string s) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_result="error:${_wshi#string:}"
+  '''
+}
+
+error throw(error x) {
+  shell '''
+  _wsh_get_local x _wsh_error
+  return 1
+  '''
+}
+
+error throw(string s) {
+  throw(s.as_error())
+}
+
+error current_error() {
+  shell '''
+  _wsh_result="error:${_wsh_error#error:}"
+  '''
+}
+
+string to_string(error x) {
+  shell '''
+  _wsh_get_local x _wshi
+  _wsh_result="string:${_wshi#error:}"
+  '''
+}
+
+string message(error x) {
+  x.to_string().split('
+')[0]
+}
+
 ref new(type/ref t) {
   bool.new().ref()
 }
@@ -104,6 +155,14 @@ any deref(ref r) {
   _wsh_get_local r _wshi
   _wsh_deref_into "${_wshi}" _wsh_result
   '''
+}
+
+string to_string(ref r) {
+  r._raw()
+}
+
+string quote(ref r) {
+  'ref('.plus(r.deref().quote()).plus(')')
 }
 
 any call(fun f) {
@@ -140,6 +199,18 @@ int as_int(bool p) {
   } else {
     0
   }
+}
+
+string to_string(bool p) {
+  if p {
+    'true'
+  } else {
+    'false'
+  }
+}
+
+string quote(bool p) {
+  p.to_string()
 }
 
 bool not(bool p) {
@@ -243,12 +314,69 @@ string to_string(int i) {
   '''
 }
 
+string quote(int i) {
+  i.to_string()
+}
+
 string new(type/string t) {
   ''
 }
 
 string as_string(string s) {
   s
+}
+
+string to_string(string s) {
+  s
+}
+
+string quote(string s) {
+  '\''.plus(s.replace('\\', '\\\\').replace('\'', '\\\'')).plus('\'')
+}
+
+string replace(string s, string c, string rep) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local c _wshj
+  _wsh_get_local rep _wshk
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  _wshk="${_wshk#string:}"
+  _wshl=''
+  _wshm=0
+  while
+    : $((_wshm++))
+  do
+    case $((_wshm > 10)) in 1)
+      _wsh_error='error:Maximum replacements reached'
+      return 1
+    ;;
+    esac
+    case "${_wshi}" in *"${_wshj}"*)
+      case "${_wshl}" in '')
+        _wshl="${_wshi%%"${_wshj}"*}${_wshk}"
+      ;; *)
+        _wshl="${_wshl}${_wshi%%"${_wshj}"*}${_wshk}"
+      ;;
+      esac
+      _wshi="${_wshi#*"${_wshj}"}"
+    ;; *)
+      case "${_wshl}" in '')
+        _wshl="${_wshi}"
+      ;; *)
+        _wshl="${_wshl}${_wshi}"
+      ;;
+      esac
+      _wshi=''
+    ;;
+    esac
+    case "${_wshi}" in '')
+      break
+    ;;
+    esac
+  done
+  _wsh_result="string:${_wshl}"
+  '''
 }
 
 bool eq(string s, string o) {
@@ -321,6 +449,48 @@ string at(string s, int i) {
   }
 }
 
+bool has(string s, string c) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local c _wshj
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  case "${_wshi}" in *"${_wshj}"*)
+    _wsh_result='bool:true'
+  ;; *)
+    _wsh_result='bool:false'
+  ;;
+  esac
+  '''
+}
+
+list split(string s, string c) {
+  _split3(s, c, [])
+}
+
+list _split3(string s, string c, list acc) {
+  if s.has(c) {
+    h = ''
+    t = ''
+    shell '''
+    _wsh_get_local s _wshi
+    _wsh_get_local c _wshj
+    _wshi="${_wshi#string:}"
+    _wshj="${_wshj#string:}"
+    _wsh_set_local h "string:${_wshi%%${_wshj}*}"
+    _wsh_result="string:${_wshi#*${_wshj}}"
+    _wsh_set_local t "${_wsh_result}"
+    '''
+    _split3(t, c, acc.push(h))
+  } else {
+    if s.length() == 0 {
+      acc
+    } else {
+      acc.push(s)
+    }
+  }
+}
+
 reflist new(type/reflist t) {
   shell '''
   _wsh_result=reflist:
@@ -344,7 +514,7 @@ ref head(reflist rl) {
   shell '''
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
-    _wsh_error="error:attempted to take head() of [] at ${_wsh_line}"
+    _wsh_error="error:attempted to take head() of []"
     return 1
   ;; *)
     _wshj="${_wshi#reflist:}"
@@ -358,7 +528,7 @@ reflist tail(reflist rl) {
   shell '''
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
-    _wsh_error="error:attempted to take tail() of [] at ${_wsh_line}"
+    _wsh_error="error:attempted to take tail() of []"
     return 1
   ;; *)
     _wshj="${_wshi#reflist:}"
@@ -392,7 +562,7 @@ ref at(reflist rl, int i) {
     : $((_wshk++))
   done
   case "${_wshm}" in notfound)
-    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk} at ${_wsh_line}"
+    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk}"
     return 1
   ;;
   esac
@@ -548,6 +718,30 @@ list _map2(list l, fun f, list acc) {
   }
 }
 
+string join(list l, string c) {
+  if l.length() == 0 {
+    ''
+  } else {
+    _list3(l.tail(), c, l.head().to_string())
+  }
+}
+
+string _list3(list l, string c, string acc) {
+  if l.length() == 0 {
+    acc
+  } else {
+    _list3(l.tail(), c, acc.plus(c).plus(l.head().to_string()))
+  }
+}
+
+string to_string(list l) {
+  '['.plus(l.map(string fun (any i) { i.to_string() }).join(', ')).plus(']')
+}
+
+string quote(list l) {
+  '['.plus(l.map(string fun (any i) { i.quote() }).join(', ')).plus(']')
+}
+
 any find(list l, fun f, any d) {
   if l == [] {
     d
@@ -613,7 +807,7 @@ any at(map m, any k) {
   if m.length() == 0 {
     shell '''
     _wsh_get_local k _wshi
-    _wsh_error="error:No such key in map: ${_wshi} at ${_wsh_line}"
+    _wsh_error="error:No such key in map: ${_wshi}"
     return 1
     '''
   }

@@ -8,8 +8,26 @@ bool test_bool_new() {
   not b
 }
 
+bool test_bool_quote() {
+  bool.new().quote() == 'false'
+}
+
 bool test_bool_and() {
   true and true
+}
+
+bool test_string_new() {
+  string.new() == ''
+}
+
+bool test_string_quote() {
+  'one'.quote() == '\'one\''
+}
+
+bool test_string_quote_with_quotes() {
+  e = '\'\\\'one\\\'\\\\ \\\'two\\\'\''
+  g = '\'one\'\\ \'two\''.quote()
+  g == e
 }
 
 bool test_string_eq_same() {
@@ -62,6 +80,53 @@ bool test_string_special() {
   s.length() == 4 and s[1] == '\''
 }
 
+bool test_string_split() {
+  s = 'one:two:three'
+  s.split(':') == ['one', 'two', 'three']
+}
+
+bool test_string_split_nl() {
+  s = 'one
+two
+three
+'
+  s.split('
+') == ['one', 'two', 'three']
+}
+
+bool test_string_split_missing() {
+  'one'.split(':') == ['one']
+}
+
+bool test_string_split_start() {
+  ':one'.split(':') == ['', 'one']
+}
+
+bool test_string_replace() {
+  g = 'one:two'.replace(':', ' ')
+  g == 'one two'
+}
+
+bool test_string_replace_missing() {
+  'one'.replace(':', ' ') == 'one'
+}
+
+bool test_string_replace_start_end() {
+  ':one:'.replace(':', '') == 'one'
+}
+
+bool test_string_replace_special() {
+  '\'one\''.replace('\'', '"') == '"one"'
+}
+
+bool test_replace_contains_backslash() {
+  'one\\a two'.replace('\\a', ':') == 'one: two'
+}
+
+bool test_replace_backslash() {
+  'one\\ two'.replace('\\', ':') == 'one: two'
+}
+
 bool test_ref_count_init() {
   _reflist.length() == 0
 }
@@ -105,6 +170,18 @@ bool test_list_head() {
   l = _make_list()
   s = l.head()
   s == 'one'
+}
+
+bool test_list_join() {
+  ['one', 'two', 'three'].join(', ') == 'one, two, three'
+}
+
+bool test_list_to_string() {
+  ['one', 'two'].to_string() == '[one, two]'
+}
+
+bool test_list_quote() {
+  ['one', 'two', 'three'].quote() == '[\'one\', \'two\', \'three\']'
 }
 
 bool test_list_eq_empty() {
@@ -190,4 +267,24 @@ fun multiplier(int i) {
 bool test_closure() {
   f = multiplier(3)
   [0, 1, 3].map(f) == [0, 3, 9]
+}
+
+bool do_throw() {
+  throw 'errortext'
+}
+
+bool test_throw_catch_succeed() {
+  try {
+    true
+  } catch x {
+    x.message() == 'not matched'
+  }
+}
+  
+bool test_throw_catch_error() {
+  try {
+    do_throw()
+  } catch x {
+    x.message() == 'errortext'
+  }
 }

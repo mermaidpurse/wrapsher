@@ -3,38 +3,52 @@ _wsh_stackp=0
 _wsh_frame=0
 
 _wsh_typeof() {
+  _wsh_type=''
   _wsh_type="${1%%:*}"
 }
 
 _wsh_typeof_underscore() {
+  _wsh_local_type=''
   _wsh_typeof "${1}"
   _wsh_type_underscore=''
-  while true
+  _wsh_local_type="${_wsh_type}"
+  while
+    :
   do
-    case "${_wsh_type}" in
-      */*) case "${_wsh_type_underscore}" in
-             '') _wsh_type_underscore="${_wsh_type%%/*}" ;;
-             *)  _wsh_type_underscore="${_wsh_type_underscore}__${_wsh_type%%*}" ;;
-           esac
-           _wsh_type="${_wsh_type#*/}" ;;
-      *)   case "${_wsh_type_underscore}" in
-             '') _wsh_type_underscore="${_wsh_type}" ;;
-             *)  _wsh_type_underscore="${_wsh_type_underscore}__${_wsh_type}" ;;
-           esac
-           _wsh_type='' ;;
+    case "${_wsh_local_type}" in */*)
+      case "${_wsh_type_underscore}" in '')
+        _wsh_type_underscore="${_wsh_local_type%%/*}"
+      ;; *)
+        _wsh_type_underscore="${_wsh_type_underscore}__${_wsh_local_type%%*}"
+      ;;
+      esac
+      _wsh_local_type="${_wsh_local_type#*/}"
+    ;; *)
+      case "${_wsh_type_underscore}" in '')
+        _wsh_type_underscore="${_wsh_local_type}"
+      ;; *)
+        _wsh_type_underscore="${_wsh_type_underscore}__${_wsh_local_type}"
+      ;;
+      esac
+      _wsh_local_type=''
+    ;;
     esac
-    case "${_wsh_type}" in
-      '') break ;;
+    case "${_wsh_local_type}" in '')
+      break
+    ;;
     esac
   done
 }
 
 _wsh_assert() {
-  case "${2}" in
-    any)       : ;;
-    "${1%%:*}") : ;;
-    *)       _wsh_error="error:Expected type '${2}', got '${1%%:*}': ${3} at $_wsh_line"
-             return 1 ;;
+  case "${2}" in any)
+    :
+  ;; "${1%%:*}")
+    :
+  ;; *)
+    _wsh_error="error:Expected type '${2}', got '${1%%:*}': ${3}"
+    return 1
+  ;;
   esac
 }
 
@@ -43,7 +57,8 @@ _wsh_assert() {
 _wsh_stack_push() {
   _wsh_stackp=$((_wsh_stackp + 1))
   case "$((_wsh_stackp > 10000))" in 1)
-    _wsh_error="error:Stack overflow at $_wsh_line"
+    _wsh_error="error:Stack overflow pushing '${1}'
+at ${_wsh_line}"
     _wsh_panic 1 "_wsh_stack_push"
   ;;
   esac
@@ -215,7 +230,7 @@ _wsh_dispatch() {
     case "${_wsh_have_function}" in 1)
       _wsh_run "_wshf_${1}_0" || return 1
     ;; *)
-      _wsh_error="error:No such 0-ary function '${1}' at ${_wsh_line}"
+      _wsh_error="error:No such 0-ary function '${1}'"
       return 1
     ;;
     esac
@@ -232,7 +247,7 @@ _wsh_dispatch() {
       case "${_wsh_have_function}" in 1)
         _wsh_run "_wshf_${1}_${2}_any" || return 1
       ;; *)
-        _wsh_error="error:No such ${2}-ary function ${1}(${_wsh_type}, at ${_wsh_line}"
+        _wsh_error="error:No such ${2}-ary function ${1}(${_wsh_type}[, ...])"
         return 1
       ;;
       esac
@@ -255,3 +270,16 @@ _wsh_panic() {
   fi
   exit "${_wsh_exitcode}"
 }
+
+# _wsh_check_return rv addl_context
+_wsh_check_return() {
+  case "${1}" in 0)
+    :
+  ;; *)
+    _wsh_error="${_wsh_error}
+  ^ ${2}"
+    return 1
+  ;;
+  esac
+}
+

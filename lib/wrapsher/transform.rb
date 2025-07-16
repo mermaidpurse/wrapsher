@@ -30,10 +30,7 @@ module Wrapsher
   class Transform < Parslet::Transform
 
     rule(list_term: subtree(:elements)) do
-      the_elements = elements
-      if the_elements.nil?
-        the_elements = []
-      end
+      the_elements = [elements].compact.flatten
 
       is_map = false
       is_map = true if !the_elements.empty? && the_elements.all? { |p| TransformUtil.transformed_pair?(p) }
@@ -192,5 +189,24 @@ module Wrapsher
       end
     end
 
+    rule(throw: subtree(:e))  do
+      {
+        fun_call: {
+          name: 'throw',
+          fun_args: [e]
+        }
+      }
+    end
+
+    rule(single_quoted: subtree(:string)) {
+      case string
+      when Array
+        if string.empty?
+          { single_quoted: '' }
+        end
+      else
+        { single_quoted: string }
+      end
+    }
   end
 end

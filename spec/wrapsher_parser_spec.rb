@@ -15,6 +15,77 @@ def test_fun(body)
 end
 
 RSpec.describe Wrapsher::Parser do
+  it "parses an empty string" do
+    source = <<~'EOF'
+    bool test(){
+      ''
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          { string_term: { single_quoted: '' } }
+          ]))
+  end
+
+  it "parses a throw expression" do
+    source = <<~'EOF'
+    bool test() {
+      throw 'No such program'
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'throw',
+              fun_args: [
+                string_term('No such program')
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a try/catch block" do
+    source = <<~'EOF'
+    bool test() {
+      try {
+        x = 1
+      } catch e {
+        throw e
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            try_block: {
+              keyword_try: 'try',
+              try_body: [
+                { assignment: { var: 'x', rvalue: { int_term: '1' } } }
+              ],
+              catch: {
+                var: 'e',
+                keyword_catch: 'catch',
+                catch_body: [
+                  {
+                    fun_call: {
+                      name: 'throw',
+                      fun_args: [
+                        { var_ref: 'e' }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
   it "parses line comments at the top level" do
     source = <<~'EOF'
     # Intro to function

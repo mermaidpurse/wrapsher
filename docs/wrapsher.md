@@ -129,7 +129,7 @@ Top-level statements in Wrapsher can be:
     for how to implement a type.
 
 Throughout, comments introduced with a pound character (`#`)
-are ignored **UNIMPLEMENTED**.
+are ignored.
 
 A block is a list of expressions enclosed by curly braces. All
 expressions have values, and the value of the last expression is the
@@ -156,7 +156,7 @@ value of the block. The following are expressions that can be used:
   dependent on the implementation in the _string_ complying with
   Wrapsher's internal calling conventions. See
   [Internals](./internals.md) for more.
-- Certain block expressions like `if` and `shell`.
+- Certain block expressions like `if` and `try`/`catch`.
 - Block control keywords `continue` and `break`. **UNIMPLEMENTED**
 - Boolean expressions, using the comparison operators `==`,
   `!=`, `>`, `>=`, `<`, `<=`; and the boolean operators `not`, `and`
@@ -166,7 +166,7 @@ value of the block. The following are expressions that can be used:
 - Anonymous function definition using the syntax <code>fun
   (_arguments_) _block_</code>. Anonymous functions can be assigned
   to a variable and called using the call function. See [Functions](./functions.md)
-  for more. **UNIMPLEMENTED**
+  for more.
 
 Block expressions accept blocks:
 
@@ -176,6 +176,9 @@ Block expressions accept blocks:
 - <code>if _expression_ _block_ else _block_</code>: evaluates the `bool` _expression_
   and, if true, executes the provided block. If false, executes
   the `else` block.
+- <code>try _block_ catch _var_ _block_</code>: executes the first block.
+  If any errors are raised, assign the error to the _var_ and execute
+  the catch block.
 - <code>while _expression_ _block_</code>: evaluates the `bool` _expression_
   and, as long as it's true, executes the _block_. **UNIMPLEMENTED**
 
@@ -570,8 +573,6 @@ bool set_is_syncio(module/file m, bool p) {
 
 ### Errors
 
-**UNIMPLEMENTED**
-
 Wrapsher discourages the use of "in-band" error signaling requiring
 error checks (for example, returning a zero or invalid value and
 expecting that this will signal an error). Use the keyword `throw` to
@@ -584,6 +585,34 @@ block. The _var_ variable is set to the error inside the `catch`
 block. If you want to test for error type or condition, use `if`. 
 You can re-throw the error explicitly using `throw` again, or
 you can ignore it.
+
+```
+int div(int i, int j) {
+  if j < 0 {
+    throw 'Division by 0'
+  }
+}
+```
+
+```
+bool process_file(string filename) {
+  try {
+    f = file.open(filename)
+  } catch e {
+    if e.message().has('file not found') {
+      false
+    } else {
+      throw e
+    }
+  }
+}
+```
+
+As of right now, errors are not rich--they are not intended for most
+control flow. Errors are a special builtin type: their `to_string()`
+method prints the call stack in addition to the message; messages are
+intended to be examined as text. In the future, more structured error
+data may be supported.
 
 ### Loops
 
@@ -614,6 +643,7 @@ See [Modules and Types](./modules-types.md) for more.
 ### Testing
 
 Wrapsher includes a TAP-compatible test framework in the **test** module.
+Consult the module documentation for usage information.
 
 ### External Dependencies
 
