@@ -27,8 +27,9 @@ words, the following function calls are equivalent:
 | :------- | :----------- |
 | `io.println(mystring)` | `println(io, mystring)` |
 | `fh.write(mystring)` | `write(fh, mystring)` |
-| `strip(mystring)` | `mystring.strip()` |
+| `mystring.strip()` | `strip(mystring)` |
 | `io.println(mystring.strip())` | `println(io, strip(mystring))` |
+| `mystring.split().length()` | `length(split(mystring))` |
 
 Of course, functions can be defined and called that take no arguments
 (nullary).
