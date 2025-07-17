@@ -1,9 +1,9 @@
 # [Amber](https://amber-lang.com/)
 
 Some of Wrapsher's initial inspiration was a post on Hacker News about
-it. It seems like a great project, with a robust parser/compiler
-implementation that focuses on producing interpretable bash code that
-resembles the input language.
+Amber, a language compiled to bash. It seems like a great project,
+with a robust parser/compiler implementation that focuses on producing
+interpretable bash code that resembles the input language.
 
 I believe Wrapsher has somewhat different goals, so I did a cursory
 comparison of some language features, and some commentary on why
