@@ -131,7 +131,7 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
-  it "parses negative ints", skip: 'TODO: fix parsing negative ints' do
+  it "parses negative ints" do
     source = <<~'EOF'
     bool test() {
       -10

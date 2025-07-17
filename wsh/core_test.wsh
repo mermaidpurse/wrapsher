@@ -216,13 +216,13 @@ bool test_list_map() {
 }
 
 bool test_list_find_present() {
-  r = [0, 1, 2, 4].find(bool fun (int i) { i == 1 }, 10)
+  r = [0, 1, 2, 4].find(bool fun (int i) { i == 1 }, -1)
   r == 1
 }
 
 bool test_list_find_absent() {
-  r = [0, 1, 2, 4].find(bool fun (int i) { i == 9 }, 10)
-  r == 10
+  r = [0, 1, 2, 4].find(bool fun (int i) { i == 9 }, -1)
+  r == -1
 }
 
 bool test_pair_new() {
