@@ -39,7 +39,7 @@ any _as(any i, any as) {
     :
   ;; *)
     _wsh_error="error:_as expected a type (e.g. 'type/list:reflist'), got '${_wshl}'"
-    return 1
+    break
   ;;
   esac
 
@@ -66,7 +66,7 @@ any _as(any i, any as) {
       _wsh_result="${_wsh_i#${_wsh_in}:}"
     ;; *)
       _wsh_error="error: Can't cast ${_wsh_in} value to ${_wsh_as}"
-      return 1
+      break
     ;;
     esac
   ;;
@@ -105,7 +105,7 @@ error as_error(string s) {
 error throw(error x) {
   shell '''
   _wsh_get_local x _wsh_error
-  return 1
+  break
   '''
 }
 
@@ -140,10 +140,8 @@ ref ref(any i) {
   r = false
   shell '''
   _wsh_get_local _reflist _wshrl
-  _wsh_error="error:Couldn't create reference for value <<${_wshv_i}>>"
   _wsh_get_global refid _wshi
   _wsh_get_local i _wshr_${_wshi#int:}
-  _wsh_error=error:
   _wsh_set_local r "ref:${_wshi#int:}"
   '''
   _reflist.push(r)
@@ -349,7 +347,7 @@ string replace(string s, string c, string rep) {
   do
     case $((_wshm > 10)) in 1)
       _wsh_error='error:Maximum replacements reached'
-      return 1
+      break
     ;;
     esac
     case "${_wshi}" in *"${_wshj}"*)
@@ -375,6 +373,7 @@ string replace(string s, string c, string rep) {
     ;;
     esac
   done
+  case "${_wsh_error}" in ?*) break ;; esac
   _wsh_result="string:${_wshl}"
   '''
 }
@@ -515,7 +514,7 @@ ref head(reflist rl) {
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
     _wsh_error="error:attempted to take head() of []"
-    return 1
+    break
   ;; *)
     _wshj="${_wshi#reflist:}"
     _wsh_result="${_wshj%% *}"
@@ -529,7 +528,7 @@ reflist tail(reflist rl) {
   _wsh_get_local rl _wshi
   case "${_wshi}" in reflist:)
     _wsh_error="error:attempted to take tail() of []"
-    return 1
+    break
   ;; *)
     _wshj="${_wshi#reflist:}"
     _wshk="${_wshj#* }"
@@ -563,7 +562,7 @@ ref at(reflist rl, int i) {
   done
   case "${_wshm}" in notfound)
     _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk}"
-    return 1
+    break
   ;;
   esac
   '''
@@ -808,7 +807,7 @@ any at(map m, any k) {
     shell '''
     _wsh_get_local k _wshi
     _wsh_error="error:No such key in map: ${_wshi}"
-    return 1
+    break
     '''
   }
   h = m.head()

@@ -56,7 +56,10 @@ int main(list args) {
     # and catching the error, which we don't
     # have yet
     _wsh_dispatch "${_wsh_test_func}" 0
-    case $? in 0)
+    case "${_wsh_error}" in ?*)
+      echo "not ok ${_wsh_test} - ${_wsh_test_func} # ${_wsh_error}"
+      : $((_wsh_fails++))
+    ;; *)
       case "${_wsh_result}" in 'bool:true')
         echo "ok ${_wsh_test} - ${_wsh_test_func}"
       ;; *)
@@ -64,9 +67,6 @@ int main(list args) {
         : $((_wsh_fails++))
       ;;
       esac
-    ;; *)
-      echo "not ok ${_wsh_test} - ${_wsh_test_func} # ${_wsh_error}"
-        : $((_wsh_fails++))
     ;;
     esac
   done

@@ -3,40 +3,15 @@
 These are a collection of design decisions that have been made
 or need to be made, and their rationales.
 
-## Overall Design
-
-Here's some things that aren't important/things wrapsher shouldn't do:
-
-- Readability of resulting shell scripts is not terribly important
-  (you shouldn't arbitrarily make things cryptic unless it means
-  harming the language; e.g., there's no good reason to allow
-  variables that aren't valid sh variables), but while the shell
-  script should pass its tests and maybe `shellcheck` (perhaps with
-  certain style lints turned off) it's not terribly important that the
-  result is a "good" shell script.
-- The compiler/transpiler itself should produce a standalone tool and
-  shouldn't be needed after transpiling/compilation but it's not important
-  that it be self-hosting or anything like that. Wrapsher programs are
-  likely to be pretty slow at text manipulation, unless we elegantly capture
-  `sed`, `awk` and similar capabilities for parsing.[^3]
-- It's definitely not important that it be a good shell or a shell at all,
-  or be used to implement a shell. A REPL would be nice as tooling. This is
-  somewhat complicated by the prohibition against bare expressions at
-  the top-level.
-
-[^3]: As a principle of design, Wrapsher would actually discourage the arbitrary
-  composition and use of external commands. You should be able to count on and
-  use a library interface rather than wrangle options or worry about what version
-  of `jq` is installed. Wrapsher will try to make this easy, so if it does need
-  to use `sed` for something, it will do all the figuring out for you, and you will
-  interact with a Wrapsher interface, not `sed`'s. That said, something like 
-  `system()` will be provided.
+## Future Ideas
 
 Things I like in various languages that would be nice to incorporate (someday?):
 
 - Set/array/list comprehensions
 
-Some ideas I had that don't seem feasible:
+`[ x: y | x <- all_things; y <- iter() ]`
+
+Some ideas I had that don't seem feasible/don't like:
 
 - Pipelines. I do like them in Powershell, I guess I like them in
   Elixir but they seem complicated and I think they actually result
@@ -99,24 +74,9 @@ necessary: the whole reason for wrapsher's existence is that
 you don't have to write shell scripts, so it should only be used
 for cases where you have no choice.
 
-## `continue`, `break` and `return`
-
-I feel like these are partly redundant. `break` and `return`
-are basically the same thing, aren't they? Can I make `break`
-take an argument and `break` from a function or is that too weird?
-Maybe I just make them synonyms. I guess the expectation is that
-`return` has a different scope, but do I really want to keep track
-of these different scopes?
-
-It's probably not that bad. Loops will probably be implemented
-with `while :` and a continue variable, so `continue` and
-`break` are pretty easy.
-
-`return` is not that hard _if_ the compiler generates the
-function postamble, which it doesn't (it's in `_wsh_run`).
-I'm still not sure I want `return`. I guess people probably
-want it for fail-fast guards (so the whole function body isn't wrapped
-in `if { } else { if { } else { } } ...`.
+Also, it would be difficult the way things currently work to
+create wrapsher libraries that could both be loaded, so it's
+one at a time.
 
 ## Variadic functions?
 
@@ -124,44 +84,23 @@ in `if { } else { if { } else { } } ...`.
 
 ## String interpolation?
 
-I've reserved double-quoted syntax for string interpolation as a maybe.
-I'm not sure if it's necessary or desirable. It complicates things quite
-a bit and ends up having this "little language" problem that I don't
-like regexes for, with `#{ }` or stuff. Maybe something like fstrings,
-though again, is that really better than `sprintf`? Or something even
-heavier-weight like mustache?
+I've reserved double-quoted syntax for string interpolation as a
+maybe.  I'm not sure if it's necessary or desirable. It complicates
+things quite a bit and ends up having this "little language" problem
+with `#{ }` or stuff. Maybe something like fstrings, though again, is
+that really better than `sprintf`? Or something even heavier-weight
+like mustache? String interpolation is very popular, though.
 
-## Elsif? Switch-case?
+## Enums
 
-Right now you have to do <code>if _cond_ { } else { if _cond_ { ... }
-else { ... } }</code to get multiple case semantics. Nesting the blocks
-is a little weird. What about matching multiple cases at once. Switch-case-style
-or if-else style or both?
-
-If if-elseif-else style, what's the keyword? Or do we just make the enclosing
-block optional, so `else if` works (I like this better than `elsif`, `elif`).
-
-I don't really like switch-case, too much syntax. It's powerful when combined
-with pattern-matching/destructuring, but the purposeful inclusion of assignment
-expressions in `if` statements is probably good enough:
+How to represent enums? This probably needs top-level list constants
+like structs.
 
 ```
-any find(list l, k, d) {
-  if not l? {
-    return d
-  }
-
-  if (h = l.head()).key() == k {
-    h.value()
-  } else {
-    l.tail().find(k)
-  }
-}
+type foo enum [...]
 ```
 
-Note in the above pseudocode I used the `?` syntax which might be neat.
-It's the same logic as `== typeof(l).new` but might be implemented
-differently for each type.
+Only basic types? Or something richer?
 
 ## Interfaces, Unions or union types?
 
@@ -233,22 +172,22 @@ I like the idea that interfaces are automatically implemented. Then again,
 I have runtime type checking all over the place so if the type doesn't implement
 the actual function there will be a failure. Hm.
 
+**iterable** (has `head()`, `tail()` and `zero()`) would be a good candidate
+for a standard interface.
+
+So would **comparable** (`eq()` and/or `gt()` and `lt()`).
+
 ### Function Interfaces
 
-This would solve the somewhat clunky double-call required for funs. Right now
-when you construct a lambda, it returns an item of time fun, the result of
-calling `call()` on which is an item whose value is of
-a unique type associated with the lambda, and accepts the right arguments.
+This would solve the somewhat clunky double-call required for
+funs. Right now when you construct a lambda, it returns an item of
+type fun, the result of calling `call()` on which is an item whose
+value is of a unique type associated with the lambda, and whose
+`with()` function accepts the right arguments.
 
-If instead you could define an interface like `callable` or `filter_thunk`,
-you could control the signature of the items passed into the function.
-
-```
-interface callable {
-  any call(self item) # Is this literally what needs to be implemented
-                  # or would the existence of 
-}
-```
+If instead you could define an interface like `callable` or
+`filter_thunk`, you could control the signature of the items passed
+into the function.
 
 ```
 interface stringfilter {
@@ -260,8 +199,8 @@ stringlist filter(stringlist sl, stringfilter f) {
 }
 ```
 
-Something like that?
-
+Something like that? Or `call_with` so it's compatible with
+general funs?
 
 ## "First class" structs?
 
@@ -303,13 +242,17 @@ doesn't really work, in particular for list or map constants. For
 eval, a REPL, and certain things like above where you want initial
 global values to have collection values, that doesn't really work.
 
+_Note: I think I just got rid of `return`_
+
 ## Weird syntax ideas
 
 ### More operator overloading
 
+```
 'stringtwo,andthis,other' / ',' => list split(string s, string d) => ['stringtwo', 'andthis', 'other']
+```
 
-is s / ',' better than s.split(',')? Is this necessary?
+is `s / ','` better than `s.split(',')`? Is this necessary?
 
 ### Assignment operators
 
@@ -318,12 +261,12 @@ mutation clear.
 
 ### `?` to test presence/nonzero
 
-What if `x?` meant `x.is_zero()` and tested if `x` is equal to the
+What if `x?` meant `x.is_zero().not()` and tested if `x` is equal to the
 type's zero value? Does this over-encourage in-band semaphore values
 as a substitute for optionality/error checking? Is it even useful?
 Will I want a ternary operator later? If so, I don't think I'd want it
 based on ` ... ? ... : ... ` because `:` is probably bound for
-maps/pairs. `... && ... || ...` perhaps?
+maps/pairs. `... && ... || ...` perhaps, like shell?
 
 ### Lambda calls
 
@@ -432,6 +375,11 @@ access to third-party modules via code-signing of some kind? Or is it
 enough to rely on DNS and HTTPS security to verify the source location
 is accurate? Does code-signing add any actual security?
 
+Maybe globals are kind of associated with a module (appear after a module
+statement, or when they're brought in as a module) and you can only
+bind a global in its own module? This probably has to be overridable
+somehow.
+
 ## Serialization
 
 For a variety of use cases, we should be able to round-trip serialized
@@ -441,6 +389,15 @@ concurrency (so that wrapsher processes can communicate with each other)
 and saving/restoring values. This might not be much more complicated than
 re-escaping strings (which is easy because escaping is very simple) and
 dumping them, possibly with decoration for wrapping.
+
+_Note: implemented `quote()`_
+
+I think this is related to needing compiler-generated literals for
+collections. Function calls are pretty expensive so this really affects
+startup time, just for the informational globals `_functions` and
+so on. The compiler should at least be able to generate all the refs
+and start the program with an initial refid that's greater than what
+it used.
 
 ## Concurrency/External Drivers
 
@@ -469,3 +426,26 @@ so it's probably the first stop (e.g. `jq`).
 So the priority is: safe command invocation and reading of output (required),
 then multiprocessing, then seeing if multiprocessing can be leveraged for
 persistent "command drivers" (are there any others than `bc`? Maybe `openssl`)
+
+Need to look a lot more into file descriptor handling, I/O and subshells
+and job control for this.
+
+## Shellchecks
+
+At some point I'll probably add shellchecks in the pipeline to test
+generated programs.  Here is what it's currently reporting:
+
+- shellchecks
+    - `SC3003 (warning): In POSIX sh, $'..' is undefined.`
+        - [they're documented here](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_02_04), but when did it get added? are lots of old shells missing this?
+    - `SC3045 (warning): In POSIX sh, read -d is undefined.`
+        - [read has -d and is required to be intrinsic](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/read.html), but when did it get added? are lots of old shells missing this?
+    -
+        ```
+        In wsh/core_test line 3833:
+         _wsh_result="int:$((${_wshi#int:} ${_wshk#string:} ${_wshj#int:}))"
+                          ^-- SC1102 (error): Shells disambiguate $(( differently or not at all. For $(command substitution), add space after $( . For $((arithmetics)), fix parsing errors.
+        ```
+    - It may be a good idea to do the arithmetic substitution differently, that should be easy enough
+    - shellcheck reports many unreachable lines, configure out
+    - It would probably be a big pain if there's some problem with reading literals the way I am with `read` and the here-documents with the start and end markers, and being able to use `$'\n'` in stripping the end marker. It's otherwise very difficult to read string literals safely and preserve characters like trailing newlines, etc., exactly. I'm really trying to avoid an encoding scheme for strings.

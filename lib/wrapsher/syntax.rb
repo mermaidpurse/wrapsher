@@ -27,10 +27,14 @@ module Wrapsher
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
     rule(:throw_call)               { str('throw') >> space >> expression.as(:throw) }
+    rule(:break_call)               { str('break').as(:break) }
+    rule(:return_call)              { (str('return').as(:keyword_return) >> space >> expression.as(:return_value)).as(:return) }
+    rule(:continue_call)            { str('continue').as(:continue) }
+    rule(:while_loop)               { (str('while').as(:keyword_while) >> space >> expression.as(:condition) >> space? >> block.as(:loop_body)).as(:while) }
     rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
     rule(:try_block)                { (str('try').as(:keyword_try) >> space >> block.as(:try_body) >> whitespace? >> (str('catch').as(:keyword_catch) >> space >> word.as(:var) >> space? >> block.as(:catch_body)).as(:catch)).as(:try_block) }
 
-    rule(:expression)               { (assignment | throw_call | shellcode_call | lambda | conditional | try_block | pair) }
+    rule(:expression)               { (assignment | break_call | continue_call | return_call | throw_call | shellcode_call | lambda | while_loop | conditional | try_block | pair) }
 
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
 

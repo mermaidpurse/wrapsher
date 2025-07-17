@@ -598,8 +598,8 @@ RSpec.describe Wrapsher::Parser do
     }
     EOF
     program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
-      test_fun([
+    expect(program).to eq( 
+     test_fun([
           {
             fun_call: {
               name: 'new',
@@ -735,6 +735,135 @@ RSpec.describe Wrapsher::Parser do
                   :name=>"push"}}
             }
           }]))
+  end
+
+  it "parses a return call" do
+    source = <<~'EOF'
+    bool test() {
+      if x > 0 {
+        return false
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+        test_fun([
+            {
+              conditional: {
+                keyword_if: 'if',
+                condition: {
+                  fun_call: {
+                    name: 'gt',
+                    fun_args: [
+                      { var_ref: 'x' },
+                      { int_term: '0' }
+                    ]
+                  }
+                },
+              then: [
+                  {
+                    return: {
+                      keyword_return: 'return',
+                      return_value: {
+                        bool_term: 'false'
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]))
+    end
+
+  it "parses a break call" do
+    source = <<~'EOF'
+    bool test() {
+      while x > 0 {
+        break
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+        test_fun([
+            {
+              while: {
+                keyword_while: 'while',
+                condition: {
+                  fun_call: {
+                    name: 'gt',
+                    fun_args: [
+                      { var_ref: 'x' },
+                      { int_term: '0' }
+                    ]
+                  }
+                },
+                loop_body: [
+                  { break: 'break' }
+                ]
+              }
+            }
+          ]))
+  end
+
+  it "parses a continue call" do
+    source = <<~'EOF'
+    bool test() {
+      while x > 0 {
+        continue
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+        test_fun([
+            {
+              while: {
+                keyword_while: 'while',
+                condition: {
+                  fun_call: {
+                    name: 'gt',
+                    fun_args: [
+                      { var_ref: 'x' },
+                      { int_term: '0' }
+                    ]
+                  }
+                },
+                loop_body: [
+                  { continue: 'continue' }
+                ]
+              }
+            }
+          ]))
+  end
+
+  it "parses a while loop" do
+    source = <<~'EOF'
+    bool test() {
+      while x > 0 {
+        true
+      }
+    }
+    EOF
+    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(program).to eq(
+        test_fun([
+            {
+              while: {
+                keyword_while: 'while',
+                condition: {
+                  fun_call: {
+                    name: 'gt',
+                    fun_args: [
+                      { var_ref: 'x' },
+                      { int_term: '0' }
+                    ]
+                  }
+                },
+                loop_body: [{ bool_term: 'true' }]
+              }
+            }
+          ]))
   end
 
   it "parses a function definition" do

@@ -3,7 +3,7 @@ require 'wrapsher'
 module Wrapsher
   class ProgramTables
     attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds,
-                  :context, :locals
+                  :context, :locals, :state
 
     def initialize(
         filename: '-',
@@ -24,6 +24,7 @@ module Wrapsher
       @adds = adds
       @context = nil
       @locals = []
+      @state = {}
       @logger = logger
       @logger.debug("ProgramTables initialized with logger level: #{@logger.level}, filename: #{@filename}, refid: #{@compiler_refid}")
     end

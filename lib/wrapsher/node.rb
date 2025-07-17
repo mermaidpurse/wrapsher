@@ -49,6 +49,22 @@ module Wrapsher
       end
     end
 
+    class Break < Node
+      def initialize(slice, tables:)
+        super
+        if !(tables.state.key?(:in_loop) && tables.state[:in_loop] > 0)
+          raise Wrapsher::CompilationError, "Must use 'break' inside a loop at #{@filename}:#{@line}"
+        end
+      end
+
+      def to_s
+        code = [
+          line,
+          'break # break'
+        ].join("\n  ")
+      end
+    end
+
     # TODO: Needs to get smarter
     # Probably all these methods should return an array of lines
     # So it can be truly empty if needed.
@@ -77,7 +93,7 @@ module Wrapsher
         code << line
         code << @condition.to_s
         code << line
-        code << "_wsh_assert \"${_wsh_result}\" 'bool' 'if condition' || return 1"
+        code << "_wsh_assert \"${_wsh_result}\" 'bool' 'if condition' || break"
         code << 'case "${_wsh_result}" in bool:true)'
         code << @then_body.to_s
         code << ';;'
@@ -92,144 +108,211 @@ module Wrapsher
       end
     end
 
-    class Meta < Node
+    class Continue < Node
       def initialize(slice, tables:)
         super
-        @line = slice[:meta_field].line_and_column[0] if slice[:meta_field].respond_to?(:line_and_column)
-        @field = slice[:meta_field].to_s
-        case @field
-        when 'doc'
-          @doc = StringValue.new(slice[:meta_data], tables: tables)
-        else
-          raise Wrapsher::CompilationError, "Unknown meta field: #{@field} at #{@filename}:#{@line}"
+        if !(tables.state.key?(:in_loop) && tables.state[:in_loop] > 0)
+          raise Wrapsher::CompilationError, "Must use 'continue' inside a loop at #{@filename}:#{@line}"
         end
-      end
-
-      # TODO: Probably shouldn't include documentation for included modules
-      def to_s
-        code = []
-        if @doc
-          code << ": <<'WSH_DOCUMENTATION'"
-          code << @doc.to_s
-          code << 'WSH_DOCUMENTATION'
-        end
-        code.join("\n")
-      end
-    end
-
-    class Version < Node
-    end
-
-    class Type < Node
-      attr_reader :errors
-
-      def initialize(slice, tables:)
-        super
-        @name = slice[:name].to_s
-        @store_type = slice[:store_type].to_s if slice[:store_type]
-        if @name !~ /^[a-z_][a-z0-9_\/]*$/ || @name.include?('__')
-          raise \
-            Wrapsher::CompilationError,
-            "Invalid type name '#{@name}' at #{@filename}:#{@line} - must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes"
-        end
-
-        if tables.globals.key?(@name)
-          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
-        end
-
-        tables.globals[@name] = true
       end
 
       def to_s
+        code = [
+          line,
+          'continue # continue'
+        ].join("\n  ")
+      end
+    end
+
+    class FunCall < Node
+      def initialize(slice, tables:)
+        super
+        @function_name = slice[:name].to_s
+        @no_check = slice[:no_check] if slice.key?(:no_check)
+        @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
+        @function_args = [slice[:fun_args]].flatten.compact.map do |arg|
+          Node.from_obj(arg, tables: tables)
+        end
+      end
+
+      def errors
+        return ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
+        if @function_args.length == 0 && !tables.functions[@function_name].key?(:nullary)
+          return ["No nullary function '#{@function_name}()' at #{line}"]
+        end
+        # We can't actually check for the right arity functions which accept an argument
+        # because we don't (yet) know the type of the first argument.
+      end
+
+      def function_dispatch
         code = []
         code << line
-        code << "# type #{@name}"
-        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
-        code.join("\n")
-      end
-    end
-
-    ##
-    # Rewrite the try block:
-    # - Create a nullary bool fun with the try_body + 'true'
-    # - Call but use a fun_call that doesn't check the sh return value (because we'll do it)
-    # - Instead, if rv !=0, invoke the catch body with an assignment from the
-    #   current_error() function
-    class TryBlock < Node
-      def initialize(slice, tables:)
-        super
-        @line = slice[:keyword_try].line_and_column[0] if slice[:keyword_try].respond_to?(:line_and_column)
-        @try_lambda = Node.from_obj(
-          {
-            fun_call: {
-              name: 'with',
-              no_check: true,
-              fun_args: [
-                {
-                  fun_call: {
-                    name: 'call',
-                    fun_args: [
-                      {
-                        lambda: {
-                          signature: {
-                            type: 'bool',
-                            arg_definitions: []
-                          },
-                          body: slice[:try_body]
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          }, tables: tables)
-        @catch_body = Body.new([
-              {
-                assignment: {
-                  var: slice[:catch][:var],
-                  rvalue: {
-                    fun_call: {
-                      name: 'current_error',
-                      fun_args: []
-                    }
-                  }
-                }
-              }
-            ] + slice[:catch][:catch_body], tables: tables)
+        code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
+        code << "_wsh_check_return \"in #{@function_name} at #{@filename}:#{@line}\" || break"
+        code << line
+        code.join("\n  ")
       end
 
       def to_s
-        code = []
-        code << @try_lambda.to_s
-        code << 'case ${_wsh_rv} in 0)'
-        code << '  :'
-        code << ';; *)'
-        code << '  ' + @catch_body.to_s
-        code << ';;'
-        code << 'esac'
+        call_bindings = @function_args.reverse.map do |arg|
+          [
+            arg.to_s,
+            "_wsh_stack_push \"${_wsh_result}\""
+          ].join("\n  ")
+        end
+        [
+          call_bindings.join("\n  "),
+          function_dispatch
+        ].join("\n")
       end
     end
 
-    class Module < Node
+    class FunStatement < Node
+      attr_reader :signature
+
       def initialize(slice, tables:)
         super
-        @name = slice.to_s
-        if tables.globals.key?(@name)
-          raise \
-            Wrapsher::CompilationError,
-            "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
+        @signature = Signature.new(slice[:signature], tables: tables)
+        @line = @signature.line
+        tables.log("Entering context '#{@signature.summary}'")
+        tables.context = @signature
+        # Argument binding introduces locals into the context
+        @signature.arg_definitions.each do |arg|
+          tables.push_local(arg.name)
         end
+        # Since we have set a context, any assignments that
+        # occur in the body will add to locals
+        @body = Body.new(slice[:body], tables: tables)
+        tables.log("Exiting context '#{@signature.summary}'")
+        tables.context = nil
+        @locals = tables.locals.dup
+        tables.log("Found locals: #{@locals.inspect}; clearing (outside of context)")
+        tables.clear_locals!
+        tables.functions[@signature.name] ||= {}
+        tables.functions[@signature.name][@signature.dispatch_type] = @signature
+      end
 
-        tables.globals[@name] = true
+      def cleanup_locals
+        "unset " + @locals.map { |v| "\"_wshv_${_wsh_frame}_#{v}\"" }.join(' ')
       end
 
       def to_s
         [
-          "# module #{@name}",
-          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'",
-          line
+          "# #{@signature.summary}",
+          "#{@signature.function_name(:presence)}=1",
+          "#{@signature.function_name(:definition)}() {",
+          line,
+          "_wsh_result='bool:false'; _wsh_error=''",
+          "while :; do",
+          "  :",
+          "  #{@signature.argument_binding}",
+          "  # function body",
+          "  #{@body}",
+          "  #{cleanup_locals}",
+          "  # end function body",
+          "  break",
+          "done",
+          "#{@signature.check_return}",
+          "}"
         ].join("\n")
+      end
+    end
+
+    class Signature < Node
+      attr_accessor :name
+      attr_reader :type, :arg_definitions
+
+      def initialize(slice, tables:)
+        super
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
+        @type = slice[:type].to_s
+        @name = slice[:name].to_s if slice.key?(:name)
+        if !slice[:arg_definitions].nil?
+          arg_definitions = slice[:arg_definitions].is_a?(Array) ? slice[:arg_definitions] : [slice[:arg_definitions]]
+          @arg_definitions = arg_definitions.map { |arg| ArgDefinition.new(arg, tables: tables) }
+        else
+          @arg_definitions = []
+        end
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
+      end
+
+      def summary(use_name=nil)
+        "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s).join(', ')})"
+      end
+
+      def arity
+        @arg_definitions.length
+      end
+
+      def nullary?
+        arity == 0
+      end
+
+      def nary?
+        arity > 0
+      end
+
+      def dispatch_type
+        nullary? ? :nullary : arg_definitions[0].type
+      end
+
+      def argument_binding
+        @arg_definitions.map do |arg|
+          [
+            line,
+            "_wsh_stack_peek_into _wshi",
+            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' || break",
+            "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\"",
+          ].join("\n  ")
+        end.join("\n  ")
+      end
+
+      def check_return(use_name=nil)
+        "_wsh_assert \"${_wsh_result}\" '#{type}' '#{use_name || name}()'"
+      end
+
+      def function_name(nametype = :definition)
+        prefix = nametype == :presence ? '_wshp' : '_wshf'
+        if @arg_definitions.empty?
+          "#{prefix}_#{@name}_0"
+        else
+          "#{prefix}_#{@name}_#{@arg_definitions.length}_#{@arg_definitions[0].type_with_underscore}"
+        end
+      end
+    end
+
+    class ArgDefinition < Node
+      attr_reader :name, :type
+
+      def initialize(slice, tables:)
+        super
+        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
+        @name = slice[:name].to_s
+        @type = slice[:type].to_s
+      end
+
+      def type_with_underscore
+        @type.gsub(/[^a-zA-Z0-9_]/, '__')
+      end
+
+      def to_s
+        "#{@type} #{@name}"
+      end
+    end
+
+    class Body < Node
+      def initialize(slice, tables:)
+        super
+        slices = slice.is_a?(Array) ? slice : [slice]
+        @nodes = slices.map { |sl| Node.from_obj(sl, tables: tables) }
+      end
+
+      def to_s
+        code = []
+        @nodes.each do |node|
+          code << node.to_s
+        end
+        code.join("\n  ")
       end
     end
 
@@ -363,192 +446,66 @@ module Wrapsher
       end
     end
 
-    class FunStatement < Node
-      attr_reader :signature
-
+    class Meta < Node
       def initialize(slice, tables:)
         super
-        @signature = Signature.new(slice[:signature], tables: tables)
-        @line = @signature.line
-        tables.log("Entering context '#{@signature.summary}'")
-        tables.context = @signature
-        # Argument binding introduces locals into the context
-        @signature.arg_definitions.each do |arg|
-          tables.push_local(arg.name)
+        @line = slice[:meta_field].line_and_column[0] if slice[:meta_field].respond_to?(:line_and_column)
+        @field = slice[:meta_field].to_s
+        case @field
+        when 'doc'
+          @doc = StringValue.new(slice[:meta_data], tables: tables)
+        else
+          raise Wrapsher::CompilationError, "Unknown meta field: #{@field} at #{@filename}:#{@line}"
         end
-        # Since we have set a context, any assignments that
-        # occur in the body will add to locals
-        @body = Body.new(slice[:body], tables: tables)
-        tables.log("Exiting context '#{@signature.summary}'")
-        tables.context = nil
-        @locals = tables.locals.dup
-        tables.log("Found locals: #{@locals.inspect}; clearing (outside of context)")
-        tables.clear_locals!
-        tables.functions[@signature.name] ||= {}
-        tables.functions[@signature.name][@signature.dispatch_type] = @signature
       end
 
-      def cleanup_locals
-        "unset " + @locals.map { |v| "\"_wshv_${_wsh_frame}_#{v}\"" }.join(' ')
+      # TODO: Probably shouldn't include documentation for included modules
+      def to_s
+        code = []
+        if @doc
+          code << ": <<'WSH_DOCUMENTATION'"
+          code << @doc.to_s
+          code << 'WSH_DOCUMENTATION'
+        end
+        code.join("\n")
+      end
+    end
+
+    class Module < Node
+      def initialize(slice, tables:)
+        super
+        @name = slice.to_s
+        if tables.globals.key?(@name)
+          raise \
+            Wrapsher::CompilationError,
+            "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
+        end
+
+        tables.globals[@name] = true
       end
 
       def to_s
         [
-          "# #{@signature.summary}",
-          "#{@signature.function_name(:presence)}=1",
-          "#{@signature.function_name(:definition)}() {",
-          line,
-          "  #{@signature.argument_binding}",
-          "  # function body",
-          "  #{@body}",
-          "  #{cleanup_locals}",
-          "  # end function body",
-          "  #{@signature.check_return}",
-          "}"
+          "# module #{@name}",
+          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'",
+          line
         ].join("\n")
       end
     end
 
-    class Signature < Node
-      attr_accessor :name
-      attr_reader :type, :arg_definitions
-
+    class Return < Node
       def initialize(slice, tables:)
         super
-        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
-        @type = slice[:type].to_s
-        @name = slice[:name].to_s if slice.key?(:name)
-        if !slice[:arg_definitions].nil?
-          arg_definitions = slice[:arg_definitions].is_a?(Array) ? slice[:arg_definitions] : [slice[:arg_definitions]]
-          @arg_definitions = arg_definitions.map { |arg| ArgDefinition.new(arg, tables: tables) }
-        else
-          @arg_definitions = []
-        end
-        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
-      end
-
-      def summary(use_name=nil)
-        "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s).join(', ')})"
-      end
-
-      def arity
-        @arg_definitions.length
-      end
-
-      def nullary?
-        arity == 0
-      end
-
-      def nary?
-        arity > 0
-      end
-
-      def dispatch_type
-        nullary? ? :nullary : arg_definitions[0].type
-      end
-
-      def argument_binding
-        @arg_definitions.map do |arg|
-          [
-            line,
-            "_wsh_stack_peek_into _wshi",
-            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' || return 1",
-            "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\"",
-          ].join("\n  ")
-        end.join("\n  ")
-      end
-
-      def check_return(use_name=nil)
-        "_wsh_assert \"${_wsh_result}\" '#{type}' '#{use_name || name}()' || return 1"
-      end
-
-      def function_name(nametype = :definition)
-        prefix = nametype == :presence ? '_wshp' : '_wshf'
-        if @arg_definitions.empty?
-          "#{prefix}_#{@name}_0"
-        else
-          "#{prefix}_#{@name}_#{@arg_definitions.length}_#{@arg_definitions[0].type_with_underscore}"
-        end
-      end
-    end
-
-    class ArgDefinition < Node
-      attr_reader :name, :type
-
-      def initialize(slice, tables:)
-        super
-        @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
-        @name = slice[:name].to_s
-        @type = slice[:type].to_s
-      end
-
-      def type_with_underscore
-        @type.gsub(/[^a-zA-Z0-9_]/, '__')
+        @line = slice[:keyword_return].line_and_column[0] if slice[:keyword_return].respond_to?(:line_and_column)
+        @depth = 1 + (tables.state[:in_loop] || 0)
+        @return_value = Node.from_obj(slice[:return_value], tables: tables)
       end
 
       def to_s
-        "#{@type} #{@name}"
-      end
-    end
-
-    class Body < Node
-      def initialize(slice, tables:)
-        super
-        slices = slice.is_a?(Array) ? slice : [slice]
-        @nodes = slices.map { |sl| Node.from_obj(sl, tables: tables) }
-      end
-
-      def to_s
-        code = []
-        @nodes.each do |node|
-          code << node.to_s
-        end
-        code.join("\n  ")
-      end
-    end
-
-    class FunCall < Node
-      def initialize(slice, tables:)
-        super
-        @function_name = slice[:name].to_s
-        @no_check = slice[:no_check] if slice.key?(:no_check)
-        @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
-        @function_args = [slice[:fun_args]].flatten.compact.map do |arg|
-          Node.from_obj(arg, tables: tables)
-        end
-      end
-
-      def errors
-        return ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
-        if @function_args.length == 0 && !tables.functions[@function_name].key?(:nullary)
-          return ["No nullary function '#{@function_name}()' at #{line}"]
-        end
-        # We can't actually check for the right arity functions which accept an argument
-        # because we don't (yet) know the type of the first argument.
-      end
-
-      def function_dispatch
-        code = []
-        code << line
-        code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
-        code << "_wsh_rv=$?"
-        code << "_wsh_check_return ${_wsh_rv} \"in #{@function_name} at #{@filename}:#{@line}\" || return 1" \
-          unless @no_check
-        code << line
-        code.join("\n  ")
-      end
-
-      def to_s
-        call_bindings = @function_args.reverse.map do |arg|
-          [
-            arg.to_s,
-            "_wsh_stack_push \"${_wsh_result}\""
-          ].join("\n  ")
-        end
         [
-          call_bindings.join("\n  "),
-          function_dispatch
-        ].join("\n")
+          '  ' + @return_value.to_s,
+          "break #{@depth} # return"
+        ].join("\n  ")
       end
     end
 
@@ -607,6 +564,78 @@ EOSTRING
           '_wshi="${_wshi#_wsh_bof}"',
           '_wsh_result="string:${_wshi}"'
         ].join("\n  ")
+      end
+    end
+
+    class Type < Node
+      attr_reader :errors
+
+      def initialize(slice, tables:)
+        super
+        @name = slice[:name].to_s
+        @store_type = slice[:store_type].to_s if slice[:store_type]
+        if @name !~ /^[a-z_][a-z0-9_\/]*$/ || @name.include?('__')
+          raise \
+            Wrapsher::CompilationError,
+            "Invalid type name '#{@name}' at #{@filename}:#{@line} - must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes"
+        end
+
+        if tables.globals.key?(@name)
+          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
+        end
+
+        tables.globals[@name] = true
+      end
+
+      def to_s
+        code = []
+        code << line
+        code << "# type #{@name}"
+        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        code.join("\n")
+      end
+    end
+
+    class TryBlock < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:keyword_try].line_and_column[0] if slice[:keyword_try].respond_to?(:line_and_column)
+        @try_body_ast = [slice[:try_body]].flatten
+        if slice[:catch][:keyword_catch].respond_to?(:line_and_column)
+          @catch_line = slice[:catch][:keyword_catch].line_and_column[0]
+        end
+        @catch_body_ast = [
+          {
+            assignment: {
+              var: slice[:catch][:var],
+              rvalue: {
+                shellcode: {
+                  triple_quoted: [
+                    "  _wsh_result=\"${_wsh_error}\"",
+                    "  _wsh_error=''"
+                  ].join("\n")
+                }
+              }
+            }
+          }
+        ] + [slice[:catch][:catch_body]].flatten
+        @try_body = Body.new(@try_body_ast, tables: tables)
+        @catch_body = Body.new(@catch_body_ast, tables: tables)
+      end
+
+      def to_s
+        code = []
+        code << line
+        code << "while :; do # try"
+        code << "  :"
+        code << @try_body.to_s
+        code << "  break"
+        code << "done"
+        code << "_wsh_line='#{@filename}:#{@catch_line}'"
+        code << "case \"${_wsh_error}\" in ?*) # catch block"
+        code << @catch_body.to_s
+        code << ";;"
+        code << "esac # end catch block"
       end
     end
 
@@ -711,6 +740,33 @@ EOSTRING
       end
     end
 
+    class Version < Node
+    end
+
+    class While < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:keyword_while].line_and_column[0] if slice.respond_to? :line_and_column
+        @condition = Node.from_obj(slice[:condition], tables: tables)
+        tables.state[:in_loop] ||= 0
+        tables.state[:in_loop] += 1
+        @loop_body = Body.new(slice[:loop_body], tables: tables)
+        tables.state[:in_loop] -= 1
+      end
+
+      def to_s
+        code = []
+        code << "while :; do # while"
+        code << @condition.to_s
+        code << "_wsh_assert \"${_wsh_result}\" 'bool' 'while condition' || break"
+        code << "case \"${_wsh_result}\" in 'bool:true') : ;; *) break ;; esac"
+        code << @loop_body.to_s
+        code << "done # while"
+        # Propagate break because it might have been from a throw/error propagation break
+        code << "case \"${_wsh_error}\" in ?*) break ;; esac"
+      end
+    end
+
     def initialize(slice, tables:)
       @filename = tables.filename
       @tables = tables
@@ -735,14 +791,17 @@ EOSTRING
     @@nodes = {
       assignment: Assignment,
       bool_term: BoolTerm,
+      break: Break,
       comment: Comment,
       conditional: Conditional,
+      continue: Continue,
       lambda: Lambda,
       fun_call: FunCall,
       fun_statement: FunStatement,
       int_term: IntTerm,
       module: Module,
       meta: Meta,
+      return: Return,
       shellcode: ShellCode,
       string_term: StringTerm,
       try_block: TryBlock,
@@ -752,6 +811,7 @@ EOSTRING
       use_module: UseModule,
       var_ref: VarRef,
       version: Version,
+      while: While
     }.freeze
 
     @@builtin_locals = %w[_reflist].freeze

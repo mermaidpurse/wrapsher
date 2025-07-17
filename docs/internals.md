@@ -1,47 +1,68 @@
 # Internals
 
+The internal representation of wrapsher code (that is, the
+shell representation) is documented here. The language
+is implemented across the [`preamble.sh`](./lib/wrapsher/preamble.sh),
+the [`postamble.sh`](./lib/wrapsher/postamble.sh) (mostly for
+the program entry point, i.e., how `main` gets called), the
+compiler (which generates `sh` code for programs) and
+the [**core** module](./wsh/core.wsh). The core module contains
+a lot of code written directly in shell in order to provide
+the necessary fundamental functions. The `preamble.sh` is not
+very large and contains some utilities.
+
+Note that Wrapsher's philosophy is to rely, especially for core
+functionality, only on POSIX-required behaviors. Many shells
+implement collection types, for example, or local variables;
+Wrapsher doesn't use these because they are not required by POSIX.
+You should be able to run Wrapsher programs on any platform
+with a compliant shell; not just when certain versions of `bash`
+are installed, for example.
+
+Wrapsher also tries to avoid unnecessary forking and subshells;
+so, for example, since the `[` or `test` command is not required
+to be builtin, it mostly uses `case` for conditional expressions,
+and for its own conditionals.
+
 ## Internal type implementations
 
 Since Wrapsher is running in a POSIX shell, it uses a simple
-tagged value scheme for tracking type information. Each value
+tagged value scheme for tracking type information (all values
+are represented by strings; by necessity). Each value
 is tagged like this:
 
 `<type>:<value>`
 
-Since only strings are available, it means that something more
-complicated is required for collection types `map` and `list`.
+Some Wrapsher types are builtin, and some are based on another type
+(the "store type"). For example, the **list** type (and the **pair**
+and **map** types) are based on the builtin **reflist** type. This
+means that the **list** type "wraps" the **reflist**, so its
+raw `sh` strings look like this:
 
-These are actually reference-based, but the reference mechanism
-is internal to Wrapsher and will probably not be exposed. References
-are cleaned up when the collections are modified. Internally,
-a three-member list of strings looks something like this:
+`list:reflist:ref:1001 ref:1002`
 
-`list:ref:1000 ref:1001 ref:1002`
+When a user implements a type, they choose a storage type (they
+can also choose **builtin**, but since the compiler doesn't
+know about the type, they'll need to write the raw shell
+code necessary for accessing the value, so it's usually easier
+to base a type on an existing builtin).
 
-When you access an list member, it is dereferenced (it's a reference
-to a shell variable out there named something like `_wshr_1001`.
-
-References are never shared; this is not subject to garbage collection
-problems. This is only a mechanism to ease handling of data that has
-to occur in shell strings.
-
-When a type is wrapped by declaring a new type, it gets prepended
-to the value. So after we've created our vector, it'll internally
-look something like:
-
-`vector:list:reflist:ref:1000 ref:1001 ref:1002`
-
-All `_as_vector(l)` really does is strip the `vector` part,
-exposing the underlying list.
+The `any _as(any i, any as)` function allows a value to be
+wrapped--that is, cast from its type to another type that uses its
+type as a storage type; or unwrapped--that is, cast from its type to
+its own type's storage type. There is validation to this, but
+it amounts to adding or removing a type tag at the beginning of
+the value.
 
 ## References
 
 Collections (lists) are implemented with underlying data types
-**ref** and **reflist**. The only difference between a **reflist** and
-a **list** is that a **list** dereferences its elements when used.
+**ref** and **reflist**. The **list** functions create references
+when items are pushed onto the list, and push the reference into
+the "inner" **reflist**; then dereference the items that are
+accessed from the list.
 
-A **reflist** is simply a list of references. In the Wrapsher internal implementation,
-it's a space-separated list:
+A **reflist** is simply a space-separated list of references:
 
 ```
 reflist:ref:1000 ref:1020 ref:1022
@@ -68,11 +89,11 @@ frame's reflist.
 When a function call occurs:
 - The function arguments are pushed onto the stack (`_wsh_stack<_wsh_stackp>`)
   in reverse order
-- `_wsh_dispatch` (or, for nullary functions, `_wsh_dispatch_nullary`) is
-  called, which peeks at the top argument to decide what function to dispatch
+- `_wsh_dispatch` is called with an arity based on the syntax of the function
+  call. It  peeks at the top argument to decide what function to dispatch
   to: either `_wshf_function_name_<type>` or `_wshf_function_name_any`,
   using `_wshp_function_name_<type>` and `_wshp_function_name_any` as
-  semaphore variables
+  signal variables (the compiler creates these functions from Wrapsher functions).
 - The function runner (`_wsh_run`) creates a new frame scope and
   initializes the reflist and list of variable names
 - Inside the function (generated code), the arguments are popped off
@@ -85,6 +106,44 @@ When a function call occurs:
 - Any references which were created were added to the local `_reflist`
   Wrapsher variable. Any unprotected references are destroyed.
 - Each local variable is then `unset`
+
+Most expressions in Wrapsher are syntactic sugar for function calls;
+internally, you can say Wrapsher uses a functional style or even that
+it is close to being a Lisp.
+
+## Funs
+
+Wrapsher's anonymous functions work by creating a special, single-use
+type for the lambda; by creating a `with` function that operates on
+that type and has the lambda's signature and body; and by creating
+a value of that type that contains a map of the variable bindings
+the lambda closes over, then wrapping that as a `fun` type so it
+can be passed around as a value.
+
+The `with` function is a real, named Wrapsher function operating
+on the single-use type.
+
+## Errors
+
+The `_wsh_error` is the standard variables to use to set an error
+condition. At each call level (i.e., when `_wsh_dispatch` is called),
+the variable is examined and the error is propagated if this variable
+is not empty.
+
+Each `sh` function body is wrapped in a single-execution `while`
+loop that can be `break`-ed when a function call sets `_wsh_error`.
+When this happens, context information is added to the error (a new
+line of call context information). The function body which called
+the function which threw the error now `break`s its own governing
+`while` loop, and so on.
+
+Try blocks are implemented as `while` loops of their own, so that
+errors can be caught.
+
+Wrapsher `while` loops are _also_ implemented as `while` loops, so
+at the conclusion of each, `_wsh_error` is examined so that
+`break`s that occur due to error propagation are distinguished from
+`break`s due to Wrapsher `break`s.
 
 ## VM Functions
 

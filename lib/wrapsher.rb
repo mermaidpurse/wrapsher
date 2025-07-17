@@ -2,6 +2,7 @@
 
 require_relative 'wrapsher/cli'
 require_relative 'wrapsher/compiler'
+require_relative 'wrapsher/compilation_error'
 require_relative 'wrapsher/parser'
 require_relative 'wrapsher/node'
 require_relative 'wrapsher/syntax'

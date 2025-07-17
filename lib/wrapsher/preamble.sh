@@ -264,20 +264,19 @@ _wsh_panic() {
     # this is basically a panic, so we have to
     # bootstrap it. Maybe someday we can be smarter
     # about this.
-    echo "${_wsh_error#error:}" >&2
+    # echo "${_wsh_error#error:}" >&2
+    echo "${_wsh_error}" >&2
   else
     echo "error:Unspecified, ${2} exited"
   fi
   exit "${_wsh_exitcode}"
 }
 
-# _wsh_check_return rv addl_context
+# _wsh_check_return addl_context
 _wsh_check_return() {
-  case "${1}" in 0)
-    :
-  ;; *)
+  case "${_wsh_error}" in ?*)
     _wsh_error="${_wsh_error}
-  ^ ${2}"
+  ^ ${1}"
     return 1
   ;;
   esac
