@@ -1,8 +1,8 @@
 # Wrapsher
 
-Wrapsher is a programming language which compiles (or transpiles) to
-POSIX sh-compliant shell code. The resulting shell scripts can be run
-on any system with a POSIX-compliant `sh`.
+Wrapsher is a programming language which compiles to POSIX
+sh-compliant shell code. The resulting shell scripts can be run on any
+system with a POSIX-compliant `sh`.
 
 The core language is implemented in
 [pure POSIX shell](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html)
@@ -26,8 +26,8 @@ Wrapsher is pre-alpha software, and not feature-complete.
 The Wrapsher build tool, `wrapsher`, is written in Ruby. The resulting
 compiled program is portable pure `sh`, though, and neither `wrapsher`
 nor Ruby are required to run any compiled Wrapsher program--it's standalone,
-and requires no dependencies (except for external commands, which it
-will exit cleanly if not present).
+and requires no dependencies (except for external commands, for which it
+will cleanly throw an error if not present).
 
 Wrapsher source code files conventionally have a `.wsh` file extension.
 
@@ -52,11 +52,11 @@ Wrapsher programs always have a `main` function as an entry point. The return
 value of this function is the program's exit code.
 
 Wrapsher automatically maps command-line arguments to the `main` function's
-signature, so the `main` function must accept a list.
+signature, so the `main` function must accept a list (of strings).
 
-Create a file `hello.wsh` and run `wrapsher compile hello.wsh`. This will
-produce an output file `hello`, which starts with `#!/bin/sh` and contains
-(voluminous, ugly) shell code.
+Create a file `hello.wsh` and run `wrapsher compile hello.wsh`. This
+will produce an output file `hello`, which starts with `#!/bin/sh` and
+contains shell code.
 
 You'll see that one of Wrapsher's design goals is explicitly _not_ to
 produce readable or maintainable shell scripts--they are intended to
@@ -71,7 +71,7 @@ safe and correct but isn't terribly readable.
 Top-level statements in Wrapsher can be:
 
 - A `use` statement which enables or incorporates dependencies,
-  features or constraints:
+  features, constraints or variables:
     - <code>use version _constraint_</code>: specifies a version
       constraint for the compiler version required to compile the
       program. See [Wrapsher versions](#wrapsher-versions) below.
@@ -90,12 +90,15 @@ Top-level statements in Wrapsher can be:
     - <code>use module _module_</code>: During compilation, find and
       load the named module in the module search location(s). Note
       that the **core** module is always implicitly included.
-- A `meta` statement providing metadata which is available to programs
-  loading the module (**UNIMPLEMENTED**):
+    - <code>use global _variable_ _initial\_value_</code>: Introduce
+      a new global variable named _variable_ with the specified
+      _initial\_value_. The value can be a scalar literal, but not
+      a collection.
+- A `meta` statement providing metadata (**UNIMPLEMENTED**):
     - `meta version`: the module or program version
     - `meta source`: the source URL
     - `meta author`: the author
-    - `meta docs`: help documentation. When the program is at the
+    - `meta docs`: help documentation for the module or program.
       top-level (not in a `module`), this is used as help text in
       the standard option processing. See [Documentation Style](style.md)
       for more.
@@ -108,11 +111,11 @@ Top-level statements in Wrapsher can be:
     <i>type</i> <i>name</i>(<i>argument specifiers</i>) <i>block</i>
     </pre> 
     for example:
-    ```
+    <pre>
     int main(list args) {
-       <i>...expressions...</i>
+       _expressions_
     }
-    ```
+    </pre>
     - In the above definition, we are saying:
         - The `main` function returns an `int` and accepts a list
           of arguments named `args`.
@@ -121,57 +124,59 @@ Top-level statements in Wrapsher can be:
       to be passed as the function's first argument, when called.
 - A type definition of the form:
     <pre>
-    type <i>typename</i> <i>type</i>
+    type <i>typename</i> <i>store\_type</i>
     </pre>
-    This declares a new user-defined named type, based on _type_.
-    Note that _type_ is used as _storage_ here, this is not any
-    form of inheritance. See [Modules and Types](./modules-types.md)
-    for how to implement a type.
+    This declares a new user-defined named type, based on
+    _store\_type_.  Note that _store_type_ is just used as storage
+    here, enabling the safe cast back and forth between the two; this
+    is not any form of inheritance. See [Modules and
+    Types](./modules-types.md) for how to implement a type.
 
 Throughout, comments introduced with a pound character (`#`)
 are ignored.
 
-A block is a list of expressions enclosed by curly braces. All
+A block is a list of expressions (separated by newlines or
+semicolons (`;`) and enclosed by curly braces (`{ }`). All
 expressions have values, and the value of the last expression is the
 value of the block. The following are expressions that can be used:
 
 - A variable assignment of the form </code>_var_ = _expression_</code>.
-- A function call of the form
-  <code>_function_(_arguments_)</code>. Module functions can be
-  qualified by module name by prepending the module name and a dot,
-  e.g., `io.print`. Type functions can be invoked against the type
-  (e.g., `file.open(...)`). Other functions can be invoked against a
-  value with the same dot syntax (e.g., `length.to\_string()`
-  or `22.to_string()` which are syntactic sugar for `to_string(length)`
-  and `to_string(22)`, respectively. See [Functions](./functions.md)
-  for more.
-- A shellcode expression of the form <code>shell _string_</code>.  The
+- A function call of the form <code>_function_(_arguments_)</code> or
+  <code>_receiver_._function_(_arguments_)</code>. The method syntax
+  with a _receiver_ is just syntactic sugar for placing the first
+  argument outside of the regular function list. For example, you can
+  call `io.println('foo')` or `println(io, 'foo')`; or
+  `mystring.length()` `length(mystring)` equivalently. This also
+  allows many function calls to be chained together.  See
+  [Functions](./functions.md) for more.
+- A shellcode expression of the form <code>shell _string_</code>. The
   _string_ is included inline in the compiled code.  Note that _this
   is unsafe_ because Wrapsher does not check this code for types or
   POSIX-compliance, or compliance with its standards for external
-  dependency management.  This is usually used in modules to enable
-  direct handling of the `sh` data (Wrapsher's internal sh-friendly
-  representation of values) or external commands (for example, in the
-  **http** module based on `curl`). The result of the expression is
-  dependent on the implementation in the _string_ complying with
-  Wrapsher's internal calling conventions. See
-  [Internals](./internals.md) for more.
+  dependency management. This should generally only be used in the
+  core module. The value of the expression depends on the code in the
+  expression conforming correctly to Wrapsher's internal calling
+  conventions. See [Internals](./internals.md) for more.
 - Certain block expressions like `if` and `try`/`catch`.
-- Block control keywords `continue` and `break`. **UNIMPLEMENTED**
+- A while loop of the form <code>while _condition_ _block_</code>.
+  Within loops, block control keywords `continue` and `break`
+  can be used to skip parts of or exit the loop.
+- The `return` keyword to return immediately from the function.
 - Boolean expressions, using the comparison operators `==`,
   `!=`, `>`, `>=`, `<`, `<=`; and the boolean operators `not`, `and`
   and `or`. See [Operators](#operators) for more.
 - Arithmetic expressions, using the arithmetic operators `+`, `-`,
   `*`, `/` and `%`, possibly grouped using parens `(` and `)`.
 - Anonymous function definition using the syntax <code>fun
-  (_arguments_) _block_</code>. Anonymous functions can be assigned
-  to a variable and called using the call function. See [Functions](./functions.md)
-  for more.
+  (_arguments_) _block_</code>. Anonymous functions are real values
+  that can be passed to other functions, assigned to variables, and
+  called using the <code>.call().with(_arguments_)</code> functions.
+  See [Functions](./functions.md) for more.
 
 Block expressions accept blocks:
 
-- <code>if _expression_ _block_</code>: evaluates the boolean expression (
-  that is, an expression returning a `bool`) and,
+- <code>if _expression_ _block_</code>: evaluates the boolean expression
+  (that is, an expression returning a `bool`) and,
   if true, executes the provided block.
 - <code>if _expression_ _block_ else _block_</code>: evaluates the `bool` _expression_
   and, if true, executes the provided block. If false, executes
@@ -180,7 +185,9 @@ Block expressions accept blocks:
   If any errors are raised, assign the error to the _var_ and execute
   the catch block.
 - <code>while _expression_ _block_</code>: evaluates the `bool` _expression_
-  and, as long as it's true, executes the _block_. **UNIMPLEMENTED**
+  and, as long as it's true, loops through the _block_. Inside the
+  block, `continue` can be used to skip to the next iteration; `break`
+  to exit the loop.
 
 #### Operators
 
@@ -225,12 +232,36 @@ order describes the categories:
 
 1. Parens
 2. Boolean not
-3. Arithmetic (secondary)
-4. Arithmetic (primary)
-5. Comparison
-6. Boolean
+3. Subscript
+4. Pair
+5. Arithmetic (secondary)
+6. Arithmetic (primary)
+7. Comparison
+8. Boolean
 
 The following lists the operators and their builtin implementations
+
+##### Subscript Operator
+
+The subscript operator `[` is syntactic sugar for the `at()`
+function. Any type can be subscripted if it implements this
+function. The builtin `string`, `list` and `map` implement
+`at()` and can be subscripted in this way.
+
+```
+string at(string s, int i)
+any at(list l, int i)
+any at(map m, any k)
+```
+
+##### Pair Operator
+
+The pair operator `:` is used to construct a `pair` consisting
+of a key and a value. Any type can be used as a key and value.
+
+```
+pair from_kv(type/pair t, any k, any v)
+```
 
 ##### Arithmetic Operators
 
@@ -249,7 +280,6 @@ int mod(int i, int j)   # modulus
 int plus(int i, int j)  # addition
 int minus(int i, int j) # subtraction
 
-list div(string s, any d)       # splitting by substring or interval
 string plus(string s, string o) # concatenation of strings
 list plus(list l, list o)       # concatenation of lists
 ```
@@ -266,6 +296,8 @@ list plus(list l, list o)       # concatenation of lists
 | `<=`       | `not gt()` | comparison (even lower) |
 
 ```
+any eq(any i, any o)     # equality of internal representation
+
 bool eq(int i, int j)    # equality
 bool gt(int i, int j)    # greater than
 bool lt(int i, int j)    # less than
@@ -302,18 +334,36 @@ s)`) must be used to read types from input strings or implement
 an optional value.
 
 
-| Type     | Zero             | Example literal values         |
-| -------- | ---------------- | ------------------------------ |
-| `bool`   | `false`          | `true`, `false`                |
-| `int`    | `0`              | `0`, `99`, `-22`, `0xa8`       |
-| `string` | `''`             | `'bob'`, `'café'`              |
-| `list`   | `[]`             | `['one', 2, false, [0, 1, 2]]` |
-| `pair`   | `false: false`   | `'one': 1`                     |
-| `map`    | `[:]`            | `['one': 1, 'two': 2]`         |
-| `fun`    | `any fun () {}`  | `bool fun (int i) { i == 0 }`  |
+| Type     | Zero                   | Example literal values         |
+| -------- | ---------------------- | ------------------------------ |
+| `bool`   | `false`                | `true`, `false`                |
+| `int`    | `0`                    | `0`, `99`, `-22`               |
+| `string` | `''`                   | `'bob'`, `'café'`              |
+| `list`   | `[]`                   | `['one', 2, false, [0, 1, 2]]` |
+| `pair`   | `false: false`         | `'one': 1`                     |
+| `map`    | `[:]`                  | `['one': 1, 'two': 2]`         |
+| `fun`    | `bool fun () { false } | `bool fun (int i) { i == 0 }`  |
 
-Each of these fundamental types has a way of writing literal values
-in that type:
+All types implement the following functions or use the generic `any` equivalent:
+
+<pre>
+_type_ new(type/_type_)
+bool is_zero(_type_ i)
+string to_string(_type_ i)
+string quote(_type_ i)
+</pre>
+
+The `new()` function takes no arguments other than the type
+variable (e.g., `bool` or `list`) and returns a new zero value.
+The `is_zero()` function returns `true` if the value is
+zero-valued. The `to_string()` function returns a "nice"
+visual representation of the value, which is not intended to
+necessarily be completely accurate. The `quote()` function
+returns a "literal equivalent" that could be included in a
+wrapsher program to define the value.
+
+Each of these fundamental types has a way of writing literal values in
+that type.
 
 ##### `bool`
 
@@ -322,37 +372,12 @@ of other types (such as `0`, `''`, `[]`) are never implicitly
 converted to `bool`, you must check explicitly (e.g., with `val == 0`,
 `val == ''` or `val == []` or `val.len() == 0`).
 
-Functions:
-
-- `bool new(type/bool) { false }`
-- `bool as_bool(bool p) { p }`
-- `bool and(bool p, bool q)`
-- `bool not(bool p)`
-- `bool or(bool p, bool q)`
-- `bool eq(bool p, bool q)`
-- `string to_string(bool p)`
-- `bool to_bool(string s)`
-
 ##### `int`
 
 Integers can be written as a series of decimal digits 0-9.
 
 Note that floats are not built in the core because they are not built
-in to a POSIX shell. See the **math** module for a floating point
-implementation based on the external dependency `bc` **UNIMPLEMENTED**.
-
-Functions:
-
-- `int new(type/int) { 0 }`
-- `int as_int(int i) { i }`
-- `int plus(int i, int j)`
-- `int minus(int i, int j)`
-- `int times(int i, int j)`
-- `int div(int i, int j)`
-- `int mod(int i, int j)`
-- `string to_string(int i)`
-- `bool zerop(int i)`
-- `int to_int(string s)`
+in to a POSIX shell.
 
 ###### `string`
 
@@ -364,30 +389,32 @@ The other syntax that is supported are triple-quoted strings, which
 begin and end with three quotation marks `'''`.
 
 Note that there are no such things as double-quoted strings in
-Wrapsher, nor variable interpolation. There are also (currently)
-no escape sequences other than `\\` and `\'` **UNIMPLEMENTED**.
+Wrapsher, nor variable interpolation. Within a single-quoted string,
+any character preceded by a backslash (`\`) is equivalent to its
+literal value; there are no special escapes that produce special
+characters: a backslash always means the same thing (make the next
+character literal). This means the string `'\n'` is equal to
+`'n'`. To embed newlines in single-quoted strings, you need to
+actually embed the newline.
 
 Strings can be subscripted with the `[` operator as this is syntactic
 sugar for `string at(string s, any i)`.
 
-- `string new(type/string) { '' }`
-- `string as_string(string s) { s }`
-- `string at(string s, any i)`
-- `string ltrim(string s, string x)`
-- `string rtrim(string s, string x)`
-- `string trim(string s, string x)`
+- `int length(string s)`
 - `bool has(string s, string search)`
 - `int index(string s, string search)`
 - `string slice(string s, int i, int len)`
 - `string set(string s, int i, string s)`
-- `string plus(string s, string addon)`
-- `string to_string(string s)`
-- `int length(strings)`
-- `bool zerop(string s)`
+- `list split(string s, string c)`
+- `string replace(string s, string c, string r)`
+- `string ltrim(string s, string x)`
+- `string rtrim(string s, string x)`
+- `string trim(string s, string x)`
 
 ##### `list`
 
-Arrays are arbitrary-length lists of any type of element.
+Arrays are arbitrary-length lists of any type of element (including
+lists, maps, user-defined types or other collections).
 
 An list literal is written with enclosing square brackets `[` and `]`
 with a comma-separated list of values. The members of a list do not
@@ -397,54 +424,49 @@ characteristic, though).
 Arrays can be subscripted like strings: `mylist[n]` is syntactic sugar
 for `mylist.at(n)`.
 
-- `list new(type/list) { [] }`
-- `any at(list l, int i)`
 - `bool has(list l, any e)`
 - `int index(list l, any e)`
 - `int length(list l)`
-- `list slice(list l, int i, int len)`
+- `any head(list l)`
+- `any tail(list l)`
+- `string join(list l, string s)`
 - `list set(list l, int i, any e)`
 - `list push(list l, any e)`
-- `list pop(list l)`
-- `list unshift(list l, any e)`
+- `any pop(list l)`
+- `list slice(list l, int i, int len)`
 - `list delete(list l, int i)`
-- `list plus(list l, list o)`
-- `list minus(list l, list o)`
 - `list map(list l, fun f)`
 - `any reduce(list l, fun f, any i)`
 - `list select(list l, fun f)`
-- `string to_string(list l)`
 - `bool any(list l, fun f)`
 - `bool all(list l, fun f)`
-- `any head(list l)`
-- `any tail(list l)`
-- `list join(list l, string s)`
 
 ##### `pair`
 
 A pair is a couple, or a single association between a key and a value.
-The key and value can be of any type.
+The key and value can be of any type. It is written literally as
+<code>_key_: _value_</code>.
 
 - `pair new(type/pair)`
 - `any key(pair p)`
 - `any value(pair p)`
-- `string to_string(pair p)`
 
 ##### `map`
 
-A map is an associative array indexed by `string` keys. Like lists
+A map is an associative array indexed by any type of key. Like lists
 and strings, it can be subscripted using the `[]` operator: `m[key]`
-is syntactic sugar for `m.at(key)`.
+is syntactic sugar for `m.at(key)`. Maps are written as a list of `pair`s.
 
-- `map new(type/map) { [:] }`
-- `any at(map m, any k)`
 - `bool has(map m, any k)`
 - `any index(map m, any v)`
 - `map set(map m, pair p)`
 - `map slice(map m, list l)`
-- `string to_string(map m)`
 - `map select(map m, fun f)`
 - `map map(map m, fun f)`
+- `any reduce(map m, fun f)`
+- `map delete(map m, any k)`
+- `pair head(map m)`
+- `map tail(map m)`
 - `int length(map m)`
 
 Like lists, map literals are written in square brackets `[` and `]`.
@@ -464,8 +486,7 @@ m = [
 m['id'] == 2992
 ```
 
-While the following is a list (of which one
-element is pair):
+While the following is a list (of which one element is pair):
 
 ```
 l = [
@@ -479,6 +500,8 @@ m[0] == 2992
 m[1] == 'name': 'Harold'
 m[1].key() == 'name'
 ```
+
+An empty map is denoted by `[:]`.
 
 ##### `any`
 
@@ -496,10 +519,10 @@ in function definitions.
 The result of the expression is of the type `fun`, on which you
 can use the call function:
 
-```
-fun/<i>opaque</i> call(fun f)
-any with(fun/<i>opaque</i>, ...)
-```
+<pre>
+_opaque_ call(fun f)
+_fun\_return_type_ with(_opaque_, ...)
+</pre>
 
 Note that in order to call the function, you need to use the
 `with` function. The invocation looks like this:
@@ -574,17 +597,17 @@ bool set_is_syncio(module/file m, bool p) {
 ### Errors
 
 Wrapsher discourages the use of "in-band" error signaling requiring
-error checks (for example, returning a zero or invalid value and
+error checks (for example, returning a zero, invalid or null value and
 expecting that this will signal an error). Use the keyword `throw` to
 throw an error. The argument to `throw` is then used to prevent
-further execution.  Uncaught errors bubble all the way up to the
+further execution. Uncaught errors bubble all the way up to the
 top-level and the program panics.
 
 You can catch errors using a <code>try { } catch _var_ { }</code>
 block. The _var_ variable is set to the error inside the `catch`
-block. If you want to test for error type or condition, use `if`. 
-You can re-throw the error explicitly using `throw` again, or
-you can ignore it.
+block. If you want to test for error type or condition, use `if`
+inside the `catch` block.  You can re-throw the error explicitly using
+`throw` again, or you can ignore it.
 
 ```
 int div(int i, int j) {
@@ -616,9 +639,14 @@ data may be supported.
 
 ### Loops
 
-**UNIMPLEMENTED**
+Wrapsher has `while` loops of the form <code>while _condition_ _block_</code>.
+It evaluates the boolean expression in _condition_, and if true, executes
+the block; then it repeats until the expression returns `false`. Inside
+the loop, the `break` and `continue` keywords can be used to exit
+the loop or skip to the next iteration, respectively.
 
-Wrapsher has `while` loops of the form <code>while _condition_ { }</code
+Note that anonymous functions and list functions like `map()`,
+`reduce()` and `select()` provide powerful ways to iterate over a list.
 
 ### Programs vs. Modules - `main`
 
@@ -635,8 +663,6 @@ searches for the module in its module include path--a file named
 
 The `main` function in a command must return an `int`. Further, it
 must accept a list of arguments (they are strings).
-
-You should probably use **optparse** to parse the options.
 
 See [Modules and Types](./modules-types.md) for more.
 
@@ -676,12 +702,12 @@ a fatal error is produced.
 The folllowing modules comprise the standard library:
 
 | Module | Description | Status |
-| :===== | :========== | :===== |
-| [**core**](wsh/core.wsh) | Core functions and fundamental types--always included | pre-alpha |
-| [**io**](wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
-| [**test**](wsh/test.wsh) | Test framework | pre-alpha |
-| [**math**](wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
-| [**http**](wsh/http.wsh) | HTTP communication based on `curl` | **UNIMPLEMENTED** |
-| [**sys**](wsh/sys.wsh) | System shells and platform | **UNIMPLEMENTED** |
-| [**optparse**](wsh/optparse.wsh) | Parse command-line options | **UNIMPLEMENTED** |
-| [**crypto**](wsh/crypto.wsh) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |
+| :----- | :---------- | :----- |
+| [**core**](./wsh/core.wsh) | Core functions and fundamental types--always included | pre-alpha |
+| [**io**](./wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
+| [**test**](./wsh/test.wsh) | Test framework | pre-alpha |
+| [**math**](./wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
+| [**sys**](./wsh/sys.wsh) | System platform | **UNIMPLEMENTED** |
+| [**optparse**](./wsh/optparse.wsh) | Parse command-line options | **UNIMPLEMENTED** |
+| [**crypto**](./wsh/crypto.wsh) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |
+| [**http**](./wsh/http.wsh) | HTTP communication based on `curl` | **UNIMPLEMENTED** |

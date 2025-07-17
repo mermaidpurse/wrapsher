@@ -6,13 +6,15 @@ dispatched on the type of the first argument.
 ## Redefinition
 
 Wrapsher functions are global in namespace and do not allow for
-redefinition **UNIMPLEMENTED**. This has implications that any
-module can define a function in any "namespace" (for example, a
-module can define a `main` function, meaning that when you
-`use` that module in a program, that will be your entry point
-for the program, and you can't provide your own `main`.
+redefinition (that is, two functions of the same name and receiver type
+can't coexist). Any module can define a function in any "namespace" (for
+example, a module can define a `main` function, meaning that when you
+`use` that module in a program, that will be your entry point for the
+program, and you can't provide your own `main`.
 
-This 
+However, Wrapsher uses its polymorphic function dispatch to provide
+a close match for module and type namespacing. There's no reason
+you can't have many `open()` functions, all operating on a given type.
 
 ## Receiver syntax
 
@@ -21,8 +23,8 @@ style is dispatched as if the receiver is its first argument. In other
 words, the following function calls are equivalent:
 
 
-| **Receiver** | **Conventional** |
-| === | === |
+| Receiver | Conventional |
+| :------- | :----------- |
 | `io.println(mystring)` | `println(io, mystring)` |
 | `fh.write(mystring)` | `write(fh, mystring)` |
 | `strip(mystring)` | `mystring.strip()` |
@@ -31,8 +33,9 @@ words, the following function calls are equivalent:
 Of course, functions can be defined and called that take no arguments
 (nullary).
 
-By convention, because the first argument is important, it's usually
-called the receiver, whether it's written that way or not.
+By convention, because the first argument is used in resolving
+function dispatch, it's usually called the receiver, whether it's
+written that way or not.
 
 ## Function dispatch/polymorphism
 
@@ -66,46 +69,61 @@ is created of type `type/vector`, enabling you to write
 See [modules-types.md](./modules-types.md) for more discussion of how
 types work.
 
-## as_ and to_ functions
+If there is no function implemented against the type, then Wrapsher
+will "fall back" to a function of the same name implemented against
+the `any` type. If there is no such function, this results in
+an error.
 
-The convention in Wrapsher is that types are converted to each other
-("casted") using both <code>as_<i>type</i>()</code> and <code>to_<i>type</i>()</code>
+## conversions, casts and quote()
+
+The convention in Wrapsher is that types can be converted to each other
+using both <code>as_<i>type</i>()</code> and <code>to_<i>type</i>()</code>
 functions. When present, they serve slightly different purposes:
 
-The <code>as_<i>type</i>()</code> should be used for an "identity"
-cast.  <code>_type_ as_<i>type</i>(_type_ i)</code> is automatically
-implemented for every type (**UNIMPLEMENTED**) as an identity
-conversion, and a cast to and from the type's "storage" type _should_
-be implemented. An identity cast is round-trip, and serves as a
-canonical, if internal representation of the type.
+The <code>as_<i>type</i>()</code> conversion is a safe cast. That is,
+the result is exactly equivalent to the input, but of a different
+type. An error is produced if the exact, safe conversion can't
+be performed. Casting to and from a type's store\_type can usually
+be performed.
+
+A <code>to_<i>type</i>()</code> conversion is a conversion, which
+_may_ result in an error if the input type is invalid. It is not
+necessarily round-trippable; it may not include all the information
+in the source and may reflect parsing or other operations. For
+example, an integer is parsed out of a string with `int to_int(string s)`,
+not directly cast. All types implement a `to_string()` method
+which can be used to produce a "nice" output value; but you would
+not necessarily expect to be able to parse the exact value back
+from the resulting string.
+
+The `quote()` function is designed to produce a Wrapsher-eval-able
+representation of a value. For example, using `quote(s)` where `s`
+is a string will return a string that, output, includes its quotes
+and escapse internal quotes and backslashes, so it coudl be used
+as a literal in a Wrapsher program.
+
+Wrapsher doesn't have "unsafe" casts where you just assert that
+a type is of a different type. You need to write a converter to
+make the conversion.
 
 For example, if defining `type stringlist list` to make a list
 of strings, you should implement `list as_list(stringlist s)`
 and `stringlist as_stringlist(list l)`, probably taking
-advantage of the automatically-implemented unsafe casts:
+advantage of the `_as()` function, which wraps or unwraps
+a value to or from its storage type.
 
 ```
 stringlist as_stringlist(list l) {
-  l._as_stringlist()
+  l._as(stringlist)
 }
 
 list as_stringlist(list l) {
   l.map(fun (any i) { i.assert(string) })
-  l._as_list()
+  l._as(list)
 }
 ```
 
-When implemented, a `to_` function isn't expected to provide
-an identical value, but a one-way conversion. For example,
-you might implement `to_string()` to provide a friendly
-representation of your type, but it's not unambiguous and conceptually
-you wouldn't need to be able to read the resulting value
-back into the type. It's okay to leave information out of a
-`.to_` conversion.
-
 ## Anonymous functions
-
-**UNIMPLEMENTED**
 
 An anonymous function definition takes the form of a return type, the
 keyword `fun` and a function signature. For example, you might define
@@ -121,3 +139,16 @@ int main(list args) {
 The result in `ints` will be an list of ints that result from calling
 the anonymous function on each (`string`) element of the list `args`.
 
+Anonymous functions are closures and contain the local variables that were
+in scope when it was created. This allows you to make factory functions:
+
+```
+fun multiplier(int i) {
+  int fun (j) { i * j }
+}
+
+int main(list args) {
+  f = multiplier(10)
+  [0, 1, 2].map(multiplier) # => [0, 10, 20]
+}
+```
