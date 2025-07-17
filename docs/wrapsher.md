@@ -124,10 +124,10 @@ Top-level statements in Wrapsher can be:
       to be passed as the function's first argument, when called.
 - A type definition of the form:
     <pre>
-    type <i>typename</i> <i>store\_type</i>
+    type <i>typename</i> <i>store_type</i>
     </pre>
     This declares a new user-defined named type, based on
-    _store\_type_.  Note that _store_type_ is just used as storage
+    _store\_type_.  Note that _store\_type_ is just used as storage
     here, enabling the safe cast back and forth between the two; this
     is not any form of inheritance. See [Modules and
     Types](./modules-types.md) for how to implement a type.
@@ -518,11 +518,6 @@ in function definitions.
 
 The result of the expression is of the type `fun`, on which you
 can use the call function:
-
-<pre>
-_opaque_ call(fun f)
-_fun\_return_type_ with(_opaque_, ...)
-</pre>
 
 Note that in order to call the function, you need to use the
 `with` function. The invocation looks like this:
