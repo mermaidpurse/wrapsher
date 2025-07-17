@@ -83,13 +83,12 @@ plus (optionally) safely-managed external dependencies.
 
 ## Inspiration: The very idea
 
-I took some initial inspiration from [Amber](https://amber-lang.com/)[^3],
+I took some initial inspiration from [Amber](https://amber-lang.com/),
 which I read about on
 [HN](https://news.ycombinator.com/item?id=40431835), and
 [Ansible](https://www.ansible.com/), an agentless configuration
-management system which I've loved to hate and hated to love.
-
-[^3]: A brief [comparison of features](./docs/amber-comparison.md) and aims.
+management system which I've loved to hate and hated to love. I wrote a
+brief [comparison with Amber](./docs/amber-comparison.md).
 
 I really liked the idea of allowing you to write programs in
 a good programming language (with types, dependency management,

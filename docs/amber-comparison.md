@@ -12,7 +12,7 @@ is not even version `0.1.0`), some of Wrapsher's features are
 pending, and so indicated.
 
 | Feature | [Amber 0.4.0](https://docs.amber-lang.com/0.4.0-alpha) | Wrapsher 0.1.0 | Comment |
-| :====== | :===================================================== | :============= | :====== |
+| :------ | :----------------------------------------------------- | :------------- | :------ |
 | Type-checking | optional | mandatory | Wrapsher has an `any` generic which matches all types |
 | Scalar types | Text, Num, Bool, Null | string, int, bool | |
 | Collection types | Array (1-dimension) | list, map, pair (arbitrarily nested) | |
