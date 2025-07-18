@@ -3,7 +3,6 @@ require 'logger'
 require 'parslet'
 require 'wrapsher'
 
-# TODO: maps, loops, comments, errors
 module Wrapsher
   class Syntax < Parslet::Parser
 
@@ -24,7 +23,7 @@ module Wrapsher
     rule(:arg_definitions)          { (arg_definition >> (comma >> arg_definition).repeat).maybe }
     rule(:arg_definition)           { word.as(:type) >> space >> word.as(:name) }
 
-    rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace }
+    rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace >> space? }
     rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
     rule(:throw_call)               { str('throw') >> space >> expression.as(:throw) }
     rule(:break_call)               { str('break').as(:break) }

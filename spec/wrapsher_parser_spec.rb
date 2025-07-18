@@ -118,7 +118,7 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
-  it "parses block ends with trailing whitespace", skip: 'TODO: fix blocks with trailing whitespace' do
+  it "parses block ends with trailing whitespace" do
     source = <<~'EOF'
     bool test() {
       false
