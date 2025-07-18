@@ -13,9 +13,7 @@ module Wrapsher
 
     def parsetext(text)
       begin
-        parsed = Wrapsher::Syntax.new.parse(text)
-        transformed = Wrapsher::Transform.new.apply(parsed)
-        transformed
+        Wrapsher::Syntax.new.parse(text)
       rescue Parslet::ParseFailed => e
         @logger.error(e.parse_failure_cause.ascii_tree)
         raise
@@ -26,6 +24,5 @@ module Wrapsher
       text = File.read(filename)
       parsetext(text)
     end
-
   end
 end

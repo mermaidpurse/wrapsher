@@ -14,14 +14,59 @@ def test_fun(body)
   }]
 end
 
-RSpec.describe Wrapsher::Parser do
+RSpec.describe 'parser/transform' do
+  it "parses  a chain" do
+    source = <<~'EOF'
+    bool test() {
+      i.to_string().quote()
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            postfix_chain: {
+              receiver: { var_ref: 'i' },
+              calls: [
+                { fun_call: { name: 'to_string', fun_args: nil } },
+                { fun_call: { name: 'quote', fun_args: nil } }
+              ]
+            }
+          }
+        ]))
+    program = Wrapsher::Transformer.new.transform(ast)
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'quote',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'to_string',
+                    fun_args: [
+                      { var_ref: 'i' }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
   it "parses an empty string" do
     source = <<~'EOF'
-    bool test(){
+    bool test() {
       ''
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          { string_term: { single_quoted: [] } }
+        ]))
+    program = Wrapsher::Transformer.new.transform(ast)
     expect(program).to eq(
       test_fun([
           { string_term: { single_quoted: '' } }
@@ -34,7 +79,10 @@ RSpec.describe Wrapsher::Parser do
       throw 'No such program'
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([{ throw: string_term('No such program') }]))
+    program = Wrapsher::Transformer.new.transform(ast)
     expect(program).to eq(
       test_fun([
           {
@@ -58,8 +106,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       test_fun([
           {
             try_block: {
@@ -72,12 +120,7 @@ RSpec.describe Wrapsher::Parser do
                 keyword_catch: 'catch',
                 catch_body: [
                   {
-                    fun_call: {
-                      name: 'throw',
-                      fun_args: [
-                        { var_ref: 'e' }
-                      ]
-                    }
+                    throw: { var_ref: 'e' }
                   }
                 ]
               }
@@ -94,8 +137,8 @@ RSpec.describe Wrapsher::Parser do
       false
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       [
         { comment: ' Intro to function' },
         { comment: ' Second comment' }
@@ -110,8 +153,8 @@ RSpec.describe Wrapsher::Parser do
       false
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       test_fun([
           { comment: ' Intro to function' },
           { bool_term: 'false'}
@@ -124,8 +167,8 @@ RSpec.describe Wrapsher::Parser do
       false
     } 
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       test_fun([
           { bool_term: 'false' }
         ]))
@@ -137,8 +180,8 @@ RSpec.describe Wrapsher::Parser do
       -10
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       test_fun([
           { int_term: '-10' }
         ]))
@@ -152,8 +195,8 @@ RSpec.describe Wrapsher::Parser do
       '\'\''
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq(
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
       test_fun([
           string_term("\\'"),
           string_term("\\\\back"),
@@ -167,7 +210,8 @@ RSpec.describe Wrapsher::Parser do
       [:]
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -185,7 +229,8 @@ RSpec.describe Wrapsher::Parser do
       y._x(p, [:])
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -212,7 +257,8 @@ RSpec.describe Wrapsher::Parser do
       p = 'key1': 'value1'
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
          {
@@ -233,13 +279,81 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
-  it "parses a pair in a complex expression", skip: 'TODO: fix precedence of pair operator' do
+  it "parses a boolean expression" do
+    source = <<~'EOF'
+    bool test() {
+      x and y or not z
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            boolean_op: [
+              { left: { var_ref: 'x' } },
+              { operator: 'and', right: { var_ref: 'y' } },
+              { operator: 'or', right: {
+                  boolean_not: {
+                    subject: { var_ref: 'z' }
+                  }
+                }
+              }
+            ]
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'or',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'and',
+                    fun_args: [
+                      { var_ref: 'x' },
+                      { var_ref: 'y' }
+                    ]
+                  }
+                },
+                {
+                  fun_call: {
+                    name: 'not',
+                    fun_args: [
+                      { var_ref: 'z' }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
+  it "parses a pair in a complex expression" do
     source = <<~'EOF'
     bool test() {
       p == 'key1': 'value1'
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            comparison: {
+              left: { var_ref: 'p' },
+              operator: '==',
+              right: {
+                pair: {
+                  key: string_term('key1'),
+                  value: string_term('value1')
+                }
+              }
+            }
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -263,13 +377,14 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
-  it "parses a pair in an expression with chains", skip: 'TODO: fix pair operator precedence' do
+  it "parses a pair in an expression with chains" do
     source = <<~'EOF'
     bool test() {
       m.head() == 'key1': 'value1'
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -306,7 +421,8 @@ RSpec.describe Wrapsher::Parser do
       'key1': 'value1'
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -328,7 +444,27 @@ RSpec.describe Wrapsher::Parser do
       ['key1': 'value1', 'key2': 'value2']
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            list_term: [
+              {
+                pair: {
+                  key: string_term('key1'),
+                  value: string_term('value1')
+                }
+              },
+              {
+                pair: {
+                  key: string_term('key2'),
+                  value: string_term('value2')
+                }
+              }
+            ]
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -388,7 +524,8 @@ RSpec.describe Wrapsher::Parser do
       a != b
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -411,7 +548,8 @@ RSpec.describe Wrapsher::Parser do
       a >= b
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -436,7 +574,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -467,7 +606,37 @@ RSpec.describe Wrapsher::Parser do
       bool fun (int a, int b) { a + b; a == b }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            lambda: {
+              signature: {
+                type: 'bool',
+                arg_definitions: [
+                  { type: 'int', name: 'a' },
+                  { type: 'int', name: 'b' }
+                ]
+              },
+              body: [
+                {
+                  additive_op: [
+                    { left: { var_ref: 'a' } },
+                    { operator: '+', right: { var_ref: 'b' } }
+                  ]
+                },
+                {
+                  comparison: {
+                    left: { var_ref: 'a' },
+                    operator: '==',
+                    right: { var_ref: 'b' }
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -502,7 +671,8 @@ RSpec.describe Wrapsher::Parser do
       f = bool fun (int a, int b) { a == b }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -536,7 +706,8 @@ RSpec.describe Wrapsher::Parser do
       l.filter(bool fun (string s) { s.length() > 0 }, other)
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -579,7 +750,17 @@ RSpec.describe Wrapsher::Parser do
       x[0]
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            subscript: [
+              { receiver: { var_ref: 'x' } },
+              { index: { int_term: '0' } }
+            ]
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -591,14 +772,52 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
+  it "parses a multidimensional subscript" do
+    source = <<~EOF
+    bool test() {
+      x[0]['foo']
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            subscript: [
+              { receiver: { var_ref: 'x' } },
+              { index: { int_term: '0' } },
+              { index: string_term('foo') }
+            ]
+          }
+        ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'at',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'at',
+                    fun_args: [{var_ref: 'x'}, {int_term: '0'}]
+                  }
+                },
+                string_term('foo')
+              ]
+            }
+          }
+        ]))
+  end
+
   it "parses an empty list" do
     source = <<~EOF
     bool test(){
       [ ]
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
-    expect(program).to eq( 
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+    expect(program).to eq(
      test_fun([
           {
             fun_call: {
@@ -609,13 +828,14 @@ RSpec.describe Wrapsher::Parser do
         ]))
   end
 
-  it "parses an additive expression", skip: 'TODO: chain operators' do
+  it "parses an additive expression" do
     source = <<~'EOF'
     bool test() {
       x.to_string() + ' ' + ' '
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     # plus(plus(to_string(x), string_term(' ')), to_string(y))
     expect(program).to eq(
       test_fun([
@@ -639,14 +859,7 @@ RSpec.describe Wrapsher::Parser do
                     ]
                   }
                 },
-                {
-                  fun_call: {
-                    name: 'to_string',
-                    fun_args: [
-                      { var_ref: 'y' }
-                    ]
-                  }
-                }
+                string_term(' ')
               ]
             }
           }
@@ -659,7 +872,8 @@ RSpec.describe Wrapsher::Parser do
       [1, 2, 3]
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -703,7 +917,8 @@ RSpec.describe Wrapsher::Parser do
       x = [0, a.to_string(), not b, 3 - 4]
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
       test_fun([
           {
@@ -745,7 +960,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
         test_fun([
             {
@@ -783,7 +999,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
         test_fun([
             {
@@ -814,7 +1031,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
         test_fun([
             {
@@ -845,7 +1063,8 @@ RSpec.describe Wrapsher::Parser do
       }
     }
     EOF
-    program = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
         test_fun([
             {
@@ -869,11 +1088,39 @@ RSpec.describe Wrapsher::Parser do
   it "parses a function definition" do
     source = <<~EOF
     int add(int a, int b) {
-      a + b
+      a * b
     }
     EOF
-    parser = Wrapsher::Parser.new
-    program = stringify(parser.parsetext(source)).flatten
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq([
+      {
+        fun_statement: {
+          signature: {
+            type: 'int',
+            name: 'add',
+            arg_definitions: [
+              {
+                type: 'int',
+                name: 'a'
+              },
+              {
+                type: 'int',
+                name: 'b'
+              }
+            ]
+          },
+          body: [
+            {
+               multiplicative_op: [
+                 { left: { var_ref: 'a' } },
+                 { operator: '*', right: { var_ref: 'b' } }
+               ]
+            }
+          ]
+        }
+      }
+    ])
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq([
       {
         fun_statement: {
@@ -894,7 +1141,7 @@ RSpec.describe Wrapsher::Parser do
           body: [
             {
               fun_call: {
-                name: 'plus',
+                name: 'times',
                 fun_args: [
                   { var_ref: 'a' },
                   { var_ref: 'b' }
@@ -907,6 +1154,94 @@ RSpec.describe Wrapsher::Parser do
     ])
   end
 
+  it "parses an if-else-if chain" do
+    source = <<~'EOF'
+    bool test() {
+      if x > 100 {
+         100
+      } else if x > 10 {
+         10
+      } else {
+         1
+      }
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+                  test_fun([
+                      {
+                        conditional: [
+                          {
+                            keyword_if: 'if',
+                            condition: {
+                              comparison: {
+                                left: { var_ref: 'x' },
+                                operator: '>',
+                                right: { int_term: '100' }
+                              }
+                            },
+                          then: [
+                              { int_term: '100' }
+                            ]
+                          },
+                          {
+                            keyword_elseif: 'else if',
+                            condition: {
+                              comparison: {
+                                left: { var_ref: 'x' },
+                                operator: '>',
+                                right: { int_term: '10' }
+                              }
+                            },
+                          then: [
+                              { int_term: '10' }
+                            ]
+                          },
+                          {
+                            keyword_else: 'else',
+                            else: [
+                              { int_term: '1' }
+                            ]
+                          }
+                        ]
+                      }
+                    ]))
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+        expect(program).to eq(
+                  test_fun([
+                      {
+                        conditional: {
+                          keyword_if: 'if',
+                          condition: {
+                            fun_call: {
+                              name: 'gt',
+                              fun_args: [{ var_ref: 'x' }, { int_term: '100' }]
+                            }
+                          },
+                        then: [{ int_term: '100' }],
+                          keyword_else: 'else if',
+                        else: {
+                            conditional: {
+                              keyword_if: 'else if',
+                              keyword_elseif: 'else if',
+                              condition: {
+                                fun_call: {
+                                  name: 'gt',
+                                  fun_args: [{ var_ref: 'x' }, { int_term: '10' }]
+                                }
+                              },
+                            then: [{ int_term: '10' }],
+                              keyword_else: 'else',
+                            else: [
+                                { int_term: '1' }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]))
+  end
+
   it "parses some wrapsher" do
     source = <<~EOF
     module ex
@@ -915,8 +1250,8 @@ RSpec.describe Wrapsher::Parser do
     type vector list
     EOF
     parser = Wrapsher::Parser.new()
-  program = stringify(parser.parsetext(source)).flatten
-  expect(program).to eq([
+    ast = stringify(parser.parsetext(source)).flatten
+    expect(ast).to eq([
           { module: 'ex' },
           { meta: { meta_field: 'author', meta_data: { single_quoted: 'dev@mermaidpurse.org' } } },
           { use_version: '0' },

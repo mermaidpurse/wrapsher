@@ -24,7 +24,7 @@ module Wrapsher
       }
       @file_optparser = OptionParser.new do |opts|
         opts.on('-eCODE', '--expr CODE', 'Expression/Wrapsher code to process') { |expr| @options[:expr] << expr }
-        opts.on('-D', '--debug', 'Print debugging output on stderr') { |debug| @options[:level] = :DEBUG }
+        opts.on('-D', '--debug', 'Print debugging output on stderr') { @options[:level] = :DEBUG }
       end
     end
 
@@ -38,10 +38,10 @@ module Wrapsher
         do_test @argv
       when 'compile'
         do_compile @argv
+      when 'transform'
+        do_transform @argv
       when 'parse'
         do_parse @argv
-      when 'grammar'
-        do_grammar
       else
         help
       end
@@ -56,6 +56,7 @@ Usage:
     wrapsher compile
     wrapsher run
     wrapsher test
+    wrapsher transform
     wrapsher parse
 EOF
     end
@@ -127,6 +128,26 @@ EOF
       end
     end
 
+    def do_transform(args)
+      args = @file_optparser.parse(*args)
+      parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
+      if ! @options[:expr].empty?
+        parsed = parser.parsetext(@options[:expr].join("\n") + "\n")
+        transformed = Wrapsher::Transformer.new(logger: @logger, level: @options[:level]).transform(parsed)
+        pp transformed
+        puts JSON.pretty_generate(transformed)
+      else
+        args.each do |source|
+          ppoutput = source.delete_suffix('.wsh') + '.pp'
+          output = source.delete_suffix('.wsh') + '.json'
+          parsed = parser.parse(source)
+          transformed = Wrapsher::Transformer.new(logger: @logger, level: @options[:level]).transform(parsed)
+          File.open(ppoutput, 'w') { |fh| PP.pp(transformed, fh) }
+          File.open(output, 'w') { |fh| fh.write(JSON.pretty_generate(transformed)) }
+        end
+      end
+    end
+
     def do_parse(args)
       args   = @file_optparser.parse(*args)
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
@@ -144,12 +165,5 @@ EOF
         end
       end
     end
-
-    def do_grammar()
-      parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
-      puts parser.grammar
-    end
-
   end
-
 end

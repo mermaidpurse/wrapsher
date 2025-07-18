@@ -9,8 +9,9 @@ module Wrapsher
     end
 
     def compiletext(text, type: :program, tables: Wrapsher::ProgramTables.new)
-      ast = Wrapsher::Parser.new.parsetext(text)
-      Wrapsher::Generator.new(type: type).generate(ast, tables: tables)
+      ast = Wrapsher::Parser.new(logger: @logger, level: @logger.level).parsetext(text)
+      transformed_ast = Wrapsher::Transformer.new(logger: @logger, level: @logger.level).transform(ast)
+      Wrapsher::Generator.new(type: type).generate(transformed_ast, tables: tables)
     end
 
     def compile(filename, type: :program, tables: Wrapsher::ProgramTables.new)

@@ -17,11 +17,8 @@
 
 ## MVP
 
-- Implement return
-- Implement if-else-if
-- Implement syntax fixes
 - Syntax highlighting, editor mode
-- Implement module _init(), cohere with **test** module (probably
+- Implement module init(), cohere with **test** module (probably
   where externals checks happen).
 - Implement externals/system() or similar
 - Reimplement test framework

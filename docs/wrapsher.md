@@ -181,6 +181,9 @@ Block expressions accept blocks:
 - <code>if _expression_ _block_ else _block_</code>: evaluates the `bool` _expression_
   and, if true, executes the provided block. If false, executes
   the `else` block.
+- <code>if _expression_ _block_ else if _expression_ _block_ ...</code>:
+  you can chain `if`, `else if` blocks in this way to avoid nesting
+  the blocks.
 - <code>try _block_ catch _var_ _block_</code>: executes the first block.
   If any errors are raised, assign the error to the _var_ and execute
   the catch block.
@@ -233,9 +236,9 @@ order describes the categories:
 1. Parens
 2. Boolean not
 3. Subscript
-4. Pair
-5. Arithmetic (secondary)
-6. Arithmetic (primary)
+4. Arithmetic (secondary)
+5. Arithmetic (primary)
+6. Pair
 7. Comparison
 8. Boolean
 

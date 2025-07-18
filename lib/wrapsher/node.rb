@@ -695,7 +695,8 @@ EOSTRING
             saved_filename = tables.filename # TODO: yuck
             tables.filename = module_filename
             module_ast = Wrapsher::Parser.new.parse(module_filename)
-            compiled_nodes = [module_ast].flatten.map do |obj|
+            module_transformed = Wrapsher::Transformer.new.transform(module_ast)
+            compiled_nodes = [module_transformed].flatten.map do |obj|
               Node.from_obj(obj, tables: tables)
             end
             tables.filename = saved_filename
@@ -820,7 +821,9 @@ EOSTRING
       def from_obj(obj, tables:)
         PP.pp(obj, $stderr) unless obj.respond_to?(:keys)
         type = obj.keys.first
-        raise NotImplementedError, "Unknown node type: #{type}" unless @@nodes.key?(type)
+        if !@@nodes.key?(type)
+          raise NotImplementedError, "Unknown node type: #{type}"
+        end
 
         @@nodes[type].new(obj[type], tables: tables)
       end

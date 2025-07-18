@@ -30,10 +30,19 @@ module Wrapsher
     rule(:return_call)              { (str('return').as(:keyword_return) >> space >> expression.as(:return_value)).as(:return) }
     rule(:continue_call)            { str('continue').as(:continue) }
     rule(:while_loop)               { (str('while').as(:keyword_while) >> space >> expression.as(:condition) >> space? >> block.as(:loop_body)).as(:while) }
-    rule(:conditional)              { (str('if').as(:keyword_if) >> space >> expression.as(:condition) >> space? >> block.as(:then) >> (whitespace? >> str('else').as(:keyword_else) >> space >> block.as(:else)).maybe).as(:conditional) }
+
+    rule(:conditional) do
+      (str('if').as(:keyword_if) >> space >> expression.as(:condition) >>
+        space? >> block.as(:then) >>
+        (whitespace? >> (str('else') >> space >> str('if')).as(:keyword_elseif) >> space >> expression.as(:condition) >>
+          space? >> block.as(:then)).repeat >>
+        (whitespace? >> str('else').as(:keyword_else) >> space >>
+          block.as(:else)).maybe).as(:conditional)
+    end
+
     rule(:try_block)                { (str('try').as(:keyword_try) >> space >> block.as(:try_body) >> whitespace? >> (str('catch').as(:keyword_catch) >> space >> word.as(:var) >> space? >> block.as(:catch_body)).as(:catch)).as(:try_block) }
 
-    rule(:expression)               { (assignment | break_call | continue_call | return_call | throw_call | shellcode_call | lambda | while_loop | conditional | try_block | pair) }
+    rule(:expression)               { (assignment | break_call | continue_call | return_call | throw_call | shellcode_call | lambda | while_loop | conditional | try_block | boolean_op) }
 
     rule(:shellcode_call)           { str('shell') >> space >> string.as(:shellcode) }
 
@@ -51,13 +60,46 @@ module Wrapsher
 
     rule(:assignment)               { (word.as(:var) >> space? >> str('=') >> space? >> expression.as(:rvalue)).as(:assignment) >> space? }
 
-    rule(:pair)                     { (boolean_op.as(:key) >> space? >> colon >> space? >> boolean_op.as(:value)).as(:pair) | boolean_op }
-    rule(:boolean_op)               { (comparison.as(:left) >> space? >> boolean_operator.as(:operator) >> space? >> comparison.as(:right)).as(:boolean_op) | comparison }
-    rule(:comparison)               { (additive_op.as(:left) >> space? >> comparison_operator.as(:operator) >> space? >> additive_op.as(:right)).as(:comparison) | additive_op }
-    rule(:additive_op)              { (multiplicative_op.as(:left) >> space? >> additive_operator.as(:operator) >> space? >> multiplicative_op.as(:right)).as(:additive_op) | multiplicative_op }
-    rule(:multiplicative_op)        { (subscript.as(:left) >> space? >> multiplicative_operator.as(:operator) >> space? >> subscript.as(:right)).as(:multiplicative_op) | subscript }
+    rule(:boolean_op) do
+      (comparison.as(:left) >>
+        (space? >> boolean_operator.as(:operator) >>
+          space? >> comparison.as(:right)).repeat(1)).as(:boolean_op) |
+        comparison
+    end
 
-    rule(:subscript)                { (chain.as(:receiver) >> lbracket >> expression.as(:index) >> rbracket).as(:subscript) | chain }
+    rule(:comparison) do
+      (pair.as(:left) >> space? >>
+        comparison_operator.as(:operator) >> space? >>
+        pair.as(:right)).as(:comparison) |
+        pair
+    end
+
+    rule(:pair) do
+      (additive_op.as(:key) >> space? >> colon >>
+        space? >> additive_op.as(:value)).as(:pair) |
+        additive_op
+    end
+
+    rule(:additive_op) do
+      (multiplicative_op.as(:left) >>
+        (space? >> additive_operator.as(:operator) >>
+          space? >> multiplicative_op.as(:right)).repeat(1)).as(:additive_op) |
+        multiplicative_op
+    end
+
+    rule(:multiplicative_op) do
+      (subscript.as(:left) >>
+        (space? >> multiplicative_operator.as(:operator) >>
+          space? >> subscript.as(:right)).repeat(1)).as(:multiplicative_op) |
+        subscript
+    end
+
+    rule(:subscript) do
+      (chain.as(:receiver) >>
+        (lbracket >>
+          expression.as(:index) >> rbracket).repeat(1)).as(:subscript) |
+        chain
+    end
     rule(:chain)                    { postfix_chain | fun_call | boolean_not }
     rule(:boolean_not)              { ((str('not') >> space | str('!') >> space?) >> expression.as(:subject)).as(:boolean_not) | term }
 

@@ -88,13 +88,45 @@ module Wrapsher
       }
     end
 
-    rule(subscript:{ receiver: subtree(:receiver), index: subtree(:index) }) do
-      {
-        fun_call: {
-          name: 'at',
-          fun_args: [receiver, index]
+    rule(subscript: subtree(:subscript)) do
+      first_receiver = subscript.shift
+      first_receiver = first_receiver[:receiver]
+
+      subscript.reduce(first_receiver) do |receiver, index|
+        {
+          fun_call: {
+            name: 'at',
+            fun_args: [receiver, index[:index]]
+          }
         }
-      }
+      end
+    end
+
+    rule(conditional: subtree(:conditional)) do
+      if conditional.is_a?(Array)
+        last_conditional = conditional.pop
+        line = last_conditional[%i[keyword_else keyword_elseif keyword_if].select { |k| last_conditional.key?(k) }]
+
+        {
+          conditional: conditional.reverse.reduce(last_conditional) do |otherwise, outer|
+            if outer.key?(:keyword_else)
+              raise Wrapsher::CompilationError, "else AND else if at line #{line[0]} col #{line[1]}"
+            end
+
+            if otherwise.key?(:then)
+              otherwise[:keyword_if] = otherwise[:keyword_elseif]
+              outer[:keyword_else] = otherwise[:keyword_elseif]
+              outer[:else] = { conditional: otherwise }
+            elsif otherwise.key?(:else)
+              outer[:keyword_else] = otherwise[:keyword_else]
+              outer[:else] = otherwise[:else]
+            end
+            outer
+          end
+        }
+      else
+        { conditional: conditional }
+      end
     end
 
     rule(type: { name: simple(:name), store_type: simple(:store_type) }) do
@@ -117,17 +149,21 @@ module Wrapsher
       }
     end
 
-    rule(boolean_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
-      fn = case operator.to_s
-           when 'and' then 'and'
-           when 'or' then 'or'
-           end
-      {
-        fun_call: {
-          name: fn,
-          fun_args: [left, right]
+    rule(boolean_op: subtree(:boolean_op)) do
+      first_left = boolean_op.shift
+
+      boolean_op.reduce(first_left[:left]) do |left, right|
+        fn = case right[:operator].to_s
+             when 'and' then 'and'
+             when 'or' then 'or'
+             end
+        {
+          fun_call: {
+            name: fn,
+            fun_args: [left, right[:right]]
+          }
         }
-      }
+      end
     end
 
     rule(comparison: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
@@ -144,31 +180,39 @@ module Wrapsher
       end
     end
 
-    rule(additive_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
-      fn = case operator.to_s
-           when '+' then 'plus'
-           when '-' then 'minus'
-           end
-     {
-        fun_call: {
-          name: fn,
-          fun_args: [left, right]
+    rule(additive_op: subtree(:additive_op)) do
+      first_left = additive_op.shift
+
+      additive_op.reduce(first_left[:left]) do |left, right|
+        fn = case right[:operator].to_s
+             when '+' then 'plus'
+             when '-' then 'minus'
+             end
+        {
+          fun_call: {
+            name: fn,
+            fun_args: [left, right[:right]]
+          }
         }
-      }
+      end
     end
 
-    rule(multiplicative_op: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
-      fn = case operator.to_s
-           when '*' then 'times'
-           when '/' then 'div'
-           when '%' then 'mod'
-           end
-      {
-        fun_call: {
-          name: fn,
-          fun_args: [left, right]
+    rule(multiplicative_op: subtree(:multiplicative_op)) do
+      first_left = multiplicative_op.shift
+
+      multiplicative_op.reduce(first_left[:left]) do |left, right|
+        fn = case right[:operator].to_s
+             when '*' then 'times'
+             when '/' then 'div'
+             when '%' then 'mod'
+             end
+        {
+          fun_call: {
+            name: fn,
+            fun_args: [left, right[:right]]
+          }
         }
-      }
+      end
     end
 
     rule(postfix_chain: { receiver: subtree(:recv), calls: subtree(:chained_calls) }) do
