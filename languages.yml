@@ -1,0 +1,14 @@
+---
+Wrapsher:
+  type: programming
+  color: "#2b2a91"
+  aliases:
+    - wsh
+  extensions:
+    - ".wsh"
+  tm_scope: source.wrapsher
+  ace_mode: sh
+  codemirror_mode: clike
+  codemirror_mime_type: text/x-csrc
+  language_id: 999999999
+  grammar: grammars/wrapsher.tmLanguage.json

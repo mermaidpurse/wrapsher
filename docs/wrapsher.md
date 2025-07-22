@@ -40,7 +40,7 @@ tool in a supported Ruby version.
 
 The following is Wrapsher's hello world:
 
-```
+```wrapsher
 use module io
 
 int main(list args) {

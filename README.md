@@ -114,7 +114,7 @@ conception) from what I found exciting about the core idea, namely:
 For now, the Wrapsher compiler is implemented in Ruby and is installable
 as a Ruby gem:
 
-```
+```shell
 gem install wrapsher
 ```
 
@@ -125,7 +125,7 @@ described above that motivated its creation.
 
 You can start by compiling the example "hello, world" program:
 
-```
+```shell
 wrapsher compile examples/hello.wsh
 ./examples/hello
 ```
