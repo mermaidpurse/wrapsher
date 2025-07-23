@@ -40,6 +40,7 @@ _wsh_typeof_underscore() {
   done
 }
 
+# _wsh_assert value expected_type context/location
 _wsh_assert() {
   case "${2}" in any)
     :
@@ -275,8 +276,11 @@ _wsh_panic() {
 # _wsh_check_return addl_context
 _wsh_check_return() {
   case "${_wsh_error}" in ?*)
-    _wsh_error="${_wsh_error}
+    case "${1}" in ?*)
+      _wsh_error="${_wsh_error}
   ^ ${1}"
+    ;;
+    esac
     return 1
   ;;
   esac

@@ -3,6 +3,10 @@ meta doc 'tests for core module'
 use module io
 use module test
 
+bool test_is_a() {
+  false.is_a(bool)
+}
+
 bool test_bool_new() {
   b = bool.new()
   not b
@@ -225,6 +229,14 @@ bool test_list_find_absent() {
   r == -1
 }
 
+bool test_list_has_present() {
+  [0, 1, 2].has(1)
+}
+
+bool test_list_has_absent() {
+  [0, 1, 2].has(3).not()
+}
+
 bool test_pair_new() {
   p = pair.new()
   not p.key() and p.value()
@@ -233,6 +245,16 @@ bool test_pair_new() {
 bool test_pair_from_lit() {
   p = 'key1': 'value1'
   p.key() == 'key1' and p.value() == 'value1'
+}
+
+bool test_pair_to_string() {
+  p = 'one': 1
+  p.to_string() == 'one: 1'
+}
+
+bool test_pair_quote() {
+  p = 'one': 1
+  p.quote() == '\'one\': 1'
 }
 
 bool test_map_new() {
@@ -259,6 +281,15 @@ bool test_map_set_simple() {
   x = 'key1': 'value1'
   m.length() == 1 and m.head() == x
 }
+
+bool test_map_to_string_empty() {
+  [:].to_string() == '[:]'
+}
+
+bool test_map_to_string() {
+  ['one': 1, 'two': 2].to_string() == '[one: 1, two: 2]'
+}
+
 
 fun multiplier(int i) {
   int fun (int j) { i * j }

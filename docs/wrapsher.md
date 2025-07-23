@@ -5,7 +5,7 @@ sh-compliant shell code. The resulting shell scripts can be run on any
 system with a POSIX-compliant `sh`.
 
 The core language is implemented in
-[pure POSIX shell](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html)
+[pure POSIX shell](https://pubs.opengroup.org/onlinepubs/9799919799/)
 with no external dependencies. This means that any external
 dependencies, including commands that are often built-ins (but aren't
 required by POSIX to be built-in), are only available in optional modules.

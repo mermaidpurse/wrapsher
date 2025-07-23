@@ -12,12 +12,35 @@ type reflist builtin
 type list reflist
 type pair reflist
 type map reflist
+type command string
+type command_output map
 
 any _typeof(any i) {
   shell '''
   _wsh_get_local i _wshi
   _wsh_typeof "${_wshi}"
   _wsh_get_global "${_wsh_type}" _wsh_result
+  '''
+}
+
+bool is_a(any i, any as) {
+  t = _typeof(i)
+  shell '''
+  _wsh_get_local i _wshi
+  _wsh_get_local as _wshj
+  case "${_wshj%%:*}" in type/*)
+    :
+  ;; *)
+    _wsh_error="error:is_a expected a type, got '${_wshj}'"
+    break
+  ;;
+  esac
+  case "${_wshj%%:*}" in type/"${_wshi%%:*}")
+    _wsh_result='bool:true'
+  ;; *)
+    _wsh_result='bool:false'
+  ;;
+  esac
   '''
 }
 
@@ -441,8 +464,10 @@ string tail(string s) {
 }
 
 string at(string s, int i) {
-  if i > 0 {
-    at(s.tail(), i - 1)
+  if s == '' {
+    throw 'index out of bounds: no index ' + i.to_string() + 'in list'
+  } else if i > 0 {
+      at(s.tail(), i - 1)
   } else {
     s.head()
   }
@@ -561,7 +586,7 @@ ref at(reflist rl, int i) {
     : $((_wshk++))
   done
   case "${_wshm}" in notfound)
-    _wsh_error="error:array index out of bounds, ${_wshj} > ${_wshk}"
+    _wsh_error="error:index out of bounds, ${_wshj} > ${_wshk}"
     break
   ;;
   esac
@@ -745,11 +770,24 @@ any find(list l, fun f, any d) {
   if l == [] {
     d
   } else {
-    h = l.head()
+    h = l.head() 
     if f.call().with(h) {
       h
     } else {
       l.tail().find(f, d)
+    }
+  }
+}
+
+bool has(list l, any i) {
+  if l == [] {
+    false
+  } else {
+    h = l.head()
+    if h == i {
+      true
+    } else {
+      l.tail().has(i)
     }
   }
 }
@@ -775,7 +813,11 @@ bool eq(pair p, pair o) {
 }
 
 string to_string(pair p) {
-  p.key().to_string().plus(': ').plus(p.value().to_string())
+  p.key().to_string() + ': ' + p.value().to_string()
+}
+
+string quote(pair p) {
+  p.key().quote() + ': ' + p.value().to_string()
 }
 
 map new(type/map t) {
@@ -788,6 +830,10 @@ int length(map m) {
 
 map from_pairlist(type/map t, list pl) {
   pl._as(reflist)._as(map)
+}
+
+list as_pairlist(map m) {
+  m._as(reflist)._as(list)
 }
 
 pair head(map m) {
@@ -828,6 +874,22 @@ bool has(map m, any k) {
     } else {
       m.tail().has(k)
     }
+  }
+}
+
+string to_string(map m) {
+  if m.length() == 0 {
+    '[:]'
+  } else {
+    m.as_pairlist().to_string()
+  }
+}
+
+string quote(map m) {
+  if m.length() == 0 {
+    '[:]'
+  } else {
+    m.as_pairlist().quote()
   }
 }
 

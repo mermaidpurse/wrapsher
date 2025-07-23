@@ -212,6 +212,7 @@ module Wrapsher
           "  # end function body",
           "  break",
           "done",
+          "case \"${_wsh_error}\" in ?*) return 1 ;; esac",
           "#{@signature.check_return}",
           "}"
         ].join("\n")
@@ -682,7 +683,7 @@ EOSTRING
         super
         @module_name = slice.to_s
         @line = slice.line_and_column[0]
-        @included_nodes = include
+        @included_nodes = [include].compact.flatten
       end
 
       def include

@@ -1,0 +1,7 @@
+use module env
+use module test
+use module io
+
+bool test_env_get() {
+  env.at('HOME').length() > 0
+}

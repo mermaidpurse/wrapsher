@@ -2,6 +2,11 @@
 
 ## Issues
 
+- Emacs mode: second } doesn't indent right (it's indented one level too far)
+- CLI: <code>wrapsher _op_ t.wsh</code> doesn't work but `./t.wsh` does
+- Compiler error: use unreferenced variable
+- Compiler error: redefine function
+- Tests for compiler errors (global redefine, etc.)
 - Global variables should be protectable, which probably means some
   kind of file scoping or override assignment so that module settings
   can work (in other words, you should be able to assign a global

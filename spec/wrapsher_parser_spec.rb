@@ -15,7 +15,217 @@ def test_fun(body)
 end
 
 RSpec.describe 'parser/transform' do
-  it "parses  a chain" do
+  it "parses an expression with linebreaks" do
+    source = <<~'EOF'
+    bool test() {
+      x = [
+        0,
+        1,
+        2
+      ]
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: [
+                  { int_term: '0' },
+                  { int_term: '1' },
+                  { int_term: '2' }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a lol" do
+    source = <<~'EOF'
+    bool test() {
+      x = [
+        0,
+        [0, 1],
+        [0, 1, 2]
+      ]
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: [
+                  { int_term: '0' },
+                  { list_term: [{ int_term: '0' }, { int_term: '1' }] },
+                  { list_term: [{ int_term: '0' }, { int_term: '1' }, { int_term: '2' }] }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a lom" do
+    source = <<~'EOF'
+    bool test() {
+      x = [
+        ['one': 1, 'two': 2],
+        [:],
+        ['THREE': 3]
+      ]
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: [
+                  {
+                    list_term: [
+                      { pair: { key: string_term('one'), value: { int_term: '1' } } },
+                      { pair: { key: string_term('two'), value: { int_term: '2' } } }
+                    ]
+                  },
+                  { empty_map_term: '[:]' },
+                  {
+                    list_term: {
+                      pair: { key: string_term('THREE'), value: { int_term: '3' } }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a mol" do
+    source = <<~'EOF'
+    bool test() {
+      x = [
+        'one': [0, 1],
+        'two': [0, 1, 2]
+      ]
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: [
+                  {
+                    pair: {
+                      key: string_term('one'),
+                      value: {
+                        list_term: [
+                          { int_term: '0' },
+                          { int_term: '1' }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    pair: {
+                      key: string_term('two'),
+                      value: {
+                        list_term: [
+                          { int_term: '0' },
+                          { int_term: '1' },
+                          { int_term: '2' }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a dispatch table", skip: 'TODO: fix lambda parse in map' do
+    source = <<~'EOF'
+    bool test() {
+      x = [
+        'add5': int fun (int i) { i + 5 },
+        'sub3': int fun (int i) { i - 3 }
+      ]
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: [
+                  {
+                    pair: {
+                      key: string_term('add5'),
+                      value: {
+                        lambda: {
+                          signature: {
+                            type: 'int',
+                            arg_definitions: {
+                              type: 'int',
+                              name: 'i'
+                            }
+                          },
+                          body: {
+                            additive_op: {
+                              left: { var_ref: 'i' },
+                              operator: '+',
+                              right: { int_term: '5' }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    pair: {
+                      key: string_term('sub3'),
+                      value: {
+                        lambda: {
+                          signature: {
+                            type: 'int',
+                            arg_definitions: {
+                              type: 'int',
+                              name: 'i'
+                            }
+                          },
+                          body: {
+                            additive_op: {
+                              left: { var_ref: 'i' },
+                              operator: '-',
+                              right: { int_term: '3' }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]))
+  end
+
+  it "parses a chain" do
     source = <<~'EOF'
     bool test() {
       i.to_string().quote()
