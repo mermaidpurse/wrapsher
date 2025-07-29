@@ -19,6 +19,12 @@
   and not being so redundant (I think the compiler can put them all
   in the context arguments to `_wsh_check_return` so we don't
   need all those `_wsh_line=` at all).
+- reflist scanning (probably) makes recursion on lists terribly
+  slow. Some optimization can be done by putting more into
+  reflists (iterating vs recursing). probably reflist scanning
+  could be better if the referenced type was pointed to
+  (would save a dereference). But long-term the whole garbage
+  avoidance/collection scheme may need to be revisited.
 
 ## MVP
 

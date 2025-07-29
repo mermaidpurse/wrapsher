@@ -5,6 +5,7 @@
 (defvar wrapsher-keywords
   '("if" "else" "use" "module" "meta" "type"
     "fun" "return" "while" "break" "continue" "shell"
+    "throw" "try" "catch"
     ))
 
 (defvar wrapsher-types

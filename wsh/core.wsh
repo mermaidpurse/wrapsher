@@ -515,6 +515,31 @@ list _split3(string s, string c, list acc) {
   }
 }
 
+string trim(string s, string c) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local c _wshj
+  _wshk=0
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  while : $((_wshk++))
+  do
+    case "${_wshi}" in "${_wshj}"*)
+      _wshi="${_wshi#"${_wshj}"}"
+      continue
+    ;;
+    esac
+    case "${_wshi}" in *"${_wshj}")
+      _wshi="${_wshi%"${_wshj}"}"
+      continue
+    ;;
+    esac
+    break
+  done
+  _wsh_result="string:${_wshi}"
+  '''
+}
+
 reflist new(type/reflist t) {
   shell '''
   _wsh_result=reflist:
@@ -586,7 +611,7 @@ ref at(reflist rl, int i) {
     : $((_wshk++))
   done
   case "${_wshm}" in notfound)
-    _wsh_error="error:index out of bounds, ${_wshj} > ${_wshk}"
+    _wsh_error="error:index out of bounds, ${_wshj} > $((_wshk - 1))"
     break
   ;;
   esac
@@ -792,6 +817,30 @@ bool has(list l, any i) {
   }
 }
 
+bool any(list l, fun f) {
+  if l == [] {
+    false
+  } else {
+    if f.call().with(l.head()) {
+      true
+    } else {
+      l.tail().any(f)
+    }
+  }
+}
+
+bool all(list l, fun f) {
+  if l == [] {
+    true
+  } else {
+    if f.call().with(l.head()) {
+      l.tail().all(f)
+    } else {
+      false
+    }
+  }
+}
+
 pair new(type/pair t) {
   t.from_kv(false, false)
 }
@@ -830,6 +879,14 @@ int length(map m) {
 
 map from_pairlist(type/map t, list pl) {
   pl._as(reflist)._as(map)
+}
+
+map as_map(list l) {
+  if l.all(bool fun (pair p) { true }) {
+    map.from_pairlist(l)
+  } else {
+    throw 'not all list elements are pairs'
+  }
 }
 
 list as_pairlist(map m) {
@@ -909,3 +966,4 @@ map _set3(map m, pair p, map acc) {
     }
   }
 }
+

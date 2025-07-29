@@ -1434,6 +1434,61 @@ RSpec.describe 'parser/transform' do
     ])
   end
 
+  it "parses a conditional" do
+    source = <<~'EOF'
+    bool test() {
+      if x > 100 {
+        true
+      }
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+              expect(ast).to eq(
+                test_fun([
+                    conditional: {
+                      keyword_if: 'if',
+                      condition: {
+                        comparison: {
+                          left: { var_ref: 'x' },
+                          operator: '>',
+                          right: { int_term: '100' }
+                        }
+                      },
+                    then: [{ bool_term: 'true' }]
+                    }
+                  ]))
+
+  end
+
+  it "parses an if-else block" do
+    source = <<~'EOF'
+    bool test() {
+      if x > 100 {
+        true
+      } else {
+        false
+      }
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+                expect(ast).to eq(
+                  test_fun([
+                      conditional: {
+                        keyword_if: 'if',
+                        condition: {
+                          comparison: {
+                            left: { var_ref: 'x' },
+                            operator: '>',
+                            right: { int_term: '100' }
+                          }
+                        },
+                        then: [{ bool_term: 'true' }],
+                        keyword_else: 'else',
+                        else: [{ bool_term: 'false' }]
+                      }
+                    ]))
+              end
+
   it "parses an if-else-if chain" do
     source = <<~'EOF'
     bool test() {

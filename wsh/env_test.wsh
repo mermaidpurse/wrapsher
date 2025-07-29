@@ -2,6 +2,11 @@ use module env
 use module test
 use module io
 
+bool test_env_set() {
+  env.set('FOOTEST': 'teststring')
+  env.at('FOOTEST') == 'teststring'
+}
+
 bool test_env_get() {
   env.at('HOME').length() > 0
 }
