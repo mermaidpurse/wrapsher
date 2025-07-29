@@ -861,7 +861,7 @@ any at(map m, any k) {
   if h.key() == k {
     h.value()
   } else {
-    m.tail().get(k)
+    m.tail().at(k)
   }
 }
 

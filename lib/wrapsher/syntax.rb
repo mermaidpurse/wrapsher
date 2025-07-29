@@ -6,7 +6,7 @@ require 'wrapsher'
 module Wrapsher
   class Syntax < Parslet::Parser
 
-    rule(:program)                  { (comment | statement).repeat }
+    rule(:program)                  { (comment >> str("\n") | statement).repeat }
     rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol }
     rule(:use_statement)            { use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement }
     rule(:meta_statement)           { (str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data)).as(:meta) }
@@ -24,7 +24,7 @@ module Wrapsher
     rule(:arg_definition)           { word.as(:type) >> space >> word.as(:name) }
 
     rule(:block)                    { lbrace >> whitespace? >> expressions >> whitespace? >> rbrace >> space? }
-    rule(:expressions)              { (expression >> eol).repeat >> expression.maybe >> eol.maybe }
+    rule(:expressions)              { ((expression | comment) >> eol).repeat >> (expression | comment).maybe >> eol.maybe }
     rule(:throw_call)               { str('throw') >> space >> expression.as(:throw) }
     rule(:break_call)               { str('break').as(:break) }
     rule(:return_call)              { (str('return').as(:keyword_return) >> space >> expression.as(:return_value)).as(:return) }
@@ -88,27 +88,33 @@ module Wrapsher
     end
 
     rule(:multiplicative_op) do
-      (subscript.as(:left) >>
+      (boolean_not.as(:left) >>
         (space? >> multiplicative_operator.as(:operator) >>
-          space? >> subscript.as(:right)).repeat(1)).as(:multiplicative_op) |
-        subscript
+          space? >> boolean_not.as(:right)).repeat(1)).as(:multiplicative_op) |
+        boolean_not
+    end
+
+    rule(:boolean_not) do
+      ((str('not') >> space | str('!') >> space?) >> chain.as(:subject)).as(:boolean_not) | chain
+    end
+
+    rule(:chain) do
+      (term.as(:receiver) >>
+        (postfix | subscript).repeat(1).as(:calls)).as(:chain) | term
     end
 
     rule(:subscript) do
-      (chain.as(:receiver) >>
-        (lbracket >>
-          expression.as(:index) >> rbracket).repeat(1)).as(:subscript) |
-        chain
+      (lbracket >> expression.as(:index) >> rbracket).as(:subscript)
     end
-    rule(:chain)                    { postfix_chain | fun_call | boolean_not }
-    rule(:boolean_not)              { ((str('not') >> space | str('!') >> space?) >> expression.as(:subject)).as(:boolean_not) | term }
 
-    rule(:postfix)                  { str('.') >> fun_call }
-    rule(:postfix_chain)            { (term.as(:receiver) >> str('.').present? >> postfix.repeat(1).as(:calls)).as(:postfix_chain) }
+    rule(:postfix) do
+      str('.') >> fun_call.as(:postfix)
+    end
+
     rule(:fun_call)                 { (word.as(:name) >> lparen >> space? >> fun_args.maybe.as(:fun_args) >> space? >> rparen).as(:fun_call) }
     rule(:fun_args)                 { expression >> (comma >> expression).repeat }
 
-    rule(:term)                     { group | int_term | bool_term | string_term | empty_map_term | list_term | var_ref }
+    rule(:term)                     { group | int_term | bool_term | string_term | empty_map_term | list_term | fun_call | var_ref }
     rule(:empty_map_term)           { (lbracket >> space? >> colon >> space? >> rbracket).as(:empty_map_term) >> space? }
     rule(:list_term)                { lbracket >> whitespace? >> (expression >> (comma >> expression).repeat).maybe.as(:list_term) >> whitespace? >> rbracket >> space? }
     rule(:group)                    { lparen >> expression.as(:group) >> rparen >> space? }
@@ -132,7 +138,7 @@ module Wrapsher
       ).repeat.as(:single_quoted) >> str('\'')
     end
     rule(:triple_quoted)            { str("'''") >> (str("'''").absent? >> any).repeat.as(:triple_quoted) >> str("'''") }
-    rule(:comment)                  { str('#') >> match('[^\n]').repeat.as(:comment) >> str("\n") }
+    rule(:comment)                  { str('#') >> match('[^\n]').repeat.as(:comment) }
 
     rule(:colon)                    { str(':') }
     rule(:lbracket)                 { str('[') }
@@ -146,9 +152,10 @@ module Wrapsher
     rule(:space?)                   { space.maybe }
     rule(:whitespace)               { match('\s').repeat(1) }
     rule(:whitespace?)              { whitespace.maybe }
-    rule(:qualified_word)           { word >> (str('.') >> word).maybe }
     rule(:word)                     { match('[a-zA-Z0-9_/]').repeat(1) }
-    rule(:eol)                      { (str(';') | match('\n')).repeat(1) >> whitespace? }
+    rule(:eol) do
+      (str(';') | match('\n')).repeat(1) >> whitespace?
+    end
 
     root(:program)
 

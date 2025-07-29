@@ -239,7 +239,7 @@ bool test_list_has_absent() {
 
 bool test_pair_new() {
   p = pair.new()
-  not p.key() and p.value()
+  not p.key() and not p.value()
 }
 
 bool test_pair_from_lit() {

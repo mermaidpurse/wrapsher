@@ -88,20 +88,6 @@ module Wrapsher
       }
     end
 
-    rule(subscript: subtree(:subscript)) do
-      first_receiver = subscript.shift
-      first_receiver = first_receiver[:receiver]
-
-      subscript.reduce(first_receiver) do |receiver, index|
-        {
-          fun_call: {
-            name: 'at',
-            fun_args: [receiver, index[:index]]
-          }
-        }
-      end
-    end
-
     rule(conditional: subtree(:conditional)) do
       if conditional.is_a?(Array)
         last_conditional = conditional.pop
@@ -215,21 +201,31 @@ module Wrapsher
       end
     end
 
-    rule(postfix_chain: { receiver: subtree(:recv), calls: subtree(:chained_calls) }) do
-      the_calls = chained_calls.is_a?(Array) ? chained_calls : [chained_calls]
-      the_calls.reduce(recv) do |receiver, call|
-        fun_call = call[:fun_call]
-        fun_args = case fun_call[:fun_args]
-                   when nil then []
-                   when Array then fun_call[:fun_args]
-                   else [fun_call[:fun_args]]
-                   end
-        {
-          fun_call: {
-            name: fun_call[:name],
-            fun_args: [receiver, *fun_args]
+    rule(chain: { receiver: subtree(:receiver), calls: subtree(:calls) }) do
+      the_calls = [calls].flatten
+      the_calls.reduce(receiver) do |recv, call|
+        case call.keys.first
+        when :subscript
+          {
+            fun_call: {
+              name: 'at',
+              fun_args: [recv, call[:subscript][:index]]
+            }
           }
-        }
+        when :postfix
+          fun_name = call[:postfix][:fun_call][:name]
+          fun_args = case call[:postfix][:fun_call][:fun_args]
+                     when nil then []
+                     when Array then call[:postfix][:fun_call][:fun_args]
+                     else [call[:postfix][:fun_call][:fun_args]]
+                     end
+          {
+            fun_call: {
+              name: fun_name,
+              fun_args: [recv, *fun_args]
+            }
+          }
+        end
       end
     end
 

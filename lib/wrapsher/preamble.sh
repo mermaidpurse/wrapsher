@@ -149,6 +149,11 @@ _wsh_scan_refs() {
       # It's a type value, it can't contain refs
       _wsh_scan_val=''
       continue
+    ;; module/*)
+      # It's a module value, it can't contain refs (for now)
+      # or at least, we don't create an clean them up
+      _wsh_scan_val=''
+      continue
     ;; ?*)
       # A value to scan for refs
       # strip it until it's down to a builtin type, then

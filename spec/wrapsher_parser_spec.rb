@@ -15,6 +15,72 @@ def test_fun(body)
 end
 
 RSpec.describe 'parser/transform' do
+  it "parses a function call" do
+    source = <<~'EOF'
+    bool test() {
+      length('one')
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'length',
+              fun_args: { string_term: { single_quoted: 'one' } }
+            }
+          }
+        ]))
+  end
+
+  it "parses a postfix on a subscript" do
+    source = <<~'EOF'
+    bool test() {
+      x[0].length()
+    }
+    EOF
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+          {
+            chain: {
+              receiver: { var_ref: 'x' },
+              calls: [
+                {
+                  subscript: {
+                    index: { int_term: '0' } }
+                },
+                {
+                  postfix: {
+                    fun_call: {
+                      name: 'length',
+                      fun_args: nil
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+    program = Wrapsher::Transformer.new.transform(ast)
+    expect(program).to eq(
+      test_fun([
+          {
+            fun_call: {
+              name: 'length',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'at',
+                    fun_args: [{ var_ref: 'x' }, { int_term: '0' }]
+                  }
+                }
+              ]
+            }
+          }
+        ]))
+  end
+
   it "parses an expression with linebreaks" do
     source = <<~'EOF'
     bool test() {
@@ -235,11 +301,11 @@ RSpec.describe 'parser/transform' do
     expect(ast).to eq(
       test_fun([
           {
-            postfix_chain: {
+            chain: {
               receiver: { var_ref: 'i' },
               calls: [
-                { fun_call: { name: 'to_string', fun_args: nil } },
-                { fun_call: { name: 'quote', fun_args: nil } }
+                { postfix: { fun_call: { name: 'to_string', fun_args: nil } } },
+                { postfix: { fun_call: { name: 'quote', fun_args: nil } } }
               ]
             }
           }
@@ -356,7 +422,7 @@ RSpec.describe 'parser/transform' do
       )
   end
 
-  it "parses line comments in a function", skip: 'TODO: fix line comments in blocks' do
+  it "parses line comments in a function" do
     source = <<~'EOF'
     bool test() {
       # Intro to function
@@ -964,10 +1030,12 @@ RSpec.describe 'parser/transform' do
     expect(ast).to eq(
       test_fun([
           {
-            subscript: [
-              { receiver: { var_ref: 'x' } },
-              { index: { int_term: '0' } }
-            ]
+            chain: {
+              receiver: { var_ref: 'x' },
+              calls: [
+                { subscript: { index: { int_term: '0' } } }
+              ]
+            }
           }
         ]))
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
@@ -992,11 +1060,13 @@ RSpec.describe 'parser/transform' do
     expect(ast).to eq(
       test_fun([
           {
-            subscript: [
-              { receiver: { var_ref: 'x' } },
-              { index: { int_term: '0' } },
-              { index: string_term('foo') }
-            ]
+            chain: {
+              receiver: { var_ref: 'x' },
+              calls: [
+                { subscript: { index: { int_term: '0' } } },
+                { subscript: { index: string_term('foo') } }
+              ]
+            }
           }
         ]))
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
