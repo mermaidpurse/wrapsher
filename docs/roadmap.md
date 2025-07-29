@@ -25,6 +25,9 @@
   could be better if the referenced type was pointed to
   (would save a dereference). But long-term the whole garbage
   avoidance/collection scheme may need to be revisited.
+- the core module should contain the `env` functionality;
+  including core should get you everything that is accessible
+  that is required by posix.
 
 ## MVP
 
