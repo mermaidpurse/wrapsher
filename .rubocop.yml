@@ -3,11 +3,21 @@ AllCops:
 
 Style/StringLiterals:
   Enabled: true
-  EnforcedStyle: double_quotes
+  EnforcedStyle: single_quotes
 
 Style/StringLiteralsInInterpolation:
   Enabled: true
-  EnforcedStyle: double_quotes
+  EnforcedStyle: single_quotes
 
 Layout/LineLength:
-  Max: 120
+  Max: 132
+
+Metrics/AbcSize:
+  CountRepeatedAttributes: false
+  Max: 25
+
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/CyclomaticComplexity:
+  Max: 10

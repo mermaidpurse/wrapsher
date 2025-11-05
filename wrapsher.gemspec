@@ -9,10 +9,10 @@ Gem::Specification.new do |spec|
   spec.email = ["admin@mermaidpurse.org"]
 
   spec.summary = "Wrapsher programming language compiler and tools"
-  spec.description = <<EOF
-Wrapsher is a familiar and reasonably ergonomic programming language
-that compiles to pure POSIX-compliant sh for execution.
-EOF
+  spec.description = <<~DESC
+    Wrapsher is a familiar and reasonably ergonomic programming language
+    that compiles to pure POSIX-compliant sh for execution.
+  DESC
   spec.homepage = "https://github.com/mermaidpurse/wrapsher"
   spec.required_ruby_version = ">= 3.0.0"
 
@@ -34,6 +34,7 @@ EOF
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "parslet", '~> 2.0.0'
+  spec.add_dependency "logger"
+  spec.add_dependency "parslet", "~> 2.0.0"
   spec.add_development_dependency "pry", "~> 0.14"
 end
