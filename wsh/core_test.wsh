@@ -400,3 +400,23 @@ bool test_return_loop() {
   }
   false
 }
+
+bool throw_something() {
+  throw 'something happen'
+}
+
+bool test_throw() {
+  try {
+    throw_something()
+  } catch e {
+    e.message().has('something')
+  }
+}
+
+bool test_assert() {
+  try {
+    3.assert(string)
+  } catch e {
+    e.message().has('Expected type \'string\', got \'int\'')
+  }
+}

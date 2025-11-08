@@ -1,24 +1,30 @@
-# Local Variables:
-# mode: sh
-# sh-basic-offset: 2
-# sh-indent-after-case: always
-# sh-indent-for-case-label: 0
-# sh-indent-for-case-alt: +
-# sh-indent-for-continuation: ++
-# eval: (defun my-sh-mode-smie-rules (kind token)
-#          (pcase (cons kind token)
-#            (`(:before . "esac") (smie-rule-parent))
-#            (`(:after . "case") sh-basic-offset)
-#            (_ nil)))
-# eval: (setq-local smie-rules-function #'my-sh-mode-smie-rules)
-# End:
-
 # wsh:preamble for scripts
+# Clear environment variables to prevent injection of bad initial values in `_wsh_ variables
+_wsh_clearenv() {
+  _wsh_clearenv_env="$(export -p)"
+  _wsh_iter=0
+  while
+    : $((_wsh_iter++))
+  do
+    _wsh_clearenv_var="${_wsh_clearenv_env%%$'\n'*}"
+    _wsh_clearenv_env="${_wsh_clearenv_env#*$'\n'}"
+    case "${_wsh_clearenv_var}" in 'export _wsh'*)
+      _wsh_clearenv_toclear="${_wsh_clearenv_var#export }"
+      _wsh_clearenv_toclear="${_wsh_clearenv_toclear%%=*}"
+      unset "${_wsh_clearenv_toclear}"
+    ;;
+    esac
+    case "${_wsh_clearenv_var}" in "${_wsh_clearenv_env}")
+      break
+    ;;
+    esac
+  done
+}
+_wsh_clearenv
+
 _wsh_stackp=0
 _wsh_frame=0
 _wsh_refid=1000
-
-# TODO - Clear environment of _wsh variables
 
 # _wsh_typeof value => _wsh_type
 _wsh_typeof() {

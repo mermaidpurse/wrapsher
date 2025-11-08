@@ -44,6 +44,25 @@ bool is_a(any i, any as) {
   '''
 }
 
+string to_string(any i) {
+  shell '''
+  _wsh_get_local i _wshi
+  case "${_wshi}" in type/*)
+    _wsh_result="${_wshi%%:*}"
+    _wsh_result="${_wsh_result#type/}"
+  ;; *)
+    _wsh_result="${_wshi#*:}"
+  ;;
+  esac
+  '''
+}
+
+bool assert(any i, any as) {
+  if !i.is_a(as) {
+    throw 'Expected type ' + as.to_string() + ', got ' + _typeof(i).to_string()
+  }
+}
+
 # Wrap or unwrap a value, coercing it to its derived type (by wrapping
 # it, as the target derived type is the storage_type for the target
 # type; or by unwrapping it, as the value is of the storage_type of
