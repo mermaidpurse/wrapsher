@@ -336,7 +336,7 @@ module Wrapsher
     #   function contains a map which is the context: the
     #   local variables that were captured in the closure.
     # - The any call(fun f) function in the core module
-    #   strips the fun: from
+    #   strips the fun+ from
     class Lambda < Node
       attr_reader :signature, :refid, :closure
 
@@ -442,7 +442,7 @@ module Wrapsher
         [
           line,
           @closure.to_s,
-          "_wsh_result=\"fun:${_wsh_result}\""
+          "_wsh_result=\"fun+${_wsh_result}\""
         ].join("\n  ")
       end
     end

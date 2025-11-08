@@ -1,5 +1,4 @@
 module core
-use global refid 1000
 
 type error builtin
 type fun builtin
@@ -28,14 +27,15 @@ bool is_a(any i, any as) {
   shell '''
   _wsh_get_local i _wshi
   _wsh_get_local as _wshj
-  case "${_wshj%%:*}" in type/*)
+  case "${_wshj%:*}" in type/*)
     :
   ;; *)
     _wsh_error="error:is_a expected a type, got '${_wshj}'"
     break
   ;;
   esac
-  case "${_wshj%%:*}" in type/"${_wshi%%:*}")
+  _wsh_typeof "${_wshi}"
+  case "${_wshj%:*}" in type/"${_wsh_type}")
     _wsh_result='bool:true'
   ;; *)
     _wsh_result='bool:false'
@@ -58,7 +58,7 @@ any _as(any i, any as) {
   _wsh_get_local in _wsh_in  # 'type/list:reflist'
   _wsh_get_local as _wsh_as  # 'type/reflist:builtin'
 
-  case "${_wsh_as%%:*}" in type/*)
+  case "${_wsh_as%:*}" in type/*)
     :
   ;; *)
     _wsh_error="error:_as expected a type (e.g. 'type/list:reflist'), got '${_wshl}'"
@@ -66,13 +66,13 @@ any _as(any i, any as) {
   ;;
   esac
 
-  # Reduce type types to words
+  # Reduce type types to words - type/* types don't get wrapped
   _wsh_in_storage_type="${_wsh_in#*:}"
-  _wsh_in="${_wsh_in%%:*}"
+  _wsh_in="${_wsh_in%:*}"
   _wsh_in="${_wsh_in#type/}"
 
   _wsh_as_storage_type="${_wsh_as#*:}"
-  _wsh_as="${_wsh_as%%:*}"
+  _wsh_as="${_wsh_as%:*}"
   _wsh_as="${_wsh_as#type/}"
 
   case "${_wsh_in}" in "${_wsh_as}")
@@ -81,12 +81,12 @@ any _as(any i, any as) {
   ;; "${_wsh_as_storage_type}")
     # our type is target's storage type--wrap
     # by adding our type to the value
-    _wsh_result="${_wsh_as}:${_wsh_i}"
+    _wsh_result="${_wsh_as}+${_wsh_i}"
   ;; *)
     case "${_wsh_in_storage_type}" in "${_wsh_as}")
       # our type's storage type is the target's type--unwrap
       # by removing our type from value
-      _wsh_result="${_wsh_i#${_wsh_in}:}"
+      _wsh_result="${_wsh_i#${_wsh_in}+}"
     ;; *)
       _wsh_error="error: Can't cast ${_wsh_in} value to ${_wsh_as}"
       break
@@ -159,15 +159,12 @@ ref new(type/ref t) {
 }
 
 ref ref(any i) {
-  refid = refid + 1
   r = false
   shell '''
-  _wsh_get_local _reflist _wshrl
-  _wsh_get_global refid _wshi
-  _wsh_get_local i _wshr_${_wshi#int:}
-  _wsh_set_local r "ref:${_wshi#int:}"
+  _wsh_get_local i _wshi
+  _wsh_makeref_into "${_wshi}" _wshr
+  _wsh_set_local r "${_wshr}"
   '''
-  _reflist.push(r)
   r
 }
 
@@ -189,7 +186,7 @@ string quote(ref r) {
 any call(fun f) {
   shell '''
   _wsh_get_local f _wshi
-  _wsh_result="${_wshi#fun:}"
+  _wsh_result="${_wshi#fun+}"
   '''
 }
 

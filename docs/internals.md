@@ -39,7 +39,7 @@ and **map** types) are based on the builtin **reflist** type. This
 means that the **list** type "wraps" the **reflist**, so its
 raw `sh` strings look like this:
 
-`list:reflist:ref:1001 ref:1002`
+`list+reflist:ref:1001 ref:1002`
 
 When a user implements a type, they choose a storage type (they
 can also choose **builtin**, but since the compiler doesn't
@@ -65,7 +65,7 @@ accessed from the list.
 A **reflist** is simply a space-separated list of references:
 
 ```
-reflist:ref:1000 ref:1020 ref:1022
+reflist:ref:1000 ref:1020 ref:2022:1012
 ```
 
 It's not typical to handle references directly in Wrapsher, but it's necessary
@@ -80,9 +80,11 @@ variable `_reflist` (it's a Wrapsher variable), which is added to by the
 `ref ref(any i)` function whenever a reference is created, and is automatically
 added to by the VM when a result value from a function call contains references.
 
-This is potentially expensive for large or deeply-nested data, since the Wrapsher
-VM scans every return value for references and imports the result into the calling
-frame's reflist.
+When a reference is taken to something that can itself contain references (i.e.
+a value whose type has a storage type of `ref` or `reflist`), the underlying
+references are included in the reference itself. So when the scanner scans
+the references being passed out of the frame, it doesn't need to deeply dereference
+the references--every reference carries its underlying references with it.
 
 ## Function Calls
 
@@ -101,7 +103,7 @@ When a function call occurs:
 - Processing occurs
 - Each expression sets `_wsh_result`, which forms the return value of the
   function
-- Before returning, `_wsh_result` is (deeply) interrogated for refs which are
+- Before returning, `_wsh_result` is examined for refs which are
   added to a temporary protected list.
 - Any references which were created were added to the local `_reflist`
   Wrapsher variable. Any unprotected references are destroyed.

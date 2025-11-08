@@ -1,12 +1,40 @@
+# Local Variables:
+# mode: sh
+# sh-basic-offset: 2
+# sh-indent-after-case: always
+# sh-indent-for-case-label: 0
+# sh-indent-for-case-alt: +
+# sh-indent-for-continuation: ++
+# eval: (defun my-sh-mode-smie-rules (kind token)
+#          (pcase (cons kind token)
+#            (`(:before . "esac") (smie-rule-parent))
+#            (`(:after . "case") sh-basic-offset)
+#            (_ nil)))
+# eval: (setq-local smie-rules-function #'my-sh-mode-smie-rules)
+# End:
+
 # wsh:preamble for scripts
 _wsh_stackp=0
 _wsh_frame=0
+_wsh_refid=1000
 
+# TODO - Clear environment of _wsh variables
+
+# _wsh_typeof value => _wsh_type
 _wsh_typeof() {
   _wsh_type=''
   _wsh_type="${1%%:*}"
+  _wsh_type="${_wsh_type%%+*}"
 }
 
+# _wsh_fundamental_typeof value => _wsh_fundamental_type
+_wsh_fundamental_typeof() {
+  _wsh_fundamental_type=''
+  _wsh_fundamental_type="${1%%:*}"
+  _wsh_fundamental_type="${_wsh_fundamental_type##*+}"
+}
+
+# _wsh_typeof_underscore type_name => _wsh_type_underscore
 _wsh_typeof_underscore() {
   _wsh_local_type=''
   _wsh_typeof "${1}"
@@ -42,12 +70,13 @@ _wsh_typeof_underscore() {
 
 # _wsh_assert value expected_type context/location
 _wsh_assert() {
+  _wsh_typeof "${1}"
   case "${2}" in any)
     :
-  ;; "${1%%:*}")
+  ;; "${_wsh_type}")
     :
   ;; *)
-    _wsh_error="error:Expected type '${2}', got '${1%%:*}': ${3}"
+    _wsh_error="error:Expected type '${2}', got '${_wsh_type}': ${3}"
     return 1
   ;;
   esac
@@ -98,9 +127,37 @@ _wsh_get_global() {
   eval "${2}=\"\${_wshg_${1}}\""
 }
 
+# _wsh_makeref_into() value var_name
+_wsh_makeref_into() {
+  : $((_wsh_refid++))
+  _wsh_value="${1}"
+  _wsh_fundamental_typeof "${_wsh_value}"
+  eval "_wshr_${_wsh_refid}=\"\${_wsh_value}\""
+  _wsh_ref="ref:${_wsh_refid}"
+  case "${_wsh_fundamental_type}" in ref)
+    _wsh_ref="${_wsh_ref}:${_wsh_value#ref:}"
+  ;; reflist)
+    for _wsh_makeref_subref in ${_wsh_value#*:}
+    do
+      _wsh_ref="${_wsh_ref}:${_wsh_makeref_subref#ref:}"
+    done
+  ;;
+  esac
+  eval "${2}=\"\${_wsh_ref}\""
+  _wsh_get_local _reflist _wsh_makeref_reflist
+  case "${_wsh_makeref_reflist}" in reflist:)
+    _wsh_set_local _reflist "${_wsh_makeref_reflist}${_wsh_ref}"
+  ;; *)
+    _wsh_set_local _reflist "${_wsh_makeref_reflist} ${_wsh_ref}"
+  ;;
+  esac
+}
+
 # _wsh_deref_into ref_value var_name
 _wsh_deref_into() {
-  eval "${2}=\"\${_wshr_${1#ref:}}\""
+  _wsh_deref_refid="${1#ref:}"
+  _wsh_deref_refid="${_wsh_deref_refid%%:*}"
+  eval "${2}=\"\${_wshr_${_wsh_deref_refid}}\""
 }
 
 # Should the function presence predicate be a function which sets
@@ -109,6 +166,7 @@ _wsh_deref_into() {
 _wsh_have_function_p() {
   eval "_wsh_have_function=\"\${_wshp_${1}${2:+_}${2}}\""
 }
+
 
 # _wsh_run resolved_function_name
 _wsh_run() {
@@ -125,6 +183,7 @@ _wsh_run() {
   _wsh_get_local _reflist _wshi
   # clean up refs that we aren't passing out
   _wsh_cleanup_refs "${_wshi}" "${_wsh_outrefs}"
+  # Close frame
   : $((_wsh_frame--))
   # import protected outrefs into parent scope's
   # reflist
@@ -138,79 +197,44 @@ _wsh_run() {
 }
 
 # _wsh_scan_refs value => _wsh_outrefs
+# _wsh_outrefs is a raw "reflist" (space-separated list of refs without a reflist: tag)
 _wsh_scan_refs() {
-  _wsh_scan_val="${1}"
   _wsh_outrefs=''
-  _wsh_refs_to_scan=''
-  _wsh_iter=0
-  while : $((_wsh_iter++))
-  do
-    case "${_wsh_scan_val}" in type/*)
-      # It's a type value, it can't contain refs
-      _wsh_scan_val=''
-      continue
-    ;; module/*)
-      # It's a module value, it can't contain refs (for now)
-      # or at least, we don't create an clean them up
-      _wsh_scan_val=''
-      continue
-    ;; ?*)
-      # A value to scan for refs
-      # strip it until it's down to a builtin type, then
-      # see if it's a ref or reflist--the other builtins
-      # can't contain refs
-      _wsh_inner=0
-      while : $((_wsh_inner++))
-      do
-        _wsh_scan_bare="${_wsh_scan_val%%:*}"
-        _wsh_get_global "${_wsh_scan_bare}" _wsh_scan_type
-        case "${_wsh_scan_type#type/${_wsh_scan_bare}:}" in builtin)
-          case "${_wsh_scan_bare}" in reflist)
-            for _wshi in ${_wsh_scan_val#reflist:}
-            do
-              _wsh_outrefs="${_wsh_outrefs} ${_wshi}"
-              _wsh_refs_to_scan="${_wsh_refs_to_scan}${_wsh_refs_to_scan:+ }${_wshi}"
-            done
-          ;; ref)
-            _wsh_outrefs="${_wsh_outrefs} ${_wsh_scan_val}"
-            _wsh_refs_to_scan="${_wsh_refs_to_scan}${_wsh_refs_to_scan:+ }${_wsh_scan_val}"
-          esac
-          _wsh_scan_val=''
-          break
-        ;; *)
-          _wsh_scan_val="${_wsh_scan_val#${_wsh_scan_bare}:}"
-        ;;
-        esac
-      done
-    ;; *)
-      # No value to scan, see if there are refs left to scan
-      case "${_wsh_refs_to_scan}" in ?*)
-        # unshift the next ref to scan, and make it the
-        # next value to scan
-        _wshi="${_wsh_refs_to_scan%% *}"
-        _wsh_refs_to_scan="${_wsh_refs_to_scan#${_wshi}}"
-        _wsh_refs_to_scan="${_wsh_refs_to_scan# }"
-        _wsh_deref_into "${_wshi}" _wsh_scan_val
-      ;; *)
-        # No refs to scan, either--we're done
-        break
-      esac
-    esac
-  done
+  _wsh_fundamental_typeof "${1}"
+  case "${_wsh_fundamental_type}" in ref)
+    _wsh_outrefs="${1}"
+  ;; reflist)
+    _wsh_outrefs="${1#*:}"
+  esac
 }
 
 # _wsh_cleanup_refs _reflist raw_outrefs
+# clean up garbage for unreferenced refs
 _wsh_cleanup_refs() {
-  for _wshi in ${1#reflist:}
+  for _wsh_cleanup_ids in ${1#reflist:}
   do
-    case "${_raw_outrefs}" in *${_wshi}\ *)
-      :
-    ;; *${_wshi})
-      :
-    ;; *)
-      unset "$_wshr_${_wshi#ref:}"
-    ;;
-    esac
+    _wsh_cleanup_ids="${_wsh_cleanup_id#ref:}"
+    _wsh_iter=0
+    while
+      : $((_wsh_iter++))
+    do
+      case "${2}" in *:${_wsh_cleanup_id%%:*}\ *)
+        :
+      ;; *:${_wsh_cleanup_id%%:*}:)
+        :
+      ;; *:${_wsh_cleanup_id%%:*})
+        :
+      ;; *)
+        unset "$_wshr_${_wsh_cleanup_id}"
+      ;;
+      esac
+      case "${_wsh_cleanup_id}" in *:*)
+        _wsh_cleanup_id="${_wsh_cleanup_id#*:}"
+      ;; *)
+        break
+      ;;
+      esac
+    done
   done
 }
 
@@ -290,4 +314,3 @@ _wsh_check_return() {
   ;;
   esac
 }
-

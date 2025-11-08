@@ -116,10 +116,11 @@ bool head(mytype i)               # These allow the type to be iterated over
 bool tail(mytype i)
 ```
 
-Internal to your basic type implementation functions, you may make heavy of `_as` to get at the storage
-type, manipulate it, then return the result rewrapped as your type. If you intend users of your type
-to be able to convert it to and from other types, you should add `as_<i>type</i>` functions as
-needed.
+Internal to your basic type implementation functions, you may make
+heavy of `_as` to get at the storage type, manipulate it, then return
+the result rewrapped as your type. If you intend users of your type to
+be able to convert it to and from other types, you should add
+`as_<i>type</i>` functions as needed.
 
 You should (must?) also implement a `new` function to create a
 zero-value instance of the new type, and should create guarded

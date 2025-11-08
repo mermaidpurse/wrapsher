@@ -3,24 +3,6 @@
 These are a collection of design decisions that have been made
 or need to be made, and their rationales.
 
-## Future Ideas
-
-Things I like in various languages that would be nice to incorporate (someday?):
-
-- Set/array/list comprehensions
-
-`[ x: y | x <- all_things; y <- iter() ]`
-
-Some ideas I had that don't seem feasible/don't like:
-
-- Pipelines. I do like them in Powershell, I guess I like them in
-  Elixir but they seem complicated and I think they actually result
-  in Elixir being harder to read for a newcomer. I don't think they
-  match Wrapsher's other syntax constructs very well, and since it
-  has method chaining, that's pretty clear in terms of transformations,
-  it just doesn't end with the variable being assigned, if the intent
-  is a binding.
-
 ## Tools
 
 Tools to implement:
@@ -448,4 +430,29 @@ generated programs.  Here is what it's currently reporting:
         ```
     - It may be a good idea to do the arithmetic substitution differently, that should be easy enough
     - shellcheck reports many unreachable lines, configure out
-    - It would probably be a big pain if there's some problem with reading literals the way I am with `read` and the here-documents with the start and end markers, and being able to use `$'\n'` in stripping the end marker. It's otherwise very difficult to read string literals safely and preserve characters like trailing newlines, etc., exactly. I'm really trying to avoid an encoding scheme for strings.
+    - It would probably be a big pain if there's some problem with
+      reading literals the way I am with `read` and the here-documents
+      with the start and end markers, and being able to use `$'\n'` in
+      stripping the end marker. It's otherwise very difficult to read
+      string literals safely and preserve characters like trailing
+      newlines, etc., exactly. I'm really trying to avoid an encoding
+      scheme for strings.
+
+## Future Ideas
+
+Things I like in various languages that would be nice to incorporate (someday?):
+
+- Set/array/list comprehensions
+
+`[ x: y | x <- all_things; y <- iter() ]`
+
+Some ideas I had that don't seem feasible/don't like:
+
+- Pipelines. I do like them in Powershell, I guess I like them in
+  Elixir but they seem complicated and I think they actually result
+  in Elixir being harder to read for a newcomer. I don't think they
+  match Wrapsher's other syntax constructs very well, and since it
+  has method chaining, that's pretty clear in terms of transformations,
+  it just doesn't end with the variable being assigned, if the intent
+  is a binding.
+
