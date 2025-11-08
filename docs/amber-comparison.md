@@ -5,11 +5,11 @@ Amber, a language compiled to bash. It seems like a great project,
 with a robust parser/compiler implementation that focuses on producing
 interpretable bash code that resembles the input language.
 
-I believe Wrapsher has somewhat different goals, so I did a cursory
+In the end, Wrapsher has different goals, so I did a cursory
 comparison of some language features, and some commentary on why
-Wrapsher is different. Note that as of this writing (while Wrapsher
-is not even version `0.1.0`), some of Wrapsher's features are
-pending, and so indicated.
+Wrapsher is different. Note that as of this writing (while Wrapsher is
+not even version `0.1.0`), some of Wrapsher's features are pending,
+and so indicated.
 
 | Feature | [Amber 0.4.0](https://docs.amber-lang.com/0.4.0-alpha) | Wrapsher 0.1.0 | Comment |
 | :------ | :----------------------------------------------------- | :------------- | :------ |
@@ -17,7 +17,7 @@ pending, and so indicated.
 | Scalar types | Text, Num, Bool, Null | string, int, bool | |
 | Collection types | Array (1-dimension) | list, map, pair (arbitrarily nested) | |
 | User-defined types | no | yes | Wrapsher allows you to define arbitrarily complex types |
-| Loops | inifinite loop, for loop | while loop, for loop | Iterates over any collection |
+| Loops | inifinite loop, for loop | while loop, for[^2] loop | Iterates over any collection |
 | Error handling | ignore or manually checked | throw/try/catch | |
 | External commands | inlined text substitution | declared dependencies[^2] | Wrapsher is designed to fail early when prerequisites aren't met |
 | Code sharing | `import` functions from files | `use module`s | Wrapsher modules are intended to be a full module system[^1] |

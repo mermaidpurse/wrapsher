@@ -107,15 +107,15 @@ Top-level statements in Wrapsher can be:
   as the function namespace. See [Modules and Types](./modules-types.md)
   for more on module and type code organization.
 - A function definiton of the form:
-    <pre>
+    <pre><code>
     <i>type</i> <i>name</i>(<i>argument specifiers</i>) <i>block</i>
-    </pre> 
+    </code></pre> 
     for example:
-    <pre>
+    <pre><code>
     int main(list args) {
-       _expressions_
+       <i>expressions</i>
     }
-    </pre>
+    </code></pre>
     - In the above definition, we are saying:
         - The `main` function returns an `int` and accepts a list
           of arguments named `args`.
@@ -140,7 +140,7 @@ semicolons (`;`) and enclosed by curly braces (`{ }`). All
 expressions have values, and the value of the last expression is the
 value of the block. The following are expressions that can be used:
 
-- A variable assignment of the form </code>_var_ = _expression_</code>.
+- A variable assignment of the form <code>_var_ = _expression_</code>.
 - A function call of the form <code>_function_(_arguments_)</code> or
   <code>_receiver_._function_(_arguments_)</code>. The method syntax
   with a _receiver_ is just syntactic sugar for placing the first
@@ -261,6 +261,7 @@ any at(map m, any k)
 
 The pair operator `:` is used to construct a `pair` consisting
 of a key and a value. Any type can be used as a key and value.
+It's syntactic sugar for the `from_kv` function:
 
 ```
 pair from_kv(type/pair t, any k, any v)
@@ -337,24 +338,24 @@ s)`) must be used to read types from input strings or implement
 an optional value.
 
 
-| Type     | Zero                   | Example literal values         |
-| -------- | ---------------------- | ------------------------------ |
-| `bool`   | `false`                | `true`, `false`                |
-| `int`    | `0`                    | `0`, `99`, `-22`               |
-| `string` | `''`                   | `'bob'`, `'café'`              |
-| `list`   | `[]`                   | `['one', 2, false, [0, 1, 2]]` |
-| `pair`   | `false: false`         | `'one': 1`                     |
-| `map`    | `[:]`                  | `['one': 1, 'two': 2]`         |
-| `fun`    | `bool fun () { false } | `bool fun (int i) { i == 0 }`  |
+| Type     | Zero                    | Example literal values         |
+| -------- | ----------------------- | ------------------------------ |
+| `bool`   | `false`                 | `true`, `false`                |
+| `int`    | `0`                     | `0`, `99`, `-22`               |
+| `string` | `''`                    | `'bob'`, `'café'`              |
+| `list`   | `[]`                    | `['one', 2, false, [0, 1, 2]]` |
+| `pair`   | `false: false`          | `'one': 1`                     |
+| `map`    | `[:]`                   | `['one': 1, 'two': 2]`         |
+| `fun`    | `bool fun () { false }` | `bool fun (int i) { i == 0 }`  |
 
 All types implement the following functions or use the generic `any` equivalent:
 
-<pre>
+<pre><code>
 _type_ new(type/_type_)
 bool is_zero(_type_ i)
 string to_string(_type_ i)
 string quote(_type_ i)
-</pre>
+</code></pre>
 
 The `new()` function takes no arguments other than the type
 variable (e.g., `bool` or `list`) and returns a new zero value.
@@ -392,13 +393,16 @@ The other syntax that is supported are triple-quoted strings, which
 begin and end with three quotation marks `'''`.
 
 Note that there are no such things as double-quoted strings in
-Wrapsher, nor variable interpolation. Within a single-quoted string,
+Wrapsher, nor variable interpolation.[^1] Within a single-quoted string,
 any character preceded by a backslash (`\`) is equivalent to its
 literal value; there are no special escapes that produce special
 characters: a backslash always means the same thing (make the next
 character literal). This means the string `'\n'` is equal to
 `'n'`. To embed newlines in single-quoted strings, you need to
-actually embed the newline.
+actually embed the newline, not use `\n`.
+
+[^1]: Possibly, a future version of wrapsher could support interpolated
+strings which are double-quoted or quoted with backticks.
 
 Strings can be subscripted with the `[` operator as this is syntactic
 sugar for `string at(string s, any i)`.
@@ -446,9 +450,9 @@ for `mylist.at(n)`.
 
 ##### `pair`
 
-A pair is a couple, or a single association between a key and a value.
-The key and value can be of any type. It is written literally as
-<code>_key_: _value_</code>.
+A pair is a couple (i.e., a 2-tuple), or a single association between
+a key and a value.  The key and value can be of any type. It is
+written literally as <code>_key_: _value_</code>.
 
 - `pair new(type/pair)`
 - `any key(pair p)`
@@ -509,7 +513,7 @@ An empty map is denoted by `[:]`.
 ##### `any`
 
 In some cases, a function may return any type of value, represented
-by the `any` type, or accept one. This usually represents an list
+by the `any` type, or accept one. This usually represents a list
 element or map value.
 
 ##### `fun`
@@ -570,9 +574,9 @@ s == 'Hello'
 ```
 
 Variables are created upon initial assignment, and are cleaned up at
-the end of the function they are in. Only local variables are created
-in this way.  Variables that are captured by a closure exist inside
-that closure when called.
+the end of the function they were assigned in. Only local variables
+are created in this way. Variables that are captured by a closure
+exist inside that closure when called.
 
 Global variables exist but they are not created by top-level
 assignments. They are only created through special statements like
@@ -655,9 +659,9 @@ the program contains no `module` declarations, while modules have
 exactly one.
 
 A "module" is a Wrapsher file that is included during compilation
-as a result of a `use module _module_` statement. The compiler
+as a result of a <code>use module _module_</code> statement. The compiler
 searches for the module in its module include path--a file named
-<code>_module_.wsh</code> and includes its compiled form in the program.
+<code>_module_.wsh</code>--and includes its compiled form in the program.
 
 The `main` function in a command must return an `int`. Further, it
 must accept a list of arguments (they are strings).

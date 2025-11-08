@@ -19,7 +19,7 @@ the following conventions:
   that variable as an argument to the `io.printf` function,
   typeset the metasyntactic reference in italics: for example,
   <code>io.printf(_format_, _variable_)</code>. In Markdown,
-  this means using `<code>` or `<pre>` instead of normal
+  this means using `&lt;code>` or `&lt;pre>` instead of normal
   Markdown syntax.
 - When making reference to the following in prose (not literal
   code examples):
@@ -42,6 +42,6 @@ a description of its purpose and some indication about how
 the user or caller should choose its value or in what circumstance
 they will use it.
 
-Modules should be written to inform the programmer who is using
-and loading the module. Commands should be written to inform
-the user who is running the command to accomplish a task.
+Module documentation should be written to inform the programmer who is
+using and loading the module. Commands should be written to inform the
+user who is running the command to accomplish a task.

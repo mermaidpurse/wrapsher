@@ -8,8 +8,7 @@ the program entry point, i.e., how `main` gets called), the
 compiler (which generates `sh` code for programs) and
 the [**core** module](./wsh/core.wsh). The core module contains
 a lot of code written directly in shell in order to provide
-the necessary fundamental functions. The `preamble.sh` is not
-very large and contains some utilities.
+the necessary fundamental functions.
 
 Note that Wrapsher's philosophy is to rely, especially for core
 functionality, only on POSIX-required behaviors. Many shells
@@ -36,16 +35,18 @@ is tagged like this:
 Some Wrapsher types are builtin, and some are based on another type
 (the "store type"). For example, the **list** type (and the **pair**
 and **map** types) are based on the builtin **reflist** type. This
-means that the **list** type "wraps" the **reflist**, so its
-raw `sh` strings look like this:
+means that the **list** type "wraps" the **reflist**, so its raw `sh`
+strings look like this: `list+reflist:ref:1001 ref:1002`.
 
-`list+reflist:ref:1001 ref:1002`
+When a user implements a type, they choose a storage type[^1]. They'll
+probably write the corresponding methods that use that type as a receiver
+as manipulations of the underlying storage type, relying on `_as` to
+unwrap the type to expose the underlying methods.
 
-When a user implements a type, they choose a storage type (they
-can also choose **builtin**, but since the compiler doesn't
-know about the type, they'll need to write the raw shell
-code necessary for accessing the value, so it's usually easier
-to base a type on an existing builtin).
+[^1]: They can also choose **builtin**, but since the compiler doesn't
+know about the type, they'll need to write all the raw shell code
+necessary for accessing the value, so it's usually easier to base a
+type on an existing builtin).
 
 The `any _as(any i, any as)` function allows a value to be
 wrapped--that is, cast from its type to another type that uses its
@@ -56,48 +57,54 @@ the value.
 
 ## References
 
-Collections (lists) are implemented with underlying data types
-**ref** and **reflist**. The **list** functions create references
-when items are pushed onto the list, and push the reference into
-the "inner" **reflist**; then dereference the items that are
+Collections (such as lists and pairs) are implemented with underlying
+data types **ref** and **reflist**. The **list** functions create
+references when items are pushed onto the list, and push the reference
+into the "inner" **reflist**; then dereference the items that are
 accessed from the list.
 
-A **reflist** is simply a space-separated list of references:
+Internally, i.e., to the shell, a **reflist** is simply a
+space-separated list of references:
 
 ```
 reflist:ref:1000 ref:1020 ref:2022:1012
 ```
 
-It's not typical to handle references directly in Wrapsher, but it's necessary
-for collections so that collections can be represented as shell strings and
-can be complex (lists of lists).
+It's not typical to handle references directly in Wrapsher, but the
+mechanism is necessary for collections so that they can be
+represented as shell strings and can be complex (lists of lists).
 
-Since Wrapsher has references, this can lead to garbage. Wrapsher's approach is
-to use a "borrow" approach where each frame is responsible for cleaning up any
-references which are created in its scope and which are _not_ passed outside
-of the frame. It does this by keeping a reference list in the magic local
-variable `_reflist` (it's a Wrapsher variable), which is added to by the
-`ref ref(any i)` function whenever a reference is created, and is automatically
-added to by the VM when a result value from a function call contains references.
+Since Wrapsher has references, this can lead to garbage. Wrapsher's
+approach is to use a "borrow" approach where each frame is responsible
+for cleaning up any references which are created in its scope and
+which are _not_ passed outside of the frame. It does this by keeping a
+reference list in the magic local variable `_reflist` (it's a Wrapsher
+variable), which is added to by the `ref ref(any i)` function whenever
+a reference is created, and is automatically added to by the VM when a
+result value from a function call contains references.
 
-When a reference is taken to something that can itself contain references (i.e.
-a value whose type has a storage type of `ref` or `reflist`), the underlying
-references are included in the reference itself. So when the scanner scans
-the references being passed out of the frame, it doesn't need to deeply dereference
-the references--every reference carries its underlying references with it.
+When a reference is taken to something that can itself contain
+references (i.e. a value whose type has a storage type of `ref` or
+`reflist`), the underlying references are included in the reference
+itself. So when the scanner scans the references being passed out of
+the frame, it doesn't need to deeply dereference the references--every
+reference carries its underlying references with it.
 
 ## Function Calls
 
 When a function call occurs:
-- The function arguments are pushed onto the stack (`_wsh_stack<_wsh_stackp>`)
+- The function arguments are pushed onto the stack (<code>_wsh_stack<i>_wsh_stackp</i></code>)
   in reverse order
-- `_wsh_dispatch` is called with an arity based on the syntax of the function
-  call. It  peeks at the top argument to decide what function to dispatch
-  to: either `_wshf_function_name_<type>` or `_wshf_function_name_any`,
-  using `_wshp_function_name_<type>` and `_wshp_function_name_any` as
-  signal variables (the compiler creates these functions from Wrapsher functions).
+- `_wsh_dispatch` is called with an arity based on the syntax of the
+  function call. It peeks at the top argument to decide what function
+  to dispatch to: either <code>_wshf_function_name_<i>type</i></code>
+  or `_wshf_function_name_any`, using
+  <code>_wshp_function_name_<i>type</i></code> and
+  `_wshp_function_name_any` as signal variables (the compiler creates
+  these functions from Wrapsher functions).
 - The function runner (`_wsh_run`) creates a new frame scope and
-  initializes the reflist and list of variable names
+  initializes the reflist (`_reflist`, a real local Wrapsher variable)
+  and list of variable names
 - Inside the function (generated code), the arguments are popped off
   the stack one by one and assigned to local variables
 - Processing occurs
@@ -112,6 +119,15 @@ When a function call occurs:
 Most expressions in Wrapsher are syntactic sugar for function calls;
 internally, you can say Wrapsher uses a functional style or even that
 it is close to being a Lisp.
+
+## Maps
+
+Maps are currently implemented as pairlists: that is, finding a map
+value is done by linear search of the list of pairs to find a pair
+that has a key that equals the search key.
+
+This is inefficient and may be changed in the future to a tree or
+hash table implementation.
 
 ## Funs
 
@@ -154,12 +170,14 @@ implemented in the [`preamble.sh`](../lib/wrapsher/preamble.sh) and
 [`postamble.sh`](../lib/wrapsher/postamble.sh) code snippets included
 every compiled Wrapsher program.
 
-Most functions that "return" values actually set a variable whose name
-you pass to the function.
+Functions in the preamble that "return" values do so either by setting
+a well-known global variable (e.g., `_wsh_typeof` sets `_wsh_type`)
+or by setting a variable whose name is passed into the function; the latter
+by convention are named <code>_wsh_<i>something</i>_into</code>.
 
 Wrapsher convention is to use `_wshi`, `_wshj` as temporary variables
-whose value you use right after setting it. Don't proliferate shell
-variables.
+whose value you use right after setting it. It's a goal not to proliferate
+shell variables overmuch.
 
 ### <code>_wsh_get_local <i>wrapsher_varname</i> <i>shell_variable</i></code>
 

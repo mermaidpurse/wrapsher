@@ -75,11 +75,12 @@ will "fall back" to a function of the same name implemented against
 the `any` type. If there is no such function, this results in
 an error.
 
-## conversions, casts and quote()
+## Conversions, casts and `quote()`
 
-The convention in Wrapsher is that types can be converted to each other
-using both <code>as_<i>type</i>()</code> and <code>to_<i>type</i>()</code>
-functions. When present, they serve slightly different purposes:
+The convention in Wrapsher is that types can be converted to each
+other using both <code>as_<i>type</i>()</code> and
+<code>to_<i>type</i>()</code> functions. When present (they need not
+be), they serve slightly different purposes:
 
 The <code>as_<i>type</i>()</code> conversion is a safe cast. That is,
 the result is exactly equivalent to the input, but of a different
@@ -97,11 +98,13 @@ which can be used to produce a "nice" output value; but you would
 not necessarily expect to be able to parse the exact value back
 from the resulting string.
 
-The `quote()` function is designed to produce a Wrapsher-eval-able
+The `quote()` function is designed to produce a Wrapsher-eval-able[^1]
 representation of a value. For example, using `quote(s)` where `s`
 is a string will return a string that, output, includes its quotes
 and escapse internal quotes and backslashes, so it coudl be used
 as a literal in a Wrapsher program.
+
+[^1]: Although, as of this writing, Wrapsher does not have `eval`.
 
 Wrapsher doesn't have "unsafe" casts where you just assert that
 a type is of a different type. You need to write a converter to

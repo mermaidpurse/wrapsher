@@ -1,7 +1,7 @@
 # Decisions
 
-These are a collection of design decisions that have been made
-or need to be made, and their rationales.
+These are a (somewhat random) collection of design decisions that have
+been made or need to be made, and their rationales.
 
 ## Tools
 
@@ -9,7 +9,7 @@ Tools to implement:
 - Emacs mode for basic electric editing and syntax highlighting for me
 - LSP (`wrapsher lsp`) with syntax highlighting
 - Syntax highlighting for github/other tools (regex-based)
-- REPL (probably via `wrapsher` module)
+- REPL (probably via a `wrapsher` module)
 - Automatic formatting
 - Linting
 
@@ -57,21 +57,26 @@ you don't have to write shell scripts, so it should only be used
 for cases where you have no choice.
 
 Also, it would be difficult the way things currently work to
-create wrapsher libraries that could both be loaded, so it's
-one at a time.
+create two wrapsher libraries that could both be loaded, so it
+would be strictly one at a time.
 
 ## Variadic functions?
 
-- No variadic functions (difficult, inconsistent, requires splatting).
+I don't think Wrapsher will ever have variadic functions: they imply
+an inconsistent interface and require a splatting syntax of some kind,
+and are therefore messy. Something like `io.printf(string fmt, list args)`
+works just as well.
 
 ## String interpolation?
 
-I've reserved double-quoted syntax for string interpolation as a
-maybe.  I'm not sure if it's necessary or desirable. It complicates
-things quite a bit and ends up having this "little language" problem
-with `#{ }` or stuff. Maybe something like fstrings, though again, is
-that really better than `sprintf`? Or something even heavier-weight
-like mustache? String interpolation is very popular, though.
+I've reserved double-quoted (and, I guess, backtick-quoted) strings
+for string interpolation as a maybe.  I'm not sure if it's necessary
+or desirable. It complicates things quite a bit and ends up having
+this "little language" problem with `#{ }` or the equivalent. Maybe
+something like fstrings, though again, is that really better than
+`sprintf`? Or something even heavier-weight like mustache? String
+interpolation is very popular, though, so it should probably not be
+ignored.
 
 ## Enums
 
@@ -86,11 +91,11 @@ Only basic types? Or something richer?
 
 ## Interfaces, Unions or union types?
 
-Right now if I want to make a function that accepts more than one
-type of second argument, I need to make it accept `any` and then
-do its own type assertion (which actually doesn't exist yet). For
-example, to create a `add(float f, number n)`-style function that 
-accepts ints and floats for `n`, you'd have to do something like:
+Right now if I want to make a function that accepts more than one type
+of second argument, I need to make it accept `any` and then do its own
+type assertion. For example, to create a `add(float f, number
+n)`-style function that accepts ints and floats for `n`, you'd have to
+do something like:
 
 ```
 float add(float f, any n) {
@@ -224,7 +229,8 @@ doesn't really work, in particular for list or map constants. For
 eval, a REPL, and certain things like above where you want initial
 global values to have collection values, that doesn't really work.
 
-_Note: I think I just got rid of `return`_
+It would be overall cleaner if the current "statements" like `use ...`
+were expressions too.
 
 ## Weird syntax ideas
 
@@ -234,12 +240,15 @@ _Note: I think I just got rid of `return`_
 'stringtwo,andthis,other' / ',' => list split(string s, string d) => ['stringtwo', 'andthis', 'other']
 ```
 
-is `s / ','` better than `s.split(',')`? Is this necessary?
+Is `s / ','` better than `s.split(',')`? Is this necessary? I find
+it attractive and clever but is this a good enough reason to implement?
 
 ### Assignment operators
 
-`+=` is very popular: implement? What about `*=`, `-=`, etc.? I don't want `++` due to not making
-mutation clear.
+`+=` is very popular: implement? What about `*=`, `-=`, etc.? I don't
+want `++` due to not making mutation clear. Since I haven't chosen to
+put assignment behind `:=` or something, and it's just `=`, I don't want
+operators other than those containing `=` to be doing assignment.
 
 ### `?` to test presence/nonzero
 
@@ -277,7 +286,7 @@ this with a convention for the pair's key (this would be particularly
 good with destructuring in an assignment; or at least, fairly common).
 
 I don't want to go full golang with the `ok, err` type stuff, but
-a little
+maybe a little of this kind of thing wouldn't be so bad:
 
 ```
 pair find(map m, any k, any d) {
@@ -297,7 +306,9 @@ and it's not in your collection.
 - Implement various warnings, lints and (overrideable errors), like:
     - Exactly one `module` for modules
     - No `module` for programs
-    - "Foreign" module functions in a file without a `module` declaration
+    - "Foreign" module functions in a file without a `module` declaration;
+      that is, functions with a module-type receiver but for a module other
+      than the current one.
     - Override probably a pragma like `use ...`
     - `use feature` in a module
 
@@ -307,7 +318,7 @@ just do `other/io`. So you do:
 `use module other/io`
 
 And you get `$INCLUDE_DIR/other/io.wsh`, that's very simple. In
-    fact I think it just works now.
+fact I think it just works now.
 
 Does the module itself declare `module other/io` or `module io`? I
 think it might be able to do either, but which is better. If `other/io`
@@ -319,12 +330,14 @@ Since modules imply global variables with a module value, it's possible
 to declare alternative implementations and replace them, perhaps. So you
 could do:
 
-`use module io`
-`use module better/io`
+```
+use module io
+use module better/io
 
 bool init() {
   io = module/better/io.new() # or something
 }
+```
 
 Now, types are not replaceable because you can't redefine a global with
 a second type, but again you could alias them:
@@ -345,6 +358,8 @@ betterfile open(string filename) {
 
 But it's probably generally better to just implement a `file`-like
 interface.
+
+## Module Loading
 
 <code>use module _version_</code> should be the one way you declare version
 constraints. I don't want there to be a Wrapsherfile or separate dependency
@@ -379,7 +394,9 @@ collections. Function calls are pretty expensive so this really affects
 startup time, just for the informational globals `_functions` and
 so on. The compiler should at least be able to generate all the refs
 and start the program with an initial refid that's greater than what
-it used.
+it used. So probably the compiler should inline shell code to initialize
+the refs for constant collections and start the program with an initial
+refid.
 
 ## Concurrency/External Drivers
 
@@ -415,11 +432,14 @@ and job control for this.
 ## Shellchecks
 
 At some point I'll probably add shellchecks in the pipeline to test
-generated programs.  Here is what it's currently reporting:
+generated programs. Here is what it's currently reporting:
 
 - shellchecks
     - `SC3003 (warning): In POSIX sh, $'..' is undefined.`
-        - [they're documented here](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_02_04), but when did it get added? are lots of old shells missing this?
+        - [they're documented
+          here](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_02_04),
+          but when did it get added? are lots of old shells missing
+          this?
     - `SC3045 (warning): In POSIX sh, read -d is undefined.`
         - [read has -d and is required to be intrinsic](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/read.html), but when did it get added? are lots of old shells missing this?
     -
@@ -428,21 +448,22 @@ generated programs.  Here is what it's currently reporting:
          _wsh_result="int:$((${_wshi#int:} ${_wshk#string:} ${_wshj#int:}))"
                           ^-- SC1102 (error): Shells disambiguate $(( differently or not at all. For $(command substitution), add space after $( . For $((arithmetics)), fix parsing errors.
         ```
-    - It may be a good idea to do the arithmetic substitution differently, that should be easy enough
+    - It may be a good idea to do the arithmetic substitution
+      differently, that should be easy enough
     - shellcheck reports many unreachable lines, configure out
     - It would probably be a big pain if there's some problem with
       reading literals the way I am with `read` and the here-documents
       with the start and end markers, and being able to use `$'\n'` in
       stripping the end marker. It's otherwise very difficult to read
       string literals safely and preserve characters like trailing
-      newlines, etc., exactly. I'm really trying to avoid an encoding
-      scheme for strings.
+      newlines, etc., exactly. I'm really _really_ trying to avoid an
+      encoding scheme for strings.
 
 ## Future Ideas
 
 Things I like in various languages that would be nice to incorporate (someday?):
 
-- Set/array/list comprehensions
+- Set/array/list comprehensions: I do love a comprehension
 
 `[ x: y | x <- all_things; y <- iter() ]`
 

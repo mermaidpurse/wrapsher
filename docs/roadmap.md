@@ -2,6 +2,7 @@
 
 ## Issues
 
+- Need `bool assert(any i, any as)` to check type.
 - Environment variable injection--we need to clear the environment of
   anything starting with `_wsh` I think
 - Emacs mode: second } doesn't indent right (it's indented one level too far)
