@@ -671,6 +671,24 @@ reflist set(reflist rl, int i, ref r) {
   '''
 }
 
+reflist map(reflist rl, fun f) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local f _wshj
+  _wshv=
+  for _wshk in ${_wshi#reflist:}
+  do
+    _wsh_set_local i "${_wshk}"
+  '''
+    r = f.call().with(i)
+  shell '''
+    _wsh_get_local r _wshr
+    _wshv="${_wshv:-reflist:}${_wshv:+ }${_wshr}"
+  done
+  _wsh_result="${_wshv}"
+  '''
+}
+
 reflist minus(reflist rl, reflist o) {
   if o.length() > 0 {
     rl.delete(o.head()).minus(o.tail())
@@ -772,7 +790,10 @@ bool eq(list l, list o) {
 }
 
 list map(list l, fun f) {
-  _map2(l, f, [])
+  rf = ref fun(ref r) {
+    f.call().with(r.deref()).ref()
+  }
+  l.as_reflist().map(rf).as_list()
 }
 
 list _map2(list l, fun f, list acc) {
