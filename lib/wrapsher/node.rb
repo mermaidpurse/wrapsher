@@ -147,7 +147,9 @@ module Wrapsher
       def function_dispatch
         code = []
         code << line
+        code << "_wsh_prof_event B wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
+        code << "_wsh_prof_event E wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_check_return \"in #{@function_name} at #{@filename}:#{@line}\" || break"
         code << line
         code.join("\n  ")

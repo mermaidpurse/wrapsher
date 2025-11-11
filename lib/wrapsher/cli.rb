@@ -24,6 +24,13 @@ module Wrapsher
       }
       @file_optparser = OptionParser.new do |opts|
         opts.on('-eCODE', '--expr CODE', 'Expression/Wrapsher code to process') { |expr| @options[:expr] << expr }
+        opts.on(
+          '-pSHELL',
+          '--profile SHELL',
+          'Compile with profiling turned on (run with WSH_PROFILE=<filename> to collect), using the specifed bash executable'
+        ) do |expr|
+          @options[:profile] = expr
+        end
         opts.on('-D', '--debug', 'Print debugging output on stderr') { @options[:level] = :DEBUG }
       end
     end
@@ -74,7 +81,7 @@ EOF
           output = source.delete_suffix('.wsh')
           compiled = compiler.compile(
             source,
-            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger),
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options),
             type: :program
           )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
@@ -98,7 +105,7 @@ EOF
           compiled = compiler.compile(
             source,
             type: :program,
-            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger)
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options)
           )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
           system(output)
@@ -121,7 +128,7 @@ EOF
           compiled = compiler.compile(
             source,
             type: :program,
-            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger)
+            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options)
           )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
         end

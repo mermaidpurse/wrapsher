@@ -64,6 +64,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  json
   pry (~> 0.14)
   rake (~> 13.0)
   rspec (~> 3.0)

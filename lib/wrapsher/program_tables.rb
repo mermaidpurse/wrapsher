@@ -1,20 +1,22 @@
 require 'wrapsher'
 
 module Wrapsher
+  # Global compiler information for a program
   class ProgramTables
     attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds,
-                  :context, :locals, :state
+                  :options, :context, :locals, :state
 
     def initialize(
-        filename: '-',
-        functions: {},
-        globals: {},
-        external: {},
-        included: {},
-        compiler_refid: 1000,
-        adds: [],
-        logger: Logger.new($stderr)
-        )
+      filename: '-',
+      functions: {},
+      globals: {},
+      external: {},
+      included: {},
+      compiler_refid: 1000,
+      adds: [],
+      logger: Logger.new($stderr),
+      options: {}
+    )
       @filename = filename
       @functions = functions
       @globals = globals
@@ -26,6 +28,7 @@ module Wrapsher
       @locals = []
       @state = {}
       @logger = logger
+      @options = options
       @logger.debug("ProgramTables initialized with logger level: #{@logger.level}, filename: #{@filename}, refid: #{@compiler_refid}")
     end
 

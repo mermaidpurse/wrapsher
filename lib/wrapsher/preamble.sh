@@ -173,6 +173,22 @@ _wsh_have_function_p() {
   eval "_wsh_have_function=\"\${_wshp_${1}${2:+_}${2}}\""
 }
 
+_wsh_prof_init() {
+  case "${WSH_PROFILE}" in ?*)
+    : >"${WSH_PROFILE}"
+    exec 3>>"${WSH_PROFILE}"
+  ;;
+  esac
+}
+
+# _wsh_prof_event phase cat name
+_wsh_prof_event() {
+  case "${WSH_PROFILE}" in ?*)
+    printf '{"ts":%s, "ph":"%s", "cat":"%s", "name":"%s", "pid":%s, "tid":0}\n' \
+      "$EPOCHREALTIME" "${1}" "${2}" "${3}" "$$" >&3
+  ;;
+  esac
+}
 
 # _wsh_run resolved_function_name
 _wsh_run() {
