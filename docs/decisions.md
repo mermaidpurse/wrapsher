@@ -67,6 +67,19 @@ an inconsistent interface and require a splatting syntax of some kind,
 and are therefore messy. Something like `io.printf(string fmt, list args)`
 works just as well.
 
+## Functions by name?
+
+Can function names have a fun value?
+
+```
+l.map(to_string)
+```
+instead of
+```
+l.map(string fun (any i) { i.to_string() }
+```
+
+
 ## String interpolation?
 
 I've reserved double-quoted (and, I guess, backtick-quoted) strings

@@ -50,7 +50,7 @@ module Wrapsher
         Wrapsher::Node.from_obj(obj, tables: tables)
       end
 
-      errors = nodes.map(&:errors).flatten
+      errors = nodes.map(&:errors).flatten.compact
       if errors.any?
         @logger.error 'Compilation errors:'
         errors.each do |error|

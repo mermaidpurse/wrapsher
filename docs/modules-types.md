@@ -11,7 +11,10 @@ not the way type checking and function dispatch works right now).
 ## Implementation of Modules
 
 When you `use module mymodule`, the compiler finds the module to
-include from its include path and includes it in the program.
+include from its include path and includes it in the program. By default,
+the include path is `$WSH_HOME/wsh:wsh`; it can be added to by
+setting the `WSH_INCLUDE` environment variable or passing directories
+with `-I` to the compiler.
 
 Wrapsher doesn't have separate function namespaces, which means
 a module can define a function for any type, in any namespace. By

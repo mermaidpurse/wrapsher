@@ -9,7 +9,26 @@ RSpec::Core::RakeTask.new(:spec)
 
 RuboCop::RakeTask.new
 
-task default: %i[spec rubocop]
+task default: %i[spec test]
+
+desc <<~DESC
+  Run Wrapsher tests
+    Usage:
+      rake test
+      rake test[wsh/core_test.wsh]
+DESC
+task :test, [:test_file] do |_, args|
+  args.with_defaults(
+    test_file: nil
+  )
+  test_files = [args[:test_file]].compact
+  if test_files.empty?
+    test_files = Dir['wsh/*_test.wsh']
+  end
+  test_files.each do |file|
+    sh "bundle exec wrapsher test #{file}"
+  end
+end
 
 namespace :profile do
   desc <<~DESC

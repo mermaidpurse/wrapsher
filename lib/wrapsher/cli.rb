@@ -1,3 +1,4 @@
+require 'english'
 require 'fileutils'
 require 'json'
 require 'logger'
@@ -6,24 +7,35 @@ require 'wrapsher'
 require 'pry'
 
 module Wrapsher
-
+  # Interpret command line arguments and options
   class CLI
-
     def self.run(argv)
-      me = self.new(argv)
+      me = new(argv)
       me.run
+    end
+
+    def default_options
+      rv = {
+        expr: [],
+        level: :INFO,
+        wsh_include_path: ['wsh']
+      }
+      rv[:wsh_include_path].unshift("#{ENV['WSH_HOME']}/wsh") if ENV['WSH_HOME']
+      rv[:wsh_include_path] = ENV['WSH_INCLUDE'].split(':') + @options[:wsh_include_path] if ENV['WSH_INCLUDE']
+      rv
     end
 
     def initialize(argv)
       @cmd = argv.shift
       @argv = argv
       @logger = Logger.new $stderr
-      @options = {
-        expr:  [],
-        level: :INFO
-      }
+      @options = default_options
       @file_optparser = OptionParser.new do |opts|
         opts.on('-eCODE', '--expr CODE', 'Expression/Wrapsher code to process') { |expr| @options[:expr] << expr }
+        opts.on('-IINCLUDE', '--include INCLUDE', 'Directory to search for Wrapsher modules') do |expr|
+          @options[:wsh_include_path] ||= []
+          @options[:wsh_include_path] = [expr] + @options[:wsh_include_path]
+        end
         opts.on(
           '-pSHELL',
           '--profile SHELL',
@@ -35,7 +47,7 @@ module Wrapsher
       end
     end
 
-    def run()
+    def run
       case @cmd
       when 'help'
         help @argv
@@ -52,27 +64,29 @@ module Wrapsher
       else
         help
       end
+    rescue Wrapsher::CompilationError => e
+      warn e.message
     end
 
-    def help(args=nil)
-      puts <<EOF
-Usage:
-  wrapsher COMMAND [options...]
+    def help(_args = nil)
+      puts <<~HELP
+        Usage:
+          wrapsher COMMAND [options...]
 
-  Run wrapsher COMMAND --help for help:
-    wrapsher compile
-    wrapsher run
-    wrapsher test
-    wrapsher transform
-    wrapsher parse
-EOF
+          Run wrapsher COMMAND --help for help:
+            wrapsher compile
+            wrapsher run
+            wrapsher test
+            wrapsher transform
+            wrapsher parse
+      HELP
     end
 
     def do_run(args)
       args = @file_optparser.parse(*args)
       compiler = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
 
-      if ! @options[:expr].empty?
+      if !@options[:expr].empty?
         compiled = compiler.compiletext(@options[:expr].join("\n") + "\n")
         IO.popen('/bin/sh', 'w') { |sh| sh.write(compiled) }
       else
@@ -86,7 +100,7 @@ EOF
           )
           File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
           system(output)
-          Process.exit($?.exitstatus)
+          Process.exit($CHILD_STATUS.exitstatus)
         end
       end
     end
@@ -95,23 +109,21 @@ EOF
       args = @file_optparser.parse(*args)
       compiler = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
 
-      if ! @options[:expr].empty?
-        raise ArgumentError, 'Cannot test expressions directly, please provide a file'
-      else
-        # TODO: Discover test files
-        args.each do |source|
-          output = source.delete_suffix('.wsh')
-          # TODO: change to :test ?
-          compiled = compiler.compile(
-            source,
-            type: :program,
-            tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options)
-          )
-          File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
-          system(output)
-          FileUtils.rm_f(output) if $?.exitstatus == 0
-          Process.exit($?.exitstatus)
-        end
+      raise ArgumentError, 'Cannot test expressions directly, please provide a file' unless @options[:expr].empty?
+
+      # TODO: Discover test files
+      args.each do |source|
+        output = source.delete_suffix('.wsh')
+        # TODO: change to :test ?
+        compiled = compiler.compile(
+          source,
+          type: :program,
+          tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options)
+        )
+        File.open(output, 'w', 0o755) { |fh| fh.write(compiled) }
+        system(output)
+        FileUtils.rm_f(output) if $CHILD_STATUS.exitstatus.zero?
+        Process.exit($CHILD_STATUS.exitstatus)
       end
     end
 
@@ -119,7 +131,7 @@ EOF
       args      = @file_optparser.parse(*args)
       compiler  = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
 
-      if ! @options[:expr].empty?
+      if !@options[:expr].empty?
         compiled = compiler.compiletext(@options[:expr].join("\n") + "\n")
         puts compiled
       else

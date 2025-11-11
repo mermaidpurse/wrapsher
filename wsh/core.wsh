@@ -11,8 +11,6 @@ type reflist builtin
 type list reflist
 type pair reflist
 type map reflist
-type command string
-type command_output map
 
 any _typeof(any i) {
   shell '''
@@ -344,6 +342,29 @@ int mod(int a, int b) {
   _arith_op(a, b, '%')
 }
 
+int to_int(string s) {
+  if s == '' {
+    throw 'can\'t convert empty string to int'
+  }
+
+  shell '''
+  _wsh_get_local s _wshi
+  _wshj="${_wshi#string:}"
+  while :; do
+    case "${_wshj}" in [\-0-9]*)
+      _wshj="${_wshj#?}"
+    ;; '')
+      _wsh_result="int:${_wshi#string:}"
+      break
+    ;; *)
+      _wsh_error="error:can't convert '${_wshi#string:}' to int"
+      break
+    ;;
+    esac
+  done
+  '''
+}
+
 string to_string(int i) {
   shell '''
   _wsh_get_local i _wshi
@@ -481,7 +502,7 @@ string tail(string s) {
 
 string at(string s, int i) {
   if s == '' {
-    throw 'index out of bounds: no index ' + i.to_string() + 'in list'
+    throw 'index out of bounds: no index ' + i.to_string() + 'in string'
   } else if i > 0 {
       at(s.tail(), i - 1)
   } else {

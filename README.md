@@ -16,7 +16,7 @@ bring in modules with external dependencies (like `curl` for
 network programming), Wrapsher will help you to define those
 dependencies, introspect them and handle them elegantly (namely,
 it will fail if the platform doesn't provide something your program
-needs, rather than do a garbage thing).
+needs, rather than do a garbage thing, as shell scripts do).
 
 [^2]: The language core will run in any POSIX-compliant shell, but you
   will probably need some utilities, like `echo`, that are not
@@ -24,7 +24,7 @@ needs, rather than do a garbage thing).
   actually build these in, and Wrapsher will be cognizant to this and
   friendly about it.
 
-## Design Centers: What problems does Wrapsher solve?
+## What problems does Wrapsher solve?
 
 _Or: You want to **run** a shell script, but you sure don't want to
 **write** one._
@@ -49,14 +49,16 @@ So why are shell scripts still so ubiquitous, and why are they used?
 
 Because shell has this killer advantage: **It is nearly ubiquitous**.
 
-If you want to write your "real" logic in Python, or Go, or some other
-programming language that is better than shell, then you need to deal
-with distribution, dependency management and installation concerns
-(for example, if using Python, the user needs to install Python and
-possibly many dependencies in order to run your program; if using Go,
-the executable may be relatively self-contained but you still need the
-user to worry about selecting the proper build for their architecture,
-and maybe platform).
+Let's say you want to write your "real" logic in Python, or Go, or
+some other programming language that is better than shell. If you do,
+you then you need to deal with distributing the program and its dependencies,
+as well as installation concerns. For example, if using Python, the user needs to
+install Python and possibly many dependencies in order to run your
+program. If using Go, the executable may be relatively self-contained--
+but you still need the user to worry about selecting the proper build
+for their architecture, and maybe platform. In fact, it's quite likely
+that the tool you use to handle these "bootstrapping" problems will
+be written in... shell.
 
 Here are some places where shell scripts still exist, in quantity,
 and are still being written:
@@ -78,8 +80,14 @@ There are solutions to all these "bootstrapping" problems, and you can
 imagine--with work, sometimes a lot of it, and sometimes on some other
 party's part--how some of them are addressable using no shell at
 all. But even image-based distribution still has to deal with these
-bootstrapping concerns. You can push this problem around, but it's a
+bootstrapping concerns.[^3] You can push this problem around, but it's a
 bit of a shell game--pun intended.
+
+[^3]: It can get tricky, because the descent-based or layered way that
+  container images get built--as a kind of whole system at once--is
+  not that friendly to installing a tool here and a tool there. Multistage
+  builds in Dockerfiles can get pretty complicated; and of course, are
+  mostly written in--you guessed it--shell.
 
 So, it's clear that (for many people, in many bootstrapping scenarios)
 you want to _run_ a shell script, but you still don't want to _write_
@@ -122,6 +130,15 @@ You can start by compiling the example "hello, world" program:
 wrapsher compile examples/hello.wsh
 ./examples/hello
 ```
+
+To hack on it, you can start by running the stdlib tests:
+
+```shell
+bundle install
+bundle exec rake test
+```
+
+wrapsher 
 
 ## Other Documents: How to read more?
 

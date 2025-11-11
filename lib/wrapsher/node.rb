@@ -26,6 +26,10 @@ module Wrapsher
         end
       end
 
+      def errors
+        @rvalue.errors
+      end
+
       def to_s
         [
           line,
@@ -88,6 +92,14 @@ module Wrapsher
         @else_body = Body.new(slice[:else], tables: tables) if slice[:else]
       end
 
+      def errors
+        [
+          @condition.errors,
+          @then_body.errors,
+          @else_body&.errors
+        ]
+      end
+
       def to_s
         code = []
         code << line
@@ -136,12 +148,14 @@ module Wrapsher
       end
 
       def errors
-        return ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
+        e = []
+        e << ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
         if @function_args.length == 0 && !tables.functions[@function_name].key?(:nullary)
-          return ["No nullary function '#{@function_name}()' at #{line}"]
+          e << ["No nullary function '#{@function_name}()' at #{line}"]
         end
         # We can't actually check for the right arity functions which accept an argument
         # because we don't (yet) know the type of the first argument.
+        e << @function_args.map(&:errors)
       end
 
       def function_dispatch
@@ -191,7 +205,15 @@ module Wrapsher
         tables.log("Found locals: #{@locals.inspect}; clearing (outside of context)")
         tables.clear_locals!
         tables.functions[@signature.name] ||= {}
+        if tables.functions[@signature.name][@signature.dispatch_type]
+          previous = tables.functions[@signature.name][@signature.dispatch_type]
+          raise Wrapsher::CompilationError, "redefinition of #{previous.summary} at #{@filename}:#{@line}"
+        end
         tables.functions[@signature.name][@signature.dispatch_type] = @signature
+      end
+
+      def errors
+        @body.errors
       end
 
       def cleanup_locals
@@ -308,6 +330,10 @@ module Wrapsher
         super
         slices = slice.is_a?(Array) ? slice : [slice]
         @nodes = slices.map { |sl| Node.from_obj(sl, tables: tables) }
+      end
+
+      def errors
+        @nodes.map(&:errors)
       end
 
       def to_s
@@ -439,6 +465,10 @@ module Wrapsher
         tables.locals = saved_locals
       end
 
+      def errors
+        @closure.errors
+      end
+
       def to_s
         # Unchecked cast to fun--will be uncast in call()
         [
@@ -502,6 +532,10 @@ module Wrapsher
         @line = slice[:keyword_return].line_and_column[0] if slice[:keyword_return].respond_to?(:line_and_column)
         @depth = 1 + (tables.state[:in_loop] || 0)
         @return_value = Node.from_obj(slice[:return_value], tables: tables)
+      end
+
+      def errors
+        @return_value.errors
       end
 
       def to_s
@@ -590,6 +624,10 @@ EOSTRING
         tables.globals[@name] = true
       end
 
+      def errors
+        return ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+      end
+
       def to_s
         code = []
         code << line
@@ -624,6 +662,13 @@ EOSTRING
         ] + [slice[:catch][:catch_body]].flatten
         @try_body = Body.new(@try_body_ast, tables: tables)
         @catch_body = Body.new(@catch_body_ast, tables: tables)
+      end
+
+      def errors
+        [
+          @try_body.errors,
+          @catch_body.errors
+        ]
       end
 
       def to_s
@@ -665,6 +710,11 @@ EOSTRING
         @line = slice[:name].line_and_column[0] if slice[:name].respond_to?(:line_and_column)
         @global_name = slice[:name].to_s
         @initial_value = Node.from_obj(slice[:value], tables: tables)
+        if tables.globals.key?(@global_name)
+          raise \
+            Wrapsher::CompilationError,
+            "Global name #{@name} conflicts with existing global name at #{@filename}:#{line}"
+        end
         tables.globals[@global_name] = true
       end
 
@@ -691,7 +741,9 @@ EOSTRING
       def include
         return if tables.included[@module_name]
 
-        WSH_INCLUDE_PATH.flat_map do |loc|
+        wsh_include_path = tables.options[:wsh_include_path] || WSH_INCLUDE_PATH
+
+        wsh_include_path.flat_map do |loc|
           module_filename = "#{loc}/#{@module_name}.wsh"
           if File.exist?(module_filename)
             tables.included[@module_name] = true
@@ -756,6 +808,13 @@ EOSTRING
         tables.state[:in_loop] += 1
         @loop_body = Body.new(slice[:loop_body], tables: tables)
         tables.state[:in_loop] -= 1
+      end
+
+      def errors
+        [
+          @condition.errors,
+          @loop_body.errors
+        ]
       end
 
       def to_s

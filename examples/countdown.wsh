@@ -1,0 +1,13 @@
+use module io
+
+int main(list args) {
+  if args.length() < 1 {
+    throw 'Syntax: countdown <number>'
+  }
+  seconds = args[0].to_int()
+  while seconds > 0 {
+    io.println(seconds.to_string())
+    seconds = seconds - 1
+  }
+  0
+}

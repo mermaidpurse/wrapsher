@@ -9,6 +9,9 @@ Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: single_quotes
 
+Style/StringConcatenation:
+  Enabled: false
+
 Layout/LineLength:
   Max: 132
 

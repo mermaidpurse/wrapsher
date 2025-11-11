@@ -20,6 +20,26 @@ bool test_bool_and() {
   true and true
 }
 
+bool test_to_int_valid() {
+  '10'.to_int() == 10
+}
+
+bool test_to_int_empty() {
+  try {
+    ''.to_int()
+  } catch e {
+    e.message().has('can\'t convert empty string')
+  }
+}
+
+bool test_to_int_invalid() {
+  try {
+    'one'.to_int()
+  } catch e {
+    e.message().has('can\'t convert \'one\'')
+  }
+}
+
 bool test_string_new() {
   string.new() == ''
 }
@@ -292,12 +312,6 @@ bool test_map_at() {
     'key2': 'value2'
   ]
   m['key1'] == 'value1'
-}
-
-bool test_map_set_simple() {
-  m = [:]
-  m.set('key1': 'value1')
-  m.length() == 1 and m.head() == 'key1': 'value1'
 }
 
 bool test_map_set_simple() {

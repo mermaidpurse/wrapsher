@@ -19,7 +19,8 @@ the `external` feature.
 
 ## Status
 
-Wrapsher is pre-alpha software, and not feature-complete.
+Wrapsher is pre-alpha software, and not feature-complete. Lots of things
+described in the README are aspirational.
 
 ## Getting Started -- The Basics
 
