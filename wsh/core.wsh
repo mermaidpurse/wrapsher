@@ -11,6 +11,207 @@ type reflist builtin
 type list reflist
 type pair reflist
 type map reflist
+type program_info list
+type command_info list
+type command_result list
+
+use global program ''
+use global externals ''
+
+bool init(module/core m) {
+  program = program_info.new()
+  location = ''
+  shell '''
+  _wsh_set_local location "string:${0}"
+  '''
+  program = program.set_location(location)
+
+  true
+}
+
+# command_result is an fstruct
+# 0 - exitcode
+# 1 - output (raw without trailing newline)
+command_result new(type/command_result t) {
+  list.new().push(0).push('')._as(command_result)
+}
+
+int exitcode(command_result cr) {
+  cr._as(list).at(0)
+}
+
+command_result set_exitcode(command_result cr, int exitcode) {
+  cr._as(list).set(0, exitcode)._as(command_result)
+}
+
+string output(command_result cr) {
+  cr._as(list).at(1)
+}
+
+command_result set_output(command_result cr, string output) {
+  cr._as(list).set(1, output)._as(command_result)
+}
+
+list lines(command_result cr) {
+  cr.output().split('
+')
+}
+
+bool is_success(command_result cr) {
+  cr.exitcode() == 0
+}
+
+string to_string(command_result cr) {
+  [
+    'exitcode': cr.exitcode(),
+    'output': cr.output()
+  ].to_string()
+}
+
+string quote(command_result cr) {
+  cr._as(list).quote()
+}
+
+# command_info is an fstruct
+# 0 - name
+# 1 - location
+# 2 - is_external
+# 3 - is_available
+command_info new(type/command_info t) {
+  ci = list.new().push('').push('').push(false).push(false)._as(command_info)
+}
+
+string to_string(command_info ci) {
+  [
+    'name': ci.name(),
+    'location': ci.location(),
+    'is_external': ci.is_external(),
+    'is_available': ci.is_available()
+  ].to_string()
+}
+
+string quote(command_info ci) {
+  ci._as(list).quote()
+}
+
+command_info get(type/command_info t, string command_name) {
+  ci = command_info.new()
+  ci = ci.set_name(command_name)
+  loc = ''
+  is_external = false
+  is_available = false
+  shell '''
+  _wsh_get_local command_name _wshi
+  _wshi="${_wshi#string:}"
+  _wshj="$(command -v "${_wshi}" 2>&1)"
+  _wshk="${?}"
+  case "${_wshk}" in 0)
+    _wsh_set_local is_available "bool:true"
+    case "${_wshj}" in alias*)
+      _wsh_set_local loc "string:${_wshi}"
+      _wsh_set_local is_external "bool:true" # assume aliases are external, which is actually a bad assumption
+    ;; "${_wshi}")
+      _wsh_set_local loc "string:${_wshj}"
+      _wsh_set_local is_external "bool:false"
+    ;; */*)
+      _wsh_set_local loc "string:${_wshj}"
+      _wsh_set_local is_external "bool:true"
+      # Assume the worst--the alternative is
+      # to (deeply) walk the alias chain
+      _wsh_set_local is_external "bool:true"
+    ;; *)
+      _wsh_error="error:internal error running 'command -v ${_wshi}'"
+      break
+    ;;
+    esac
+  ;; *)
+    _wsh_set_local is_available "bool:false"
+  ;;
+  esac
+  '''
+  ci = ci.set_location(loc)
+  ci = ci.set_is_external(is_external)
+  ci = ci.set_is_available(is_available)
+}
+
+command_result run(command_info ci, list args) {
+  if !ci.is_available() {
+    throw 'command \'' + ci.name() + '\' is not available'
+  }
+  if !args.all(bool fun (string s) { s.is_a(string) }) {
+    throw 'can\'t pass non-string arguments to system commands'
+  }
+  rl = args.as_reflist()
+  loc = ci.location()
+  exitcode = 0
+  output = ''
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local loc _wshj
+  _wshk=0
+  _wsh_command_line="_wsh_raw_result=\"\$(\"${_wshj#string:}\""
+  for _wshl in ${_wshi#reflist:}
+  do
+    _wsh_deref_into "${_wshl}" "_wsh_command_arg${_wshk}"
+    _wsh_command_line="${_wsh_command_line} \"\${_wsh_command_arg${_wshk}#string:}\""
+    : $((_wshk++))
+  done
+  _wsh_command_line="${_wsh_command_line})\""
+  eval "${_wsh_command_line}"
+  _wsh_set_local exitcode "int:$?"
+  _wsh_set_local output "string:${_wsh_raw_result}"
+  '''
+  cr = command_result.new()
+  cr = cr.set_exitcode(exitcode)
+  cr = cr.set_output(output)
+}
+
+string name(command_info ci) {
+  ci._as(list).at(0)
+}
+
+string location(command_info ci) {
+  ci._as(list).at(1)
+}
+
+bool is_external(command_info ci) {
+  ci._as(list).at(2)
+}
+
+bool is_available(command_info ci) {
+  ci._as(list).at(3)
+}
+
+command_info set_name(command_info ci, string name) {
+  ci._as(list).set(0, name)._as(command_info)
+}
+
+command_info set_location(command_info ci, string loc) {
+  ci._as(list).set(1, loc)._as(command_info)
+}
+
+command_info set_is_external(command_info ci, bool is_external) {
+  ci._as(list).set(2, is_external)._as(command_info)
+}
+
+command_info set_is_available(command_info ci, bool is_available) {
+  ci._as(list).set(3, is_available)._as(command_info)
+}
+
+
+# program_info is an fstruct
+# 0 - location
+program_info new(type/program_info pi) {
+  pi = list.new().push('')._as(program_info)
+}
+
+string location(program_info pi) {
+  pi._as(list).at(0)
+}
+
+program_info set_location(program_info pi, string loc) {
+  pi._as(list).set(0, loc)._as(program_info)
+}
 
 any _typeof(any i) {
   shell '''
@@ -525,6 +726,36 @@ bool has(string s, string c) {
   '''
 }
 
+bool has_prefix(string s, string c) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local c _wshj
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  case "${_wshi}" in "${_wshj}"*)
+    _wsh_result="bool:true"
+  ;; *)
+    _wsh_result="bool:false"
+  ;;
+  esac
+  '''
+}
+
+bool has_suffix(string s, string c) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local c _wshj
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  case "${_wshi}" in *"${_wshj}")
+    _wsh_result="bool:true"
+  ;; *)
+    _wsh_result="bool:false"
+  ;;
+  esac
+  '''
+}
+
 list split(string s, string c) {
   _split3(s, c, [])
 }
@@ -679,14 +910,16 @@ reflist set(reflist rl, int i, ref r) {
   _wsh_get_local r _wshk
   _wshl=0
   _wshm=''
+  _wshj="${_wshj#int:}"
   for _wshn in ${_wshi#reflist:}
   do
-    case $((_wshl == "${_wshj#int:}")) in 1)
+    case $((_wshl == _wshj)) in 1)
       _wshm="${_wshm}${_wshm:+ }${_wshk}"
     ;; *)
       _wshm="${_wshm}${_wshm:+ }${_wshn}"
     ;;
     esac
+    : $((_wshl++))
   done
   _wsh_result="reflist:${_wshm}"
   '''
@@ -798,6 +1031,10 @@ int length(list l) {
   l.as_reflist().length()
 }
 
+list set(list l, int i, any v) {
+  l.as_reflist().set(i, v.ref()).as_list()
+}
+
 bool eq(list l, list o) {
   if l.length() == 0 and o.length() == 0 {
     true
@@ -805,7 +1042,7 @@ bool eq(list l, list o) {
     if l.length() != o.length() {
       false
     } else {
-      l.tail().eq(o.tail())
+      l.head() == o.head() and l.tail().eq(o.tail())
     }
   }
 }

@@ -32,7 +32,6 @@
 - Implement module init(), cohere with **test** module (probably
   where externals checks happen).
 - Implement externals/system() or similar (env is a slight prototype)
-- Reimplement test framework with real expectation types.
 - Github actions for testing (strong preference to write these
   in wrapsher)
 - Implement docs

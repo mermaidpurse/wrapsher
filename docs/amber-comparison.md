@@ -19,7 +19,7 @@ and so indicated.
 | User-defined types | no | yes | Wrapsher allows you to define arbitrarily complex types |
 | Loops | inifinite loop, for loop | while loop, for[^2] loop | Iterates over any collection |
 | Error handling | ignore or manually checked | throw/try/catch | |
-| External commands | inlined text substitution | declared dependencies[^2] | Wrapsher is designed to fail early when prerequisites aren't met |
+| External commands | inlined text substitution | declared dependencies | Wrapsher is designed to fail early when prerequisites aren't met |
 | Code sharing | `import` functions from files | `use module`s | Wrapsher modules are intended to be a full module system[^1] |
 | Tests | manually-written | **test** module | |
 | Runtime | bash | any POSIX sh | |
@@ -44,8 +44,5 @@ issues.
 
 [^1]: Although Wrapsher doesn't have module namespaces _per se_, module types and the module
   global value serve as a namespace for most module use cases; in addition to the types
-  declared in the module. This allows `io.println`, `file.println` and `myfd.println`
-  to coexist and refer to different functions. Amber prepends a pseudo-namespace to certain
-  standard libary functions, e.g. `array_contains`, `char_at`, etc.
-
-[^2]: Pending!
+  declared in the module. This allows `io.println()`, `file.println()` and `myfd.println()`
+  to coexist and refer to different functions.

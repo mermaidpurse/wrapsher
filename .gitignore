@@ -6,6 +6,7 @@
 /pkg/
 /spec/reports/
 /tmp/
+/book/
 
 # rspec failure tracking
 .rspec_status

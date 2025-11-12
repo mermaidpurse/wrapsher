@@ -3,6 +3,10 @@ meta doc 'tests for core module'
 use module io
 use module test
 
+bool test_script_name() {
+  program.location().has('core_test')
+}
+
 bool test_is_a() {
   false.is_a(bool)
 }
@@ -135,6 +139,18 @@ bool test_string_trim() {
   '"one"'.trim('"') == 'one'
 }
 
+bool test_string_has_prefix_all() {
+  'one'.has_prefix('one')
+}
+
+bool test_string_has_prefix_some() {
+  'one two'.has_prefix('one')
+}
+
+bool test_string_has_prefix_none() {
+  not 'one two'.has_prefix('foo')
+}
+
 bool test_string_replace_long() {
   g = 'one\\"two'.replace('\\"', '"')
   g == 'one"two'
@@ -225,9 +241,21 @@ bool test_list_eq_same() {
   ['one', 'two', 'three'] == ['one', 'two', 'three']
 }
 
-bool test_list_eq_different() {
+bool test_list_eq_different_length() {
   ['one', 'two', 'three'] != ['one', 'two']
 }
+
+bool test_list_set() {
+  l = ['one', 'two', 'three']
+  l = l.set(1, 'TWO')
+  l == ['one', 'TWO', 'three']
+}
+
+bool test_list_eq_different() {
+  cmp = ['one', 'two', 'three'] == ['one', 'TWO', 'three']
+  !cmp
+}
+
 
 bool test_list_tail() {
   l = _make_list()
@@ -433,4 +461,36 @@ bool test_assert() {
   } catch e {
     e.message().has('Expected type \'string\', got \'int\'')
   }
+}
+
+bool test_command_info_nonexistent() {
+  i = command_info.get('foobanza')
+  i.name() == 'foobanza' and !i.is_available()
+}
+
+bool test_command_info_builtin() {
+  i = command_info.get('type')
+  i.location() == 'type' and !i.is_external() and i.is_available()
+}
+
+bool test_command_info_external() {
+  i = command_info.get('ruby')
+  i.location().has('/ruby') and i.is_external() and i.is_available()
+}
+
+bool test_command_result() {
+  cr = command_result.new()
+  cr.exitcode() == 0 and cr.output() == ''
+}
+
+bool test_command_run_builtin() {
+  c = command_info.get('type')
+  result = c.run(['type'])
+  result.output() == 'type is a shell builtin' and result.is_success()
+}
+
+bool test_command_run_lines() {
+  c = command_info.get('export')
+  result = c.run(['-p'])
+  result.lines().all(bool fun (string s) { s.has_prefix('export') })
 }

@@ -553,6 +553,58 @@ factor = 10
 [10, 15, 20, 25, 30].select(bool fun (int i) { i % factor == 0 }) == [10, 20, 30]
 ```
 
+### Fstructs
+
+Wrapsher has no first-class structs (yet). When it does, they will
+be compatible with manually-managed **fstructs**, a nickname for
+"faux structs" that are manually created and based on lists or
+some other type. Maps are pretty inefficient (actually they're all
+quite inefficient for the moment) so lists are a better choice.
+
+For example, if you have a `person` structure with two fields,
+you might implement it like this:
+
+```
+type person list
+
+# person is a fstruct
+# 0 - name
+# 1 - age
+person new(type/person t) {
+  p = list.new().as_person()
+  p = p.set_name('')
+  p = p.set_age(0)
+}
+
+person as_person(list l) {
+  l._as(person)
+}
+
+list as_list(person p) {
+  p._as(list)
+}
+
+string name(person p) {
+  p.as_list().at(0)
+}
+
+person set_name(person p, string name) {
+  p.as_list().set(0, name).as_person()
+}
+
+int age(person p) {
+  p._as_list().at(1)
+}
+
+person set_age(person p, int age) {
+  p.as_list().set(1, age).as_person()
+}
+```
+
+Of course, this is quite tedious--future versions of Wrapsher
+will generate these getters and setters and/or allow some kind of
+first-class struct support or syntactic sugar for them.
+
 ### Variables
 
 Wrapsher has no separate variable declaration syntax, and variables

@@ -204,10 +204,15 @@ general funs?
 
 ## "First class" structs?
 
-You can manually implement your own struct, but this seems to be such
-a common case that maybe something like `type foo struct [id: uuid, name: string]`
-should be accepted (or maybe it's actually the zero value, and therefore also defines
-the types: `type foo struct [id: uuid.new(), name: '']` and it will generate stuff like:
+The convention right now are fstructs, which are manual struct-likes
+("false structs", "faux structs", "function structs") manually
+implemented from a reflist.
+
+But this seems to be such a common case that maybe something like
+`type foo struct [id: uuid, name: string]` should be accepted (or
+maybe it's actually the zero value, and therefore also defines the
+types: `type foo struct [id: uuid.new(), name: '']` and it will
+generate stuff like:
 
 ```
 foo new(type/foo t) {
@@ -238,9 +243,10 @@ foo set_name(foo i, string s) {
 
 Right now, the top-level kind of doesn't have expressions, or it does
 in certain contexts but the VM implementation based on `return`
-doesn't really work, in particular for list or map constants. For
-eval, a REPL, and certain things like above where you want initial
-global values to have collection values, that doesn't really work.
+doesn't really work (actually, this no longer applies), in particular
+for list or map constants. For eval, a REPL, and certain things like
+above where you want initial global values to have collection values,
+that doesn't really work.
 
 It would be overall cleaner if the current "statements" like `use ...`
 were expressions too.
@@ -285,10 +291,10 @@ syntax clunky.
 
 ## Pairs for in-band errors
 
-Basically we only have errors and they're not checked (at least not
-now): there's no requirement to declare the errors you might throw
-nor opportunity to see if you're doing something with them. They're
-true error conditions--no valid value could be produced.
+Basically we only have unstructured errors and they're not checked (at
+least not now): there's no requirement to declare the errors you might
+throw nor opportunity to see if you're doing something with
+them. They're true error conditions--no valid value could be produced.
 
 Wrapsher's design is that nullity and invalid values are impossible:
 you can have an error but not a wrong answer. However, what about
@@ -323,7 +329,7 @@ and it's not in your collection.
       that is, functions with a module-type receiver but for a module other
       than the current one.
     - Override probably a pragma like `use ...`
-    - `use feature` in a module
+    - `use feature` in a module (prohibit)
 
 What about module namespaces? Maybe this is very simple and we can
 just do `other/io`. So you do:

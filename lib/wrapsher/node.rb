@@ -747,6 +747,7 @@ EOSTRING
           module_filename = "#{loc}/#{@module_name}.wsh"
           if File.exist?(module_filename)
             tables.included[@module_name] = true
+            tables.modules += [@module_name]
             saved_filename = tables.filename # TODO: yuck
             tables.filename = module_filename
             module_ast = Wrapsher::Parser.new.parse(module_filename)

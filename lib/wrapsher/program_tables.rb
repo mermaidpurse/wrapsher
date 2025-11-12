@@ -4,7 +4,7 @@ module Wrapsher
   # Global compiler information for a program
   class ProgramTables
     attr_accessor :filename, :functions, :globals, :external, :included, :compiler_refid, :adds,
-                  :options, :context, :locals, :state
+                  :options, :context, :locals, :state, :modules
 
     def initialize(
       filename: '-',
@@ -15,7 +15,8 @@ module Wrapsher
       compiler_refid: 1000,
       adds: [],
       logger: Logger.new($stderr),
-      options: {}
+      options: {},
+      modules: []
     )
       @filename = filename
       @functions = functions
@@ -29,6 +30,7 @@ module Wrapsher
       @state = {}
       @logger = logger
       @options = options
+      @modules = modules
       @logger.debug("ProgramTables initialized with logger level: #{@logger.level}, filename: #{@filename}, refid: #{@compiler_refid}")
     end
 
@@ -92,12 +94,14 @@ module Wrapsher
             {
               assignment: {
                 var: '_functions',
-                rvalue: functions.keys.uniq.reduce({
+                rvalue: functions.keys.uniq.reduce(
+                  {
                     fun_call: {
                       name: 'new',
-                      fun_args: [ {var_ref: 'list'} ]
+                      fun_args: [{ var_ref: 'list' }]
                     }
-                  }) do |acc, fn_name|
+                  }
+                ) do |acc, fn_name|
                   {
                     fun_call: {
                       name: 'push',
@@ -107,13 +111,27 @@ module Wrapsher
                 end
               }
             },
+            module_init_calls,
             { bool_term: 'true' }
-          ],
+          ].flatten
         },
         tables: self
       )
-      nodes += self.adds
+      nodes += adds
       nodes
+    end
+
+    def module_init_calls
+      modules.map do |module_name|
+        next unless functions['init']["module/#{module_name}"]
+
+        {
+          fun_call: {
+            name: 'init',
+            fun_args: [{ var_ref: module_name }]
+          }
+        }
+      end.compact
     end
 
     def to_s
