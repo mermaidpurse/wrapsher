@@ -1,5 +1,15 @@
 module core
 
+meta doc '''
+Wrapsher language core
+
+## Usage
+
+This module is implicitly `use`-ed in every Wrapsher program; there is
+no need to `use module core`. It contains functions that operate on all
+the core language types and provides several other utilities and types.
+'''
+
 type error builtin
 type fun builtin
 type type builtin
@@ -25,6 +35,10 @@ bool init(module/core m) {
   _wsh_set_local location "string:${0}"
   '''
   program = program.set_location(location)
+
+  externals = _externals.map(command_info fun (string n) {
+      command_info.need(n)
+    })
 
   true
 }
@@ -134,9 +148,23 @@ command_info get(type/command_info t, string command_name) {
   ci = ci.set_is_available(is_available)
 }
 
+command_info need(type/command_info t, string command_name) {
+  ci = command_info.get(command_name)
+  if !ci.is_available() {
+    throw 'required command \'' + command_name + '\' is unavailable'
+  }
+  if ci.is_external() and !_feature_external {
+    throw 'required command \'' + command_name + '\' is external but \'use feature external\' is not in effect'
+  }
+  ci
+}
+
 command_result run(command_info ci, list args) {
   if !ci.is_available() {
     throw 'command \'' + ci.name() + '\' is not available'
+  }
+  if ci.is_external() and !_feature_external {
+    throw 'command \'' + ci.name() + '\' is external but \'use feature external\' is not in effect'
   }
   if !args.all(bool fun (string s) { s.is_a(string) }) {
     throw 'can\'t pass non-string arguments to system commands'
@@ -925,24 +953,6 @@ reflist set(reflist rl, int i, ref r) {
   '''
 }
 
-reflist map(reflist rl, fun f) {
-  shell '''
-  _wsh_get_local rl _wshi
-  _wsh_get_local f _wshj
-  _wshv=
-  for _wshk in ${_wshi#reflist:}
-  do
-    _wsh_set_local i "${_wshk}"
-  '''
-    r = f.call().with(i)
-  shell '''
-    _wsh_get_local r _wshr
-    _wshv="${_wshv:-reflist:}${_wshv:+ }${_wshr}"
-  done
-  _wsh_result="${_wshv}"
-  '''
-}
-
 reflist minus(reflist rl, reflist o) {
   if o.length() > 0 {
     rl.delete(o.head()).minus(o.tail())
@@ -1048,10 +1058,7 @@ bool eq(list l, list o) {
 }
 
 list map(list l, fun f) {
-  rf = ref fun(ref r) {
-    f.call().with(r.deref()).ref()
-  }
-  l.as_reflist().map(rf).as_list()
+  _map2(l, f, [])
 }
 
 list _map2(list l, fun f, list acc) {
@@ -1079,7 +1086,8 @@ string _list3(list l, string c, string acc) {
 }
 
 string to_string(list l) {
-  '['.plus(l.map(string fun (any i) { i.to_string() }).join(', ')).plus(']')
+  inner = l.map(string fun (any i) { i.to_string() }).join(', ')
+  '['+ inner + ']'
 }
 
 string quote(list l) {

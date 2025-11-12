@@ -492,15 +492,8 @@ module Wrapsher
         end
       end
 
-      # TODO: Probably shouldn't include documentation for included modules
       def to_s
-        code = []
-        if @doc
-          code << ": <<'WSH_DOCUMENTATION'"
-          code << @doc.to_s
-          code << 'WSH_DOCUMENTATION'
-        end
-        code.join("\n")
+        []
       end
     end
 
@@ -514,6 +507,7 @@ module Wrapsher
             "Module global name #{@name} conflicts with existing global variable at #{@filename}:#{line}"
         end
 
+        tables.in_module = @name
         tables.globals[@name] = true
       end
 
@@ -696,11 +690,30 @@ EOSTRING
       end
 
       def to_s
-        [
-          "# use external command #{@external_command}",
-          line,
-          "# _wsh_check_external '#{@external_command}' || return 1"
-        ].join("\n")
+        []
+      end
+    end
+
+    class UseFeature < Node
+      FEATURES = [
+        'external'
+      ].freeze
+
+      def initialize(slice, tables:)
+        super
+        @feature_name = slice.to_s
+        @line = slice.line_and_column[0] if slice.respond_to?(:line_and_column)
+        if tables.in_module
+          raise \
+            Wrapsher::CompilationError,
+            "Can't use features in modules (module #{tables.in_module}) at #{@filename}:#{@line}"
+        end
+        tables.feature[@feature_name] = true
+        @line = slice.line_and_column[0]
+      end
+
+      def to_s
+        []
       end
     end
 
@@ -713,7 +726,7 @@ EOSTRING
         if tables.globals.key?(@global_name)
           raise \
             Wrapsher::CompilationError,
-            "Global name #{@name} conflicts with existing global name at #{@filename}:#{line}"
+            "Global name #{@global_name} conflicts with existing global name at #{@filename}:#{line}"
         end
         tables.globals[@global_name] = true
       end
@@ -756,6 +769,7 @@ EOSTRING
               Node.from_obj(obj, tables: tables)
             end
             tables.filename = saved_filename
+            tables.in_module = nil
             return compiled_nodes
           end
         end
@@ -871,6 +885,7 @@ EOSTRING
       try_block: TryBlock,
       type: Type,
       use_external: UseExternal,
+      use_feature: UseFeature,
       use_global: UseGlobal,
       use_module: UseModule,
       var_ref: VarRef,

@@ -130,3 +130,21 @@ heavy of `_as` to get at the storage type, manipulate it, then return
 the result rewrapped as your type. If you intend users of your type to
 be able to convert it to and from other types, you should add
 <code>as_<i>type</i></code> functions as needed.
+
+## `init()`
+
+You can define a unary `init()` function that operates on your module type, like so:
+
+<pre><code>
+module mymodule
+
+bool init(module/<i>mymodule</i> m) {
+  ...
+}
+</pre></code>
+
+This function will run when at the beginning of program execution. You
+would use this to initialize globals that can't have a hardcoded
+value, or that have a collection value.
+
+The **core** module uses this function to check external command dependencies.

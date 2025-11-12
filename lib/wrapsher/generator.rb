@@ -50,6 +50,7 @@ module Wrapsher
         Wrapsher::Node.from_obj(obj, tables: tables)
       end
 
+      nodes = tables.to_nodes + nodes if @type == :program
       errors = nodes.map(&:errors).flatten.compact
       if errors.any?
         @logger.error 'Compilation errors:'
@@ -59,7 +60,6 @@ module Wrapsher
         raise Wrapsher::CompilationError, "Compilation failed with #{errors.size} errors"
       end
 
-      nodes = tables.to_nodes + nodes if @type == :program
 
       lines = []
       lines << (tables.options[:profile] ? profile_shebang(tables.options[:profile]) : shebang)

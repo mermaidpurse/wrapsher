@@ -229,6 +229,14 @@ bool test_list_to_string() {
   ['one', 'two'].to_string() == '[one, two]'
 }
 
+bool test_list_to_string_deep() {
+  l = [
+    ['one', 'two'],
+    ['first', 'second']
+  ]
+  l.to_string() == '[[one, two], [first, second]]'
+}
+
 bool test_list_quote() {
   ['one', 'two', 'three'].quote() == '[\'one\', \'two\', \'three\']'
 }

@@ -1,8 +1,6 @@
 module test
 
 meta doc '''
-# test
-
 Wrapsher test framework
 
 ## Usage
@@ -19,9 +17,8 @@ Any functions in your program that begin with `test_` will
 be run. They are expected to be of type **bool** and return
 `true` on success and `false` on failure.
 
-**UNIMPLEMENTED:** In the future, instead of nullary functions
-**returning bool**, you will accept a **case** argument and return an
-****expectation**.
+This test module is simple and no diagnostics about the failing
+test assertion are provided.
 
 '''
 

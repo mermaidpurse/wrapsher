@@ -2,6 +2,10 @@
 
 ## Issues
 
+- Multiline function calls, or maybe multiline function calls with
+  funs, don't seem to work, like `map(\n...fun...\n)`, maybe
+  other multiline calls. It works when you break on the `{` and
+  `}` for the function call.
 - Global variables should be protectable, which probably means some
   kind of file scoping or override assignment so that module settings
   can work (in other words, you should be able to assign a global
@@ -29,9 +33,6 @@
 
 - Syntax highlighting, editor mode
   - Emacs mode: second } doesn't indent right (it's indented one level too far)
-- Implement module init(), cohere with **test** module (probably
-  where externals checks happen).
-- Implement externals/system() or similar (env is a slight prototype)
 - Github actions for testing (strong preference to write these
   in wrapsher)
 - Implement docs

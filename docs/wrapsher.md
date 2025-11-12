@@ -82,12 +82,11 @@ Top-level statements in Wrapsher can be:
       (e.g., `printf`, usually), it doesn't trigger an `external`
       requirement. If it's not builtin, it does; and the program will
       need to `use feature external` to allow this constraint.
-      **UNIMPLEMENTED**
-    - <code>use feature _feature_</code>: indicate that the program requires
-      the named feature. For example, a program isn't allowed to shell
-      out to an external dependency without enabling the `external`
-      feature, to indicate the program might need to shell out.
-      **UNIMPLEMENTED**
+    - <code>use feature _feature_</code>: indicate that the program
+      uses or permits the named feature. For example, a program isn't
+      allowed to shell out to an external dependency without enabling
+      the `external` feature, to indicate the program might need to
+      shell out.
     - <code>use module _module_</code>: During compilation, find and
       load the named module in the module search location(s). Note
       that the **core** module is always implicitly included.
@@ -95,14 +94,14 @@ Top-level statements in Wrapsher can be:
       a new global variable named _variable_ with the specified
       _initial\_value_. The value can be a scalar literal, but not
       a collection.
-- A `meta` statement providing metadata (**UNIMPLEMENTED**):
+- A `meta` statement providing metadata:
     - `meta version`: the module or program version
     - `meta source`: the source URL
     - `meta author`: the author
     - `meta docs`: help documentation for the module or program.
       top-level (not in a `module`), this is used as help text in
       the standard option processing. See [Documentation Style](style.md)
-      for more.
+      for more. **UNIMPLEMENTED**
 - A `module` statement which defines the program as a loadable module,
   which can be loaded in other programs with a `use` statement, as well
   as the function namespace. See [Modules and Types](./modules-types.md)
@@ -728,8 +727,6 @@ Consult the module documentation for usage information.
 
 ### External Dependencies
 
-**UNIMPLEMENTED**
-
 Remember that Wrapsher's primary use case is being able to run your
 program _without configuration or bootstrapping_ on any system with
 a POSIX `sh`. But it's also true that to do anything useful--especially
@@ -737,9 +734,9 @@ in the configuration management or bootstrapping arena--you must,
 by necessity do things that are platform-specific.
 
 Wrapsher allows you to declare a specific dependency on external
-commands (including frequently-used ones like `sed` and `awk`) so
-that the users of a program can decide if it's acceptable or not,
-depending on the platform. You do this with the `use external` statement.
+commands (including frequently-used ones like `sed` and `awk`) so that
+the users of a program can decide if it's acceptable or not, depending
+on the platform. You do this with the `use external` statement.
 
 When encountering <code>use external _command_</code>, Wrapsher determines:
 - If the command is present; if not, it throws an error (which is fatal)
@@ -750,7 +747,8 @@ Program authors can declare whether external commands are acceptable to their
 program by the `use feature external` statement. If this statement is
 present, then external commands are allowed. If not, then it is not allowed,
 and if a `use external` command is discovered that is not built-in,
-a fatal error is produced.
+a fatal error is produced. The `use feature` statement is only valid
+in programs, not modules.
 
 ### Standard Library
 
@@ -766,3 +764,4 @@ The folllowing modules comprise the standard library:
 | [**optparse**](./wsh/optparse.wsh) | Parse command-line options | **UNIMPLEMENTED** |
 | [**crypto**](./wsh/crypto.wsh) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |
 | [**http**](./wsh/http.wsh) | HTTP communication based on `curl` | **UNIMPLEMENTED** |
+| [**json**](./wsh/json.wsh) | JSON handling based on `jq` | **UNIMPLEMENTED** |
