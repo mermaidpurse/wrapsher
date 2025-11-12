@@ -17,7 +17,7 @@ and so indicated.
 | Scalar types | Text, Num, Bool, Null | string, int, bool | |
 | Collection types | Array (1-dimension) | list, map, pair (arbitrarily nested) | |
 | User-defined types | no | yes | Wrapsher allows you to define arbitrarily complex types |
-| Loops | inifinite loop, for loop | while loop, for[^2] loop | Iterates over any collection |
+| Loops | infinite loop, for loop | while loop, `.map()` etc. | Iterates over any collection |
 | Error handling | ignore or manually checked | throw/try/catch | |
 | External commands | inlined text substitution | declared dependencies | Wrapsher is designed to fail early when prerequisites aren't met |
 | Code sharing | `import` functions from files | `use module`s | Wrapsher modules are intended to be a full module system[^1] |
@@ -27,20 +27,22 @@ and so indicated.
 | Influence | ECMAScript, bash | C, Python, Lisp | |
 | Implementation language | Rust | Ruby | |
 | REPL | no | no | |
-| IDE Tools | no | Emacs mode, LSP[^2] | |
+| IDE Tools | no | Emacs mode | |
 
-Wrapsher's intention is to allow you to build "somewhat large" programs and systems, and
-to provide the tools (like complex types, error handling, etc.) to get you there safely. It's
-also designed to work in "hostile" environments where you're bootstrapping a system, such
-as installers and system initializers, and so its intention is to minimize dependency on
-specific runtimes like `bash`, and allow you to do the safest thing (and fail immediately)
-when critical external dependencies (like `curl` for http) are unavailable, rather than
-failing somewhere down the line in executing the program, when the program encounters the
-`curl` call.
+Wrapsher's intention is to allow you to build "somewhat large"
+programs and systems, and to provide the tools (like complex types,
+error handling, etc.) to get you there safely. It's also designed to
+work in "hostile" environments where you're bootstrapping a system,
+such as installers and system initializers, and so its intention is to
+minimize dependency on specific runtimes like `bash`, and allow you to
+do the safest thing (and fail immediately) when critical external
+dependencies (like `curl` for http) are unavailable, rather than
+failing somewhere down the line in executing the program, when the
+program encounters the `curl` call.
 
-On the other hand (as of this writing) Amber's parser implementation is clean, robust and
-well-implemented, whereas Wrapsher is extremely pre-alpha and full of edge cases and parsing
-issues.
+As of this writing, Amber's parser implementation is clean, robust and
+well-implemented, whereas Wrapsher is extremely pre-alpha and full of
+edge cases and parsing issues.
 
 [^1]: Although Wrapsher doesn't have module namespaces _per se_, module types and the module
   global value serve as a namespace for most module use cases; in addition to the types

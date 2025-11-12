@@ -44,9 +44,9 @@ as manipulations of the underlying storage type, relying on `_as` to
 unwrap the type to expose the underlying methods.
 
 [^1]: They can also choose **builtin**, but since the compiler doesn't
-know about the type, they'll need to write all the raw shell code
-necessary for accessing the value, so it's usually easier to base a
-type on an existing builtin).
+  know about the type, they'll need to write all the raw shell code
+  necessary for accessing the value, so it's usually easier to base a
+  type on an existing builtin).
 
 The `any _as(any i, any as)` function allows a value to be
 wrapped--that is, cast from its type to another type that uses its
@@ -60,32 +60,32 @@ the value.
 Collections (such as lists and pairs) are implemented with underlying
 data types **ref** and **reflist**. The **list** functions create
 references when items are pushed onto the list, and push the reference
-into the "inner" **reflist**; then dereference the items that are
+into the "inner" **reflist**; then dereference the items when
 accessed from the list.
 
 Internally, i.e., to the shell, a **reflist** is simply a
 space-separated list of references:
 
-```
+```wrapsher
 reflist:ref:1000 ref:1020 ref:2022:1012
 ```
 
 It's not typical to handle references directly in Wrapsher, but the
 mechanism is necessary for collections so that they can be
-represented as shell strings and can be complex (lists of lists).
+represented as shell strings and can be complex (lists including
+lists, maps, pairs, etc.)
 
 Since Wrapsher has references, this can lead to garbage. Wrapsher's
 approach is to use a "borrow" approach where each frame is responsible
 for cleaning up any references which are created in its scope and
 which are _not_ passed outside of the frame. It does this by keeping a
-reference list in the magic local variable `_reflist` (it's a Wrapsher
-variable), which is added to by the `ref ref(any i)` function whenever
-a reference is created, and is automatically added to by the VM when a
-result value from a function call contains references.
+reference list in a magic local variable `_reflist` (it's a real Wrapsher
+variable), which is added to by the `_wsh_makeref_into` shell function whenever
+a reference is created.
 
 When a reference is taken to something that can itself contain
 references (i.e. a value whose type has a storage type of `ref` or
-`reflist`), the underlying references are included in the reference
+`reflist`), the underlying reference Ids are included in the reference
 itself. So when the scanner scans the references being passed out of
 the frame, it doesn't need to deeply dereference the references--every
 reference carries its underlying references with it.
@@ -93,12 +93,13 @@ reference carries its underlying references with it.
 ## Function Calls
 
 When a function call occurs:
-- The function arguments are pushed onto the stack (<code>_wsh_stack<i>_wsh_stackp</i></code>)
-  in reverse order
-- `_wsh_dispatch` is called with an arity based on the syntax of the
-  function call. It peeks at the top argument to decide what function
-  to dispatch to: either <code>_wshf_function_name_<i>type</i></code>
-  or `_wshf_function_name_any`, using
+- The function arguments are pushed onto the stack
+  (<code>_wsh_stack<i>_wsh_stackp</i></code>) in reverse order
+- The `_wsh_dispatch` shell function is called with an arity based on
+  the syntax of the function call. It peeks at the top argument to
+  decide what function to dispatch to: either
+  <code>_wshf_function_name_<i>type</i></code> or
+  `_wshf_function_name_any`, using
   <code>_wshp_function_name_<i>type</i></code> and
   `_wshp_function_name_any` as signal variables (the compiler creates
   these functions from Wrapsher functions).
@@ -107,14 +108,15 @@ When a function call occurs:
   and list of variable names
 - Inside the function (generated code), the arguments are popped off
   the stack one by one and assigned to local variables
-- Processing occurs
-- Each expression sets `_wsh_result`, which forms the return value of the
-  function
+- Processing occurs according to generated code
+- Each expression sets `_wsh_result`, the last result of which forms
+  the return value of the function
 - Before returning, `_wsh_result` is examined for refs which are
   added to a temporary protected list.
-- Any references which were created were added to the local `_reflist`
-  Wrapsher variable. Any unprotected references are destroyed.
-- Each local variable is then `unset`
+- Any references which were created were added to the (parent frame's)
+  local `_reflist` Wrapsher variable. Any unprotected references are
+  destroyed.
+- Each local variable's underlying shell variable is then `unset`
 
 Most expressions in Wrapsher are syntactic sugar for function calls;
 internally, you can say Wrapsher uses a functional style or even that
@@ -143,7 +145,7 @@ on the single-use type.
 
 ## Errors
 
-The `_wsh_error` is the standard variables to use to set an error
+The `_wsh_error` is the standard variable to use to set an error
 condition. At each call level (i.e., when `_wsh_dispatch` is called),
 the variable is examined and the error is propagated if this variable
 is not empty.
@@ -153,7 +155,8 @@ loop that can be `break`-ed when a function call sets `_wsh_error`.
 When this happens, context information is added to the error (a new
 line of call context information). The function body which called
 the function which threw the error now `break`s its own governing
-`while` loop, and so on.
+`while` loop, and so on, which is how the call stack is added
+to errors.
 
 Try blocks are implemented as `while` loops of their own, so that
 errors can be caught.
@@ -177,12 +180,12 @@ by convention are named <code>_wsh_<i>something</i>_into</code>.
 
 Wrapsher convention is to use `_wshi`, `_wshj` as temporary variables
 whose value you use right after setting it. It's a goal not to proliferate
-shell variables overmuch.
+shell variables overmuch, so you can imagine these a little like registers.
 
 ### <code>_wsh_get_local <i>wrapsher_varname</i> <i>shell_variable</i></code>
 
-This function retrieves a local variable into the shell varable that you
-provide.
+This function retrieves a local variable into the shell varable whose name
+you provide.
 
 ### <code>_wsh_set_local <i>wrapsher_varname</i> <i>value</i></code>
 
@@ -195,3 +198,13 @@ cleanup list and sets a variable whose value can be retrieved with
 These operate similarly to their local equivalents. Note that in general,
 Wrapsher compiled code does not need `_wsh_set_global` since the compiler
 arranges to call the direct assignment operation.
+
+### <code>_wsh_makeref_into <i>value</i> <i>shell\_varname</i></code>
+
+This creates a reference to the value and provides the resulting
+`ref` value in the named variable.
+
+### <code>_wsh_deref_into <i>ref\_value</i> <i>shell\_varname</i></code>
+
+This dereferences the value and provides the value in the
+named variable.

@@ -1,9 +1,7 @@
 # Documentation Style
 
-**TODO:** Unimplemented
-
 Wrapsher is opinionated about documentation--programs and
-modules are expected to be documented using the `meta docs`
+modules are expected to be documented using the `meta doc`
 metadata statement.
 
 Documentation in source code is written in Markdown. Accompanying
@@ -12,15 +10,21 @@ the following conventions:
 
 - The documentation should readable as plain text--minimize
   the use of HTML.
-- Most literal code should be set off in code blocks using
+- Most literal code mentioned inline should be set off in code strings using
   backticks (<code>``</code>). When using a metasyntax
   reference (for example, when the name of a variable is
   up to the user and you want to give an example of using
   that variable as an argument to the `io.printf` function,
   typeset the metasyntactic reference in italics: for example,
-  <code>io.printf(_format_, _variable_)</code>. In Markdown,
-  this means using `&lt;code>` or `&lt;pre>` instead of normal
-  Markdown syntax.
+  <code>io.printf(_format_, _variable_)</code>.
+- When showing examples of literal code, use fenced code blocks
+  separated by triple-backticks and marke the example
+  as Wrapsher code: <code>```wrapsher</code>. Typesetting in
+  italics for metasyntactic references is not supported (code
+  blocks should contain runnable code) so instead, choose identifiers
+  and literals so that it's obvious to the reader they must
+  substitute their own value, generally using the words "my cool"
+  or the equivalent, like `my_cool_something` or `"My Cool User"`.
 - When making reference to the following in prose (not literal
   code examples):
     - Typeset module and type names in **bold**, e.g., "the **io**
@@ -43,5 +47,5 @@ the user or caller should choose its value or in what circumstance
 they will use it.
 
 Module documentation should be written to inform the programmer who is
-using and loading the module. Commands should be written to inform the
-user who is running the command to accomplish a task.
+using and loading the module. Program documentation should be written
+to inform the user who is running the command to accomplish a task.

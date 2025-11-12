@@ -49,7 +49,7 @@ The function signature defines the type that the function accepts as
 the first argument. Consider the following function signature of
 a "module function":
 
-```
+```wrapsher
 int println(module/io m, string s) {
 ```
 
@@ -67,7 +67,7 @@ When you do `type vector list`, a global variable `vector`
 is created of type `type/vector`, enabling you to write
 `vector.new()` or (equivalently) `new(vector)`.
 
-See [modules-types.md](./modules-types.md) for more discussion of how
+See [Modules and Types](./modules-types.md) for more discussion of how
 types work.
 
 If there is no function implemented against the type, then Wrapsher
@@ -78,45 +78,48 @@ an error.
 ## Conversions, casts and `quote()`
 
 The convention in Wrapsher is that types can be converted to each
-other using both <code>as_<i>type</i>()</code> and
-<code>to_<i>type</i>()</code> functions. When present (they need not
+other using both <code>as\_<i>type</i>()</code> and
+<code>to\_<i>type</i>()</code> functions. When present (they need not
 be), they serve slightly different purposes:
 
-The <code>as_<i>type</i>()</code> conversion is a safe cast. That is,
-the result is exactly equivalent to the input, but of a different
-type. An error is produced if the exact, safe conversion can't
-be performed. Casting to and from a type's store\_type can usually
-be performed.
+The <code>as_<i>type</i>()</code> conversion is supposed to be a safe
+cast. That is, the result is exactly equivalent to the input, but of a
+different type. An error is produced if the exact, safe conversion
+can't be performed. Casting to and from a type's store\_type can
+usually be performed (it's the only check performed by the
+<code>\_as(_type_)</code> function).
 
 A <code>to_<i>type</i>()</code> conversion is a conversion, which
 _may_ result in an error if the input type is invalid. It is not
 necessarily round-trippable; it may not include all the information
 in the source and may reflect parsing or other operations. For
 example, an integer is parsed out of a string with `int to_int(string s)`,
-not directly cast. All types implement a `to_string()` method
-which can be used to produce a "nice" output value; but you would
-not necessarily expect to be able to parse the exact value back
-from the resulting string.
+not directly cast.
+
+All types implement a `to_string()` method which can be used to
+produce a "nice" output value; but you would not necessarily expect to
+be able to parse the exact value back from the resulting string.
 
 The `quote()` function is designed to produce a Wrapsher-eval-able[^1]
 representation of a value. For example, using `quote(s)` where `s`
 is a string will return a string that, output, includes its quotes
-and escapse internal quotes and backslashes, so it coudl be used
+and escapes internal quotes and backslashes, so it could be used
 as a literal in a Wrapsher program.
 
-[^1]: Although, as of this writing, Wrapsher does not have `eval`.
+[^1]: Although, as of this writing, Wrapsher does not have "eval".
 
-Wrapsher doesn't have "unsafe" casts where you just assert that
+Wrapsher doesn't have "unsafe" casts where you just claim that
 a type is of a different type. You need to write a converter to
 make the conversion.
 
-For example, if defining `type stringlist list` to make a list
-of strings, you should implement `list as_list(stringlist s)`
-and `stringlist as_stringlist(list l)`, probably taking
-advantage of the `_as()` function, which wraps or unwraps
-a value to or from its storage type.
+For example, if defining `type stringlist list` to make a list of
+strings, you should implement `list as_list(stringlist s)` and
+`stringlist as_stringlist(list l)`, probably taking advantage of the
+`_as()` function, which wraps or unwraps a value to or from its
+storage type, after using `assert()` or another type check to ensure
+each member was of the correct type.
 
-```
+```wrapsher
 stringlist as_stringlist(list l) {
   l._as(stringlist)
 }
@@ -134,9 +137,10 @@ keyword `fun` and a function signature. For example, you might define
 a function and assign it to a variable, or pass it to a conventional
 function call:
 
-```
+```wrapsher
 int main(list args) {
   ints = args.map(int fun(string s) { s.to_int() })
+  0
 }
 ```
 
@@ -146,7 +150,7 @@ the anonymous function on each (`string`) element of the list `args`.
 Anonymous functions are closures and contain the local variables that were
 in scope when it was created. This allows you to make factory functions:
 
-```
+```wrapsher
 fun multiplier(int i) {
   int fun (j) { i * j }
 }
@@ -154,5 +158,6 @@ fun multiplier(int i) {
 int main(list args) {
   f = multiplier(10)
   [0, 1, 2].map(multiplier) # => [0, 10, 20]
+  0
 }
 ```

@@ -30,6 +30,15 @@ task :test, [:test_file] do |_, args|
   end
 end
 
+desc <<~DESC
+  Generate Wrapsher documentation site
+    Usage:
+      rake site
+DESC
+task :site do
+  sh "mdbook build"
+end
+
 namespace :profile do
   desc <<~DESC
     Convert JSON event stream FILE into Chrome traceEvents file.

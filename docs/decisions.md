@@ -1,4 +1,4 @@
-# Decisions
+# Decisions (Design and Musings)
 
 These are a (somewhat random) collection of design decisions that have
 been made or need to be made, and their rationales.
@@ -71,32 +71,22 @@ works just as well.
 
 Can function names have a fun value?
 
-```
+```wrapsher
 l.map(to_string)
 ```
 instead of
+
+```wrapsher
+l.map(string fun (any i) { i.to_string() } # useless wrapper
 ```
-l.map(string fun (any i) { i.to_string() }
-```
 
-
-## String interpolation?
-
-I've reserved double-quoted (and, I guess, backtick-quoted) strings
-for string interpolation as a maybe.  I'm not sure if it's necessary
-or desirable. It complicates things quite a bit and ends up having
-this "little language" problem with `#{ }` or the equivalent. Maybe
-something like fstrings, though again, is that really better than
-`sprintf`? Or something even heavier-weight like mustache? String
-interpolation is very popular, though, so it should probably not be
-ignored.
 
 ## Enums
 
 How to represent enums? This probably needs top-level list constants
 like structs.
 
-```
+```wrapsher
 type foo enum [...]
 ```
 
@@ -110,7 +100,7 @@ type assertion. For example, to create a `add(float f, number
 n)`-style function that accepts ints and floats for `n`, you'd have to
 do something like:
 
-```
+```wrapsher
 float add(float f, any n) {
   if n.is_a(int) {
     n = n.as_float()
@@ -125,7 +115,7 @@ float add(float f, any n) {
 
 Should this be made easier?
 
-```
+```wrapsher
 float add(float f, int | float n) {
 ...
 }
@@ -138,7 +128,7 @@ Or... what if this is interfaces where I really just want a type that implements
 a certain function or set of functions? If we required identity `as_` functions,
 this could work?
 
-```
+```wrapsher
 float add(float f, float n.as_float()) {
 }
 ```
@@ -147,7 +137,7 @@ Maybe I could even call the function and check the type of the result before bin
 
 Or
 
-```
+```wrapsher
 float add(float f, as_float() n) {
 }
 ```
@@ -156,11 +146,11 @@ Do those make the parsing really hard?
 
 Maybe introduce explicit interfaces?
 
-```
+```wrapsher
 interface can_float [as_float: float, times: float]
 ```
 
-```
+```wrapsher
 float add(float f, can_float n) {
   n = n.as_float()
 }
@@ -189,7 +179,7 @@ If instead you could define an interface like `callable` or
 `filter_thunk`, you could control the signature of the items passed
 into the function.
 
-```
+```wrapsher
 interface stringfilter {
   bool call(string s)
 }
@@ -214,7 +204,7 @@ maybe it's actually the zero value, and therefore also defines the
 types: `type foo struct [id: uuid.new(), name: '']` and it will
 generate stuff like:
 
-```
+```wrapsher
 foo new(type/foo t) {
   [
     uuid.new(),
@@ -239,6 +229,14 @@ foo set_name(foo i, string s) {
 }
 ```
 
+This requires (among other things) improvements in the parser
+and code generator so that collection constants aren't constructed
+from function calls.
+
+This could go along with syntactic sugar for struct member access,
+finally unlocking bareword method notation, where `expr.thing` means
+`thing(expr)` and `expr.thing = value` means `expr.set_thing(value)`.
+
 ## Top-level expressions
 
 Right now, the top-level kind of doesn't have expressions, or it does
@@ -255,7 +253,7 @@ were expressions too.
 
 ### More operator overloading
 
-```
+```wrapsher
 'stringtwo,andthis,other' / ',' => list split(string s, string d) => ['stringtwo', 'andthis', 'other']
 ```
 
@@ -416,6 +414,18 @@ and start the program with an initial refid that's greater than what
 it used. So probably the compiler should inline shell code to initialize
 the refs for constant collections and start the program with an initial
 refid.
+
+## Philosophy - Little languages and cleanliness
+
+There are a lot of places where a programming languages acquires these
+little mini-languages and while sometimes useful, I think they always
+indicate a problem. Regular expressions (when they get baked into the
+language somehow) are a big example of this, but so are formatting
+specifiers (e.g. Lisp `format`, C and friends `printf`, Powershell/C#
+format strings) and string interpolation and that's why I've punted on
+providing these things for now. When they are needed, I want them to
+be very thought out and not interfere with the core language, but be
+a natural extension of it.
 
 ## Concurrency/External Drivers
 

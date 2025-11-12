@@ -14,9 +14,10 @@ create-missing = false    # don’t auto-create missing chapter files
 # Built-in themes: light, rust, coal, navy, ayu
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
-curly-quotes = true
+smart-punctuation = true
 git-repository-url = "https://github.com/mermaidpurse/wrapsher"
 git-repository-icon = "fa-github"
+additional-js = ["docs/theme/wrapsher-hljs.js"]
 
 # You can add extra CSS files later (see notes below)
 # additional-css = ["css/wrapsher.css"]

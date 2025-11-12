@@ -1,6 +1,6 @@
 # Wrapsher is a programming language which compiles to shell
 
-[Wrapsher](./docs/wrapsher.md) is a shell wrapping language[^1] which takes a
+[Wrapsher](./wrapsher.md) is a shell wrapping language[^1] which takes a
 programmer-friendly, typed language and compiles it to
 [POSIX-compliant sh](https://pubs.opengroup.org/onlinepubs/9799919799/).
 
@@ -22,7 +22,7 @@ needs, rather than do a garbage thing, as shell scripts do).
   actually build these in, and Wrapsher will be cognizant to this and
   friendly about it.
 
-## What problems does Wrapsher solve?
+## Use Case: What problems does Wrapsher solve?
 
 _Or: You want to **run** a shell script, but you sure don't want to
 **write** one._
@@ -96,6 +96,8 @@ plus (optionally) safely-managed external dependencies.
 
 ## Inspiration: The very idea
 
+_Or: What made you want to do such a thing?_
+
 I took some initial inspiration from [Amber](https://amber-lang.com/),
 which I read about on
 [HN](https://news.ycombinator.com/item?id=40431835); and
@@ -109,6 +111,8 @@ rich expressions) and execute it in a "ubiquitous" runtime. That has
 potential to usefully solve the real problem described above.
 
 ## Getting Started: How do I run Wrapsher?
+
+_Or: Hello, world?
 
 For now, the Wrapsher compiler is implemented in Ruby and is installable
 as a Ruby gem:
@@ -136,11 +140,11 @@ bundle install
 bundle exec rake test
 ```
 
-wrapsher 
-
 ## Other Documents: How to read more?
 
-- [Wrapsher language](./docs/wrapsher.md)
-- [Internals](./docs/internals.md)
-- [Decisions](./docs/decisions.md)
-- [Roadmap](./docs/roadmap.md)
+_Or: How does it work?_
+
+- [Wrapsher language](./wrapsher.md)
+- [Internals](./internals.md)
+- [Decisions](./decisions.md)
+- [Roadmap](./roadmap.md)

@@ -19,12 +19,11 @@ the `external` feature.
 
 ## Status
 
-Wrapsher is pre-alpha software, and not feature-complete. Lots of things
-described in the README are aspirational.
+Wrapsher is pre-alpha software, and not feature-complete.
 
 ## Getting Started -- The Basics
 
-The Wrapsher build tool, `wrapsher`, is written in Ruby. The resulting
+The Wrapsher build tool, `wrapsher`, is written in Ruby. But the resulting
 compiled program is portable pure `sh`, though, and neither `wrapsher`
 nor Ruby are required to run any compiled Wrapsher program--it's standalone,
 and requires no dependencies (except for external commands, for which it
@@ -73,10 +72,6 @@ Top-level statements in Wrapsher can be:
 
 - A `use` statement which enables or incorporates dependencies,
   features, constraints or variables:
-    - <code>use version _constraint_</code>: specifies a version
-      constraint for the compiler version required to compile the
-      program. See [Wrapsher versions](#wrapsher-versions) below.
-      **UNIMPLEMENTED**
     - <code>use external _command_</code>: specifies an external command which is
       required.  At runtime, if the command is found to be built-in
       (e.g., `printf`, usually), it doesn't trigger an `external`
@@ -98,7 +93,7 @@ Top-level statements in Wrapsher can be:
     - `meta version`: the module or program version
     - `meta source`: the source URL
     - `meta author`: the author
-    - `meta docs`: help documentation for the module or program.
+    - `meta doc`: help documentation for the module or program.
       top-level (not in a `module`), this is used as help text in
       the standard option processing. See [Documentation Style](style.md)
       for more. **UNIMPLEMENTED**
@@ -106,31 +101,26 @@ Top-level statements in Wrapsher can be:
   which can be loaded in other programs with a `use` statement, as well
   as the function namespace. See [Modules and Types](./modules-types.md)
   for more on module and type code organization.
-- A function definiton of the form:
-    <pre><code>
-    <i>type</i> <i>name</i>(<i>argument specifiers</i>) <i>block</i>
-    </code></pre> 
-    for example:
-    <pre><code>
+- A function definiton of the form: <code>_type_ _function_(_argument\_type_ _argument\_name_) { ... }</code>,
+  for example:
+    ```wrapsher
     int main(list args) {
-       <i>expressions</i>
+       return 0
     }
-    </code></pre>
+    ```
     - In the above definition, we are saying:
         - The `main` function returns an `int` and accepts a list
           of arguments named `args`.
-    - Functions can be called as methods (see [Methods](#methods)),
-      which is just syntactic sugar for allowing the method "receiver"
-      to be passed as the function's first argument, when called.
-- A type definition of the form:
-    <pre>
-    type <i>typename</i> <i>store_type</i>
-    </pre>
-    This declares a new user-defined named type, based on
-    _store\_type_.  Note that _store\_type_ is just used as storage
-    here, enabling the safe cast back and forth between the two; this
-    is not any form of inheritance. See [Modules and
-    Types](./modules-types.md) for how to implement a type.
+    - Functions can be called as methods (see
+      [Functions](./functions.md#receiver-syntax)), which is just
+      syntactic sugar for allowing the method "receiver" to be passed
+      as the function's first argument, when called.
+- A type definition of the form <code>type _typename_
+  _store\_type_</code>.  This declares a new user-defined named type,
+  based on _store\_type_.  Note that _store\_type_ is just used as
+  storage here, enabling the safe cast back and forth between the two;
+  this is not any form of inheritance. See [Modules and
+  Types](./modules-types.md) for how to implement a type.
 
 Throughout, comments introduced with a pound character (`#`)
 are ignored.
@@ -150,7 +140,8 @@ value of the block. The following are expressions that can be used:
   allows many function calls to be chained together.  See
   [Functions](./functions.md) for more.
 - A shellcode expression of the form <code>shell _string_</code>. The
-  _string_ is included inline in the compiled code.  Note that _this
+  _string_ is included inline in the compiled code. Note that just
+  as when directly accessing other programming language internals, _this
   is unsafe_ because Wrapsher does not check this code for types or
   POSIX-compliance, or compliance with its standards for external
   dependency management. This should generally only be used in the
@@ -167,7 +158,7 @@ value of the block. The following are expressions that can be used:
   and `or`. See [Operators](#operators) for more.
 - Arithmetic expressions, using the arithmetic operators `+`, `-`,
   `*`, `/` and `%`, possibly grouped using parens `(` and `)`.
-- Anonymous function definition using the syntax <code>fun
+- Anonymous function definition using the syntax <code>_type_ fun
   (_arguments_) _block_</code>. Anonymous functions are real values
   that can be passed to other functions, assigned to variables, and
   called using the <code>.call().with(_arguments_)</code> functions.
@@ -251,10 +242,10 @@ function. Any type can be subscripted if it implements this
 function. The builtin `string`, `list` and `map` implement
 `at()` and can be subscripted in this way.
 
-```
-string at(string s, int i)
-any at(list l, int i)
-any at(map m, any k)
+```wrapsher
+string at(string s, int i) { }
+any at(list l, int i) { }
+any at(map m, any k) { }
 ```
 
 ##### Pair Operator
@@ -263,8 +254,8 @@ The pair operator `:` is used to construct a `pair` consisting
 of a key and a value. Any type can be used as a key and value.
 It's syntactic sugar for the `from_kv` function:
 
-```
-pair from_kv(type/pair t, any k, any v)
+```wrapsher
+pair from_kv(type/pair t, any k, any v) { }
 ```
 
 ##### Arithmetic Operators
@@ -277,15 +268,15 @@ pair from_kv(type/pair t, any k, any v)
 | `+`        | `plus()`   | primary (lower)      |
 | `-`        | `minus()`  | primary (lower)      |
 
-```
-int times(int i, int j) # multiplication
-int div(int i, int j)   # division
-int mod(int i, int j)   # modulus
-int plus(int i, int j)  # addition
-int minus(int i, int j) # subtraction
+```wrapsher
+int times(int i, int j) { } # multiplication
+int div(int i, int j) { }   # division
+int mod(int i, int j) { }   # modulus
+int plus(int i, int j) { }  # addition
+int minus(int i, int j) { } # subtraction
 
-string plus(string s, string o) # concatenation of strings
-list plus(list l, list o)       # concatenation of lists
+string plus(string s, string o) { } # concatenation of strings
+list plus(list l, list o) { }       # concatenation of lists
 ```
 
 ##### Comparison Operators
@@ -299,31 +290,31 @@ list plus(list l, list o)       # concatenation of lists
 | `>=`       | `not lt()` | comparison (even lower) |
 | `<=`       | `not gt()` | comparison (even lower) |
 
-```
-any eq(any i, any o)     # equality of internal representation
+```wrapsher
+any eq(any i, any o) { }  # equality of internal representation
 
-bool eq(int i, int j)    # equality
-bool gt(int i, int j)    # greater than
-bool lt(int i, int j)    # less than
+bool eq(int i, int j) { } # equality
+bool gt(int i, int j) { } # greater than
+bool lt(int i, int j) { } # less than
 
-bool eq(string s, string o)    # text equality
-bool gt(string s, string o)    # lexical greater than
-bool lt(string s, string o)    # lexical less than
+bool eq(string s, string o) { }   # text equality
+bool gt(string s, string o) { }   # lexical greater than
+bool lt(string s, string o) { }   # lexical less than
 
-bool eq(list l, list o)        # order-dependent equality of each element
+bool eq(list l, list o) { }       # order-dependent equality of each element
 
-bool eq(map m, map o)          # equality of each pair
+bool eq(map m, map o) { }         # equality of each pair
 ```
 
 ##### Boolean Operators
 
 | Operator   | Function   | Precedence            |
 | ---------- | ---------- | --------------------- |
-| `not`      | `not()`    | boolean not (highest) |
+| `not`, `!` | `not()`    | boolean not (highest) |
 | `and`      | `and()`    | boolean (lowest)      |
 | `or`       | `or()`     | boolean (lowest)      |
 
-```
+```wrapsher
 bool not(bool p)              # logical negation
 bool and(bool p, bool q)      # logical AND
 bool or(bool p, bool q)       # logical OR
@@ -332,7 +323,7 @@ bool or(bool p, bool q)       # logical OR
 #### Types and Values
 
 The core language (module **core**) implements the following
-fundamental types. Note that all types have a zero value and are not
+builtin types. Note that all types have a zero value and are not
 nullable. Type conversion functions (e.g., `int as_int(string
 s)`) must be used to read types from input strings or implement
 an optional value.
@@ -350,23 +341,21 @@ an optional value.
 
 All types implement the following functions or use the generic `any` equivalent:
 
-<pre><code>
-_type_ new(type/_type_)
-bool is_zero(_type_ i)
-string to_string(_type_ i)
-string quote(_type_ i)
-</code></pre>
+```wrapsher
+my_cool_type new(type/my_cool_type) { }
+string to_string(my_cool_type i) { }
+string quote(my_cool_type i) { }
+```
 
 The `new()` function takes no arguments other than the type
 variable (e.g., `bool` or `list`) and returns a new zero value.
-The `is_zero()` function returns `true` if the value is
-zero-valued. The `to_string()` function returns a "nice"
+The `to_string()` function returns a "nice"
 visual representation of the value, which is not intended to
 necessarily be completely accurate. The `quote()` function
 returns a "literal equivalent" that could be included in a
 wrapsher program to define the value.
 
-Each of these fundamental types has a way of writing literal values in
+Each of these builtin types has a way of writing literal values in
 that type.
 
 ##### `bool`
@@ -378,14 +367,17 @@ converted to `bool`, you must check explicitly (e.g., with `val == 0`,
 
 ##### `int`
 
-Integers can be written as a series of decimal digits 0-9.
+Integers can be written as a series of decimal digits 0-9. C-style
+numbers in an alternative base (e.g. `0x...` or `0`) are not
+supported.
 
 Note that floats are not built in the core because they are not built
-in to a POSIX shell.
+in to a POSIX shell. See the [**math**](./wsh/math.wsh) module for
+floating point arithmetic.
 
-###### `string`
+##### `string`
 
-Strings literals can be single-quoted in single quotation marks (with
+String literals can be single-quoted in single quotation marks (with
 internal quotation mark characters `'` escaped with a backslash `\`)
 is the literal value of of the string.
 
@@ -399,10 +391,13 @@ literal value; there are no special escapes that produce special
 characters: a backslash always means the same thing (make the next
 character literal). This means the string `'\n'` is equal to
 `'n'`. To embed newlines in single-quoted strings, you need to
-actually embed the newline, not use `\n`.
+actually embed the newline, not use `\n`.[^2]
 
 [^1]: Possibly, a future version of wrapsher could support interpolated
-strings which are double-quoted or quoted with backticks.
+  strings which are double-quoted or quoted with backticks.
+
+[^2]: Yes, this is awkward, and at least a character-expanding function
+  or syntax is planned.
 
 Strings can be subscripted with the `[` operator as this is syntactic
 sugar for `string at(string s, any i)`.
@@ -420,7 +415,7 @@ sugar for `string at(string s, any i)`.
 
 ##### `list`
 
-Arrays are arbitrary-length lists of any type of element (including
+Lists are arbitrary-length lists of any type of element (including
 lists, maps, user-defined types or other collections).
 
 An list literal is written with enclosing square brackets `[` and `]`
@@ -428,7 +423,7 @@ with a comma-separated list of values. The members of a list do not
 need to agree on type (you can implement a type which does have this
 characteristic, though).
 
-Arrays can be subscripted like strings: `mylist[n]` is syntactic sugar
+Lists can be subscripted like strings: `mylist[n]` is syntactic sugar
 for `mylist.at(n)`.
 
 - `bool has(list l, any e)`
@@ -436,22 +431,17 @@ for `mylist.at(n)`.
 - `int length(list l)`
 - `any head(list l)`
 - `any tail(list l)`
-- `string join(list l, string s)`
 - `list set(list l, int i, any e)`
 - `list push(list l, any e)`
-- `any pop(list l)`
-- `list slice(list l, int i, int len)`
-- `list delete(list l, int i)`
 - `list map(list l, fun f)`
-- `any reduce(list l, fun f, any i)`
-- `list select(list l, fun f)`
+- `bool eq(list l, list otherlist)`
 - `bool any(list l, fun f)`
 - `bool all(list l, fun f)`
 
 ##### `pair`
 
 A pair is a couple (i.e., a 2-tuple), or a single association between
-a key and a value.  The key and value can be of any type. It is
+a key and a value. The key and value can be of any type. It is
 written literally as <code>_key_: _value_</code>.
 
 - `pair new(type/pair)`
@@ -468,10 +458,7 @@ is syntactic sugar for `m.at(key)`. Maps are written as a list of `pair`s.
 - `any index(map m, any v)`
 - `map set(map m, pair p)`
 - `map slice(map m, list l)`
-- `map select(map m, fun f)`
 - `map map(map m, fun f)`
-- `any reduce(map m, fun f)`
-- `map delete(map m, any k)`
 - `pair head(map m)`
 - `map tail(map m)`
 - `int length(map m)`
@@ -484,7 +471,7 @@ the compiler; if they aren't, then you will get a list instead
 
 For example, the following is a map:
 
-```
+```wrapsher
 m = [
   'id': 2992,
   'name': 'Harold'
@@ -495,17 +482,17 @@ m['id'] == 2992
 
 While the following is a list (of which one element is pair):
 
-```
+```wrapsher
 l = [
   2992,
   'name': 'Harold'
 ]
 
-try { m['id'] } catch e { e.has("expected an 'int'") }
-try { m['name'] } catch e { e.has("expected an 'int'") }
-m[0] == 2992
-m[1] == 'name': 'Harold'
-m[1].key() == 'name'
+try { l['id'] } catch e { e.has("expected an 'int'") }
+try { l['name'] } catch e { e.has("expected an 'int'") }
+l[0] == 2992
+l[1] == 'name': 'Harold'
+l[1].key() == 'name'
 ```
 
 An empty map is denoted by `[:]`.
@@ -516,6 +503,10 @@ In some cases, a function may return any type of value, represented
 by the `any` type, or accept one. This usually represents a list
 element or map value.
 
+A function can accept an argument of any value, as well. In this
+case, the function may have to do its own type check using
+<code>is_a(_type_)</code> or <code>assert(_type_)</code>.
+
 ##### `fun`
 
 An anonymous function item. These are formed by expressions
@@ -524,12 +515,11 @@ The argument list of types and variable names is the same as
 in function definitions.
 
 The result of the expression is of the type `fun`, on which you
-can use the call function:
+can use the `call()` function. The return value of `call()`
+is a value you can use the `with()` function on to execute
+the function according to its type signature.
 
-Note that in order to call the function, you need to use the
-`with` function. The invocation looks like this:
-
-```
+```wrapsher
 f = bool fun (int i) { i % 2 == 0 }
 f.call().with(2) == true
 f.call().with(1) == false
@@ -547,7 +537,7 @@ items, make for a powerful way to express iteration.
 `fun` items are closures, and capture local variables in
 their context. This allows you to do things like:
 
-```
+```wrapsher
 factor = 10
 [10, 15, 20, 25, 30].select(bool fun (int i) { i % factor == 0 }) == [10, 20, 30]
 ```
@@ -557,13 +547,12 @@ factor = 10
 Wrapsher has no first-class structs (yet). When it does, they will
 be compatible with manually-managed **fstructs**, a nickname for
 "faux structs" that are manually created and based on lists or
-some other type. Maps are pretty inefficient (actually they're all
-quite inefficient for the moment) so lists are a better choice.
+some other type. Maps are pretty inefficient so lists are a better choice.
 
 For example, if you have a `person` structure with two fields,
 you might implement it like this:
 
-```
+```wrapsher
 type person list
 
 # person is a fstruct
@@ -613,13 +602,13 @@ you need to assign the new value. You can assign the new value to the
 same variable. This is how you make "updates" to collections, for
 example:
 
-```
+```wrapsher
 s = 'hello'
 s.set(0, 'H')
 s == 'hello'
 ```
 
-```
+```wrapsher
 s = 'hello'
 s = s.set(0, 'H')
 s == 'Hello'
@@ -632,11 +621,11 @@ exist inside that closure when called.
 
 Global variables exist but they are not created by top-level
 assignments. They are only created through special statements like
-`module`, `type` and `use`. They are referenced just like other
+`module`, `type` and `use global`. They are referenced just like other
 variables and in fact are rebindable (this is how "mutable" global
 objects like module settings can be implemented):
 
-```
+```wrapsher
 module file
 
 bool is_syncio(module/file m) {
@@ -663,7 +652,7 @@ block. If you want to test for error type or condition, use `if`
 inside the `catch` block.  You can re-throw the error explicitly using
 `throw` again, or you can ignore it.
 
-```
+```wrapsher
 int div(int i, int j) {
   if j < 0 {
     throw 'Division by 0'
@@ -671,7 +660,7 @@ int div(int i, int j) {
 }
 ```
 
-```
+```wrapsher
 bool process_file(string filename) {
   try {
     f = file.open(filename)
@@ -685,11 +674,15 @@ bool process_file(string filename) {
 }
 ```
 
-As of right now, errors are not rich--they are not intended for most
+As of right now, errors are not rich--they are not intended for
 control flow. Errors are a special builtin type: their `to_string()`
 method prints the call stack in addition to the message; messages are
-intended to be examined as text. In the future, more structured error
-data may be supported.
+intended to be examined as text.
+
+In Wrapsher, it's idiomatic to pre-check operations that might fail
+if there is a valid alternative processing path. Error catching
+is primarily for cleanup and friendly shutdown rather than control
+flow.
 
 ### Loops
 
@@ -700,7 +693,7 @@ the loop, the `break` and `continue` keywords can be used to exit
 the loop or skip to the next iteration, respectively.
 
 Note that anonymous functions and list functions like `map()`,
-`reduce()` and `select()` provide powerful ways to iterate over a list.
+provide powerful ways to iterate over a list.
 
 ### Programs vs. Modules - `main`
 
@@ -722,8 +715,9 @@ See [Modules and Types](./modules-types.md) for more.
 
 ### Testing
 
-Wrapsher includes a TAP-compatible test framework in the **test** module.
-Consult the module documentation for usage information.
+Wrapsher includes a TAP-compatible test framework in the
+[**test**](./wsh/test.wsh) module.  Consult the module documentation
+for usage information.
 
 ### External Dependencies
 
@@ -731,7 +725,7 @@ Remember that Wrapsher's primary use case is being able to run your
 program _without configuration or bootstrapping_ on any system with
 a POSIX `sh`. But it's also true that to do anything useful--especially
 in the configuration management or bootstrapping arena--you must,
-by necessity do things that are platform-specific.
+by necessity, do things that are platform-specific.
 
 Wrapsher allows you to declare a specific dependency on external
 commands (including frequently-used ones like `sed` and `awk`) so that
@@ -756,7 +750,7 @@ The folllowing modules comprise the standard library:
 
 | Module | Description | Status |
 | :----- | :---------- | :----- |
-| [**core**](./wsh/core.wsh) | Core functions and fundamental types--always included | pre-alpha |
+| [**core**](./wsh/core.wsh) | Core functions and builtin types--always included | pre-alpha |
 | [**io**](./wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
 | [**test**](./wsh/test.wsh) | Test framework | pre-alpha |
 | [**math**](./wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
