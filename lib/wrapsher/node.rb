@@ -3,10 +3,9 @@ require 'wrapsher'
 require 'pry'
 
 module Wrapsher
-
   WSH_INCLUDE_PATH = [
     "${ENV['WSH_HOME']}/wsh",
-    './wsh',
+    './wsh'
   ].freeze
 
   class Node
@@ -56,9 +55,9 @@ module Wrapsher
     class Break < Node
       def initialize(slice, tables:)
         super
-        if !(tables.state.key?(:in_loop) && tables.state[:in_loop] > 0)
-          raise Wrapsher::CompilationError, "Must use 'break' inside a loop at #{@filename}:#{@line}"
-        end
+        return if tables.state.key?(:in_loop) && tables.state[:in_loop] > 0
+
+        raise Wrapsher::CompilationError, "Must use 'break' inside a loop at #{@filename}:#{@line}"
       end
 
       def to_s
@@ -86,7 +85,9 @@ module Wrapsher
       def initialize(slice, tables:)
         super
         @line = slice[:keyword_if].line_and_column[0] if slice[:keyword_if].respond_to?(:line_and_column)
-        @else_line = slice[:keyword_else].line_and_column[0] if slice[:keyword_else] && slice[:keyword_else].respond_to?(:line_and_column)
+        if slice[:keyword_else] && slice[:keyword_else].respond_to?(:line_and_column)
+          @else_line = slice[:keyword_else].line_and_column[0]
+        end
         @condition = Node.from_obj(slice[:condition], tables: tables)
         @then_body = Body.new(slice[:then], tables: tables)
         @else_body = Body.new(slice[:else], tables: tables) if slice[:else]
@@ -123,9 +124,9 @@ module Wrapsher
     class Continue < Node
       def initialize(slice, tables:)
         super
-        if !(tables.state.key?(:in_loop) && tables.state[:in_loop] > 0)
-          raise Wrapsher::CompilationError, "Must use 'continue' inside a loop at #{@filename}:#{@line}"
-        end
+        return if tables.state.key?(:in_loop) && tables.state[:in_loop] > 0
+
+        raise Wrapsher::CompilationError, "Must use 'continue' inside a loop at #{@filename}:#{@line}"
       end
 
       def to_s
@@ -173,7 +174,7 @@ module Wrapsher
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
-            "_wsh_stack_push \"${_wsh_result}\""
+            '_wsh_stack_push "${_wsh_result}"'
           ].join("\n  ")
         end
         [
@@ -217,7 +218,7 @@ module Wrapsher
       end
 
       def cleanup_locals
-        "unset " + @locals.map { |v| "\"_wshv_${_wsh_frame}_#{v}\"" }.join(' ')
+        'unset ' + @locals.map { |v| "\"_wshv_${_wsh_frame}_#{v}\"" }.join(' ')
       end
 
       def to_s
@@ -227,18 +228,18 @@ module Wrapsher
           "#{@signature.function_name(:definition)}() {",
           line,
           "_wsh_result='bool:false'; _wsh_error=''",
-          "while :; do",
-          "  :",
+          'while :; do',
+          '  :',
           "  #{@signature.argument_binding}",
-          "  # function body",
+          '  # function body',
           "  #{@body}",
           "  #{cleanup_locals}",
-          "  # end function body",
-          "  break",
-          "done",
-          "case \"${_wsh_error}\" in ?*) return 1 ;; esac",
+          '  # end function body',
+          '  break',
+          'done',
+          'case "${_wsh_error}" in ?*) return 1 ;; esac',
           "#{@signature.check_return}",
-          "}"
+          '}'
         ].join("\n")
       end
     end
@@ -261,8 +262,8 @@ module Wrapsher
         @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
       end
 
-      def summary(use_name=nil)
-        "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s).join(', ')})"
+      def summary(use_name = nil)
+        "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s)&.join(', ')})"
       end
 
       def arity
@@ -285,14 +286,14 @@ module Wrapsher
         @arg_definitions.map do |arg|
           [
             line,
-            "_wsh_stack_peek_into _wshi",
+            '_wsh_stack_peek_into _wshi',
             "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' || break",
-            "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\"",
+            "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\""
           ].join("\n  ")
         end.join("\n  ")
       end
 
-      def check_return(use_name=nil)
+      def check_return(use_name = nil)
         "_wsh_assert \"${_wsh_result}\" '#{type}' '#{use_name || name}()'"
       end
 
@@ -376,17 +377,19 @@ module Wrapsher
         @signature[:arg_definitions] = [@signature[:arg_definitions]].compact.flatten
         @signature[:name] = 'with'
         @signature[:arg_definitions].unshift({
-            name: '_wsh_context',
-            type: "_fun#{@refid}"
-          })
-        summary = "#{@signature[:name]}(" + @signature[:arg_definitions].map { |arg| "#{arg[:type]} #{arg[:name]}" }.join(', ') + ')'
+                                               name: '_wsh_context',
+                                               type: "_fun#{@refid}"
+                                             })
+        summary = "#{@signature[:name]}(" + @signature[:arg_definitions].map { |arg|
+                                              "#{arg[:type]} #{arg[:name]}"
+                                            }.join(', ') + ')'
         tables.log("Creating lambda #{@refid} with signature: #{summary}, capturing #{tables.locals.inspect}")
         variable_capture = tables.locals.reduce({
-            fun_call: {
-              name: 'new',
-              fun_args: [ { var_ref: 'map' } ]
-            }
-          }) do |arg, var|
+                                                  fun_call: {
+                                                    name: 'new',
+                                                    fun_args: [{ var_ref: 'map' }]
+                                                  }
+                                                }) do |arg, var|
           {
             fun_call: {
               name: 'push',
@@ -407,14 +410,14 @@ module Wrapsher
           }
         end
         @closure = Node.from_obj({
-          fun_call: {
-            name: '_as',
-            fun_args: [
-              variable_capture,
-              { var_ref: "_fun#{@refid}" }
-            ]
-          }
-        }, tables: tables)
+                                   fun_call: {
+                                     name: '_as',
+                                     fun_args: [
+                                       variable_capture,
+                                       { var_ref: "_fun#{@refid}" }
+                                     ]
+                                   }
+                                 }, tables: tables)
 
         get_context = [
           {
@@ -474,7 +477,7 @@ module Wrapsher
         [
           line,
           @closure.to_s,
-          "_wsh_result=\"fun+${_wsh_result}\""
+          '_wsh_result="fun+${_wsh_result}"'
         ].join("\n  ")
       end
     end
@@ -605,7 +608,7 @@ EOSTRING
         super
         @name = slice[:name].to_s
         @store_type = slice[:store_type].to_s if slice[:store_type]
-        if @name !~ /^[a-z_][a-z0-9_\/]*$/ || @name.include?('__')
+        if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
           raise \
             Wrapsher::CompilationError,
             "Invalid type name '#{@name}' at #{@filename}:#{@line} - must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes"
@@ -619,7 +622,7 @@ EOSTRING
       end
 
       def errors
-        return ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+        ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
       end
 
       def to_s
@@ -646,7 +649,7 @@ EOSTRING
               rvalue: {
                 shellcode: {
                   triple_quoted: [
-                    "  _wsh_result=\"${_wsh_error}\"",
+                    '  _wsh_result="${_wsh_error}"',
                     "  _wsh_error=''"
                   ].join("\n")
                 }
@@ -668,16 +671,16 @@ EOSTRING
       def to_s
         code = []
         code << line
-        code << "while :; do # try"
-        code << "  :"
+        code << 'while :; do # try'
+        code << '  :'
         code << @try_body.to_s
-        code << "  break"
-        code << "done"
+        code << '  break'
+        code << 'done'
         code << "_wsh_line='#{@filename}:#{@catch_line}'"
-        code << "case \"${_wsh_error}\" in ?*) # catch block"
+        code << 'case "${_wsh_error}" in ?*) # catch block'
         code << @catch_body.to_s
-        code << ";;"
-        code << "esac # end catch block"
+        code << ';;'
+        code << 'esac # end catch block'
       end
     end
 
@@ -834,14 +837,14 @@ EOSTRING
 
       def to_s
         code = []
-        code << "while :; do # while"
+        code << 'while :; do # while'
         code << @condition.to_s
         code << "_wsh_assert \"${_wsh_result}\" 'bool' 'while condition' || break"
         code << "case \"${_wsh_result}\" in 'bool:true') : ;; *) break ;; esac"
         code << @loop_body.to_s
-        code << "done # while"
+        code << 'done # while'
         # Propagate break because it might have been from a throw/error propagation break
-        code << "case \"${_wsh_error}\" in ?*) break ;; esac"
+        code << 'case "${_wsh_error}" in ?*) break ;; esac'
       end
     end
 
@@ -861,7 +864,7 @@ EOSTRING
     end
 
     def to_s
-      raise NotImplementedError, "Subclasses(#{self.class}) must implement a to_s method: #{self.inspect}"
+      raise NotImplementedError, "Subclasses(#{self.class}) must implement a to_s method: #{inspect}"
     end
 
     attr_reader :filename, :tables
@@ -899,9 +902,7 @@ EOSTRING
       def from_obj(obj, tables:)
         PP.pp(obj, $stderr) unless obj.respond_to?(:keys)
         type = obj.keys.first
-        if !@@nodes.key?(type)
-          raise NotImplementedError, "Unknown node type: #{type}"
-        end
+        raise NotImplementedError, "Unknown node type: #{type}" unless @@nodes.key?(type)
 
         @@nodes[type].new(obj[type], tables: tables)
       end

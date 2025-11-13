@@ -17,18 +17,16 @@ module Wrapsher
       # Is this pair.from_kv(...)?
       def transformed_pair?(p)
         if p[:fun_call] && p[:fun_call][:name] == 'from_kv' &&
-            p[:fun_call][:fun_args][0] == { var_ref: 'pair' }
-          result = true
+           p[:fun_call][:fun_args][0] == { var_ref: 'pair' }
+          true
         else
-          result = false
+          false
         end
-        result
       end
     end
   end
 
   class Transform < Parslet::Transform
-
     rule(list_term: subtree(:elements)) do
       the_elements = [elements].compact.flatten
 
@@ -38,7 +36,7 @@ module Wrapsher
       new_list = {
         fun_call: {
           name: 'new',
-          fun_args: [{var_ref: 'list'}]
+          fun_args: [{ var_ref: 'list' }]
         }
       }
 
@@ -95,9 +93,7 @@ module Wrapsher
 
         {
           conditional: conditional.reverse.reduce(last_conditional) do |otherwise, outer|
-            if outer.key?(:keyword_else)
-              raise Wrapsher::CompilationError, "else AND else if at line #{line[0]} col #{line[1]}"
-            end
+            raise Wrapsher::CompilationError, "else AND else if at line #{line[0]} col #{line[1]}" if outer.key?(:keyword_else)
 
             if otherwise.key?(:then)
               otherwise[:keyword_if] = otherwise[:keyword_elseif]
@@ -120,7 +116,7 @@ module Wrapsher
         {
           type: {
             name: name,
-            store_type: store_type,
+            store_type: store_type
           }
         }
       ]
@@ -155,9 +151,9 @@ module Wrapsher
     rule(comparison: { left: subtree(:left), operator: simple(:operator), right: subtree(:right) }) do
       fn = case operator.to_s
            when '==' then ['eq']
-           when '!=' then ['eq', 'not']
-           when '<=' then ['gt', 'not']
-           when '>=' then ['lt', 'not']
+           when '!=' then %w[eq not]
+           when '<=' then %w[gt not]
+           when '>=' then %w[lt not]
            when '<' then ['lt']
            when '>' then ['gt']
            end
@@ -229,7 +225,7 @@ module Wrapsher
       end
     end
 
-    rule(throw: subtree(:e))  do
+    rule(throw: subtree(:e)) do
       {
         fun_call: {
           name: 'throw',
@@ -238,15 +234,13 @@ module Wrapsher
       }
     end
 
-    rule(single_quoted: subtree(:string)) {
+    rule(single_quoted: subtree(:string)) do
       case string
       when Array
-        if string.empty?
-          { single_quoted: '' }
-        end
+        { single_quoted: '' } if string.empty?
       else
         { single_quoted: string }
       end
-    }
+    end
   end
 end

@@ -1,1 +1,1 @@
-brew "libyaml"
+brew 'libyaml'

@@ -150,7 +150,7 @@ module Wrapsher
     def do_transform(args)
       args = @file_optparser.parse(*args)
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
-      if ! @options[:expr].empty?
+      if !@options[:expr].empty?
         parsed = parser.parsetext(@options[:expr].join("\n") + "\n")
         transformed = Wrapsher::Transformer.new(logger: @logger, level: @options[:level]).transform(parsed)
         pp transformed
@@ -170,7 +170,7 @@ module Wrapsher
     def do_parse(args)
       args   = @file_optparser.parse(*args)
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
-      if ! @options[:expr].empty?
+      if !@options[:expr].empty?
         parsed = parser.parsetext(@options[:expr].join("\n") + "\n")
         pp parsed
         puts JSON.pretty_generate(parsed)

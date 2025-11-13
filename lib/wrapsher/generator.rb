@@ -60,7 +60,6 @@ module Wrapsher
         raise Wrapsher::CompilationError, "Compilation failed with #{errors.size} errors"
       end
 
-
       lines = []
       lines << (tables.options[:profile] ? profile_shebang(tables.options[:profile]) : shebang)
       lines << showtables(tables) if @type == :program

@@ -22,9 +22,7 @@ task :test, [:test_file] do |_, args|
     test_file: nil
   )
   test_files = [args[:test_file]].compact
-  if test_files.empty?
-    test_files = Dir['wsh/*_test.wsh']
-  end
+  test_files = Dir['wsh/*_test.wsh'] if test_files.empty?
   test_files.each do |file|
     sh "bundle exec wrapsher test #{file}"
   end
@@ -36,7 +34,7 @@ desc <<~DESC
       rake site
 DESC
 task :site do
-  sh "mdbook build"
+  sh 'mdbook build'
 end
 
 namespace :profile do

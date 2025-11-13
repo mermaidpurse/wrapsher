@@ -155,7 +155,7 @@ module Wrapsher
             fun_args: [{ var_ref: 'list' }]
           }
         }
-        ) do |acc, external_name|
+      ) do |acc, external_name|
         {
           fun_call: {
             name: 'push',
@@ -173,7 +173,7 @@ module Wrapsher
             fun_args: [{ var_ref: 'list' }]
           }
         }
-        ) do |acc, global_name|
+      ) do |acc, global_name|
         {
           fun_call: {
             name: 'push',
@@ -191,7 +191,7 @@ module Wrapsher
             fun_args: [{ var_ref: 'list' }]
           }
         }
-        ) do |acc, fn_name|
+      ) do |acc, fn_name|
         {
           fun_call: {
             name: 'push',
@@ -217,8 +217,8 @@ module Wrapsher
     def to_s
       lines = []
       lines << "filename: #{filename}"
-      lines << "globals: #{globals.keys.join(" ")}"
-      lines << "external: #{external.keys.join(" ")}"
+      lines << "globals: #{globals.keys.join(' ')}"
+      lines << "external: #{external.keys.join(' ')}"
       lines << 'included:'
       included.each do |modname, source|
         lines << "  #{modname} => #{source}"

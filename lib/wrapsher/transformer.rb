@@ -1,11 +1,13 @@
+# frozen_string_literal: true
+
 require 'json'
 require 'logger'
 require 'parslet'
 require 'wrapsher'
 
 module Wrapsher
+  # Transform parse AST
   class Transformer
-
     def initialize(logger: nil, level: nil)
       @logger = logger || Logger.new($stderr)
       @logger.level = level || :DEBUG

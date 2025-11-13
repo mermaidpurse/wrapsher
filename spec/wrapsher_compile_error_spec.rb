@@ -2,6 +2,7 @@
 
 require 'logger'
 
+# rubocop:disable Metrics/BlockLength
 RSpec.describe 'compile/errors' do
   subject(:compile) do
     logger = Logger.new $stderr
@@ -74,7 +75,7 @@ RSpec.describe 'compile/errors' do
   describe 'bad store type' do
     let(:program) do
       <<~PROGRAM
-      type foo bar
+        type foo bar
       PROGRAM
     end
 
@@ -109,3 +110,4 @@ RSpec.describe 'compile/errors' do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength
