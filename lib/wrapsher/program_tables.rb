@@ -10,10 +10,12 @@ require 'wrapsher'
 
 module Wrapsher
   # Global compiler information for a program
+  # rubocop:disable Metrics/ClassLength
   class ProgramTables
     attr_accessor :filename, :functions, :globals, :feature, :external, :included, :compiler_refid, :adds,
                   :options, :context, :locals, :state, :modules, :in_module
 
+    # rubocop:disable Metrics/ParameterLists
     def initialize(
       filename: '-',
       functions: {},
@@ -43,8 +45,12 @@ module Wrapsher
       @options = options
       @modules = modules
       @in_module = in_module
-      @logger.debug("ProgramTables initialized with logger level: #{@logger.level}, filename: #{@filename}, refid: #{@compiler_refid}")
+      @logger.debug(
+        "ProgramTables initialized with logger level: #{@logger.level}, " \
+        "filename: #{@filename}, refid: #{@compiler_refid}"
+      )
     end
+    # rubocop:enable Metrics/ParameterLists
 
     def log(message)
       @logger.debug(message)
@@ -77,35 +83,17 @@ module Wrapsher
         },
         tables: self
       )
-      nodes << Node::UseGlobal.new(
-        {
-          name: '_globals',
-          value: {
-            bool_term: 'false'
-          }
-        },
-        tables: self
-      )
-      nodes << Node::UseGlobal.new(
-        {
-          name: '_externals',
-          value: {
-            bool_term: 'false'
-          }
-        },
-        tables: self
-      )
+      nodes += use_globals(%w[_globals _externals _functions])
       nodes += feature_assignments
-      nodes << Node::UseGlobal.new(
-        {
-          name: '_functions',
-          value: {
-            bool_term: 'false'
-          }
-        },
-        tables: self
-      )
-      nodes << Node::FunStatement.new(
+      nodes << program_init_call
+      nodes += adds
+      nodes
+    end
+
+    # nullary _init - global program init
+    # rubocop:disable Metrics/MethodLength
+    def program_init_call
+      Node::FunStatement.new(
         {
           signature: {
             name: '_init',
@@ -137,8 +125,21 @@ module Wrapsher
         },
         tables: self
       )
-      nodes += adds
-      nodes
+    end
+    # rubocop:enable Metrics/MethodLength
+
+    def use_globals(globals)
+      globals.map do |global|
+        Node::UseGlobal.new(
+          {
+            name: global,
+            value: {
+              bool_term: 'false'
+            }
+          },
+          tables: self
+        )
+      end
     end
 
     def feature_assignments
@@ -241,4 +242,5 @@ module Wrapsher
       lines.join("\n")
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

@@ -65,6 +65,7 @@ module Wrapsher
       doc.join("\n").delete_prefix("\n")
     end
 
+    # rubocop:disable Metrics/PerceivedComplexity, Metrics/AbcSize
     def generate(program, tables: nil)
       nodes = (wsh_preamble + [program].flatten).map do |obj|
         Wrapsher::Node.from_obj(obj, tables: tables)
@@ -89,6 +90,7 @@ module Wrapsher
       lines << postamble
       lines.join("\n")
     end
+    # rubocop:enable Metrics/PerceivedComplexity, Metrics/AbcSize
 
     def profile_shebang(bash)
       if @type == :program

@@ -11,12 +11,9 @@ require 'wrapsher'
 require 'pry'
 
 module Wrapsher
-  WSH_INCLUDE_PATH = [
-    "${ENV['WSH_HOME']}/wsh",
-    './wsh'
-  ].freeze
-
+  # Base class for Wrapsher language nodes
   class Node
+    # var = expression
     class Assignment < Node
       def initialize(slice, tables:)
         super
@@ -46,6 +43,7 @@ module Wrapsher
       end
     end
 
+    # true | false
     class BoolTerm < Node
       def initialize(slice, tables:)
         super
@@ -60,16 +58,17 @@ module Wrapsher
       end
     end
 
+    # break
     class Break < Node
       def initialize(slice, tables:)
         super
-        return if tables.state.key?(:in_loop) && tables.state[:in_loop] > 0
+        return if tables.state.key?(:in_loop) && tables.state[:in_loop].positive?
 
         raise Wrapsher::CompilationError, "Must use 'break' inside a loop at #{@filename}:#{@line}"
       end
 
       def to_s
-        code = [
+        [
           line,
           'break # break'
         ].join("\n  ")
@@ -80,22 +79,17 @@ module Wrapsher
     # Probably all these methods should return an array of lines
     # So it can be truly empty if needed.
     class Comment < Node
-      def initialize(slice, tables:)
-        super
-      end
-
       def to_s
         ''
       end
     end
 
+    # conditional expression
     class Conditional < Node
       def initialize(slice, tables:)
         super
         @line = slice[:keyword_if].line_and_column[0] if slice[:keyword_if].respond_to?(:line_and_column)
-        if slice[:keyword_else] && slice[:keyword_else].respond_to?(:line_and_column)
-          @else_line = slice[:keyword_else].line_and_column[0]
-        end
+        @else_line = slice[:keyword_else].line_and_column[0] if slice[:keyword_else].respond_to?(:line_and_column)
         @condition = Node.from_obj(slice[:condition], tables: tables)
         @then_body = Body.new(slice[:then], tables: tables)
         @else_body = Body.new(slice[:else], tables: tables) if slice[:else]
@@ -129,22 +123,24 @@ module Wrapsher
       end
     end
 
+    # continue
     class Continue < Node
       def initialize(slice, tables:)
         super
-        return if tables.state.key?(:in_loop) && tables.state[:in_loop] > 0
+        return if tables.state.key?(:in_loop) && tables.state[:in_loop].positive?
 
         raise Wrapsher::CompilationError, "Must use 'continue' inside a loop at #{@filename}:#{@line}"
       end
 
       def to_s
-        code = [
+        [
           line,
           'continue # continue'
         ].join("\n  ")
       end
     end
 
+    # <function>(...)
     class FunCall < Node
       def initialize(slice, tables:)
         super
@@ -159,7 +155,7 @@ module Wrapsher
       def errors
         e = []
         e << ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
-        if @function_args.length == 0 && !tables.functions[@function_name].key?(:nullary)
+        if @function_args.empty? && !tables.functions[@function_name].key?(:nullary)
           e << ["No nullary function '#{@function_name}()' at #{line}"]
         end
         # We can't actually check for the right arity functions which accept an argument
@@ -192,9 +188,11 @@ module Wrapsher
       end
     end
 
+    # <type> <function>(...) { }
     class FunStatement < Node
       attr_reader :signature
 
+      # rubocop:disable Metrics/AbcSize
       def initialize(slice, tables:)
         super
         @signature = Signature.new(slice[:signature], tables: tables)
@@ -220,6 +218,7 @@ module Wrapsher
         end
         tables.functions[@signature.name][@signature.dispatch_type] = @signature
       end
+      # rubocop:enable Metrics/AbcSize
 
       def errors
         @body.errors
@@ -246,16 +245,18 @@ module Wrapsher
           '  break',
           'done',
           'case "${_wsh_error}" in ?*) return 1 ;; esac',
-          "#{@signature.check_return}",
+          @signature.check_return.to_s,
           '}'
         ].join("\n")
       end
     end
 
+    # <type> <function>(...)
     class Signature < Node
       attr_accessor :name
       attr_reader :type, :arg_definitions
 
+      # rubocop:disable Metrics/AbcSize
       def initialize(slice, tables:)
         super
         @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
@@ -269,6 +270,7 @@ module Wrapsher
         end
         @line = slice[:type].line_and_column[0] if slice[:type].respond_to?(:line_and_column)
       end
+      # rubocop:enable Metrics/AbcSize
 
       def summary(use_name = nil)
         "#{type} #{use_name || name}(#{arg_definitions&.map(&:to_s)&.join(', ')})"
@@ -279,11 +281,11 @@ module Wrapsher
       end
 
       def nullary?
-        arity == 0
+        arity.zero?
       end
 
       def nary?
-        arity > 0
+        arity.positive?
       end
 
       def dispatch_type
@@ -315,6 +317,7 @@ module Wrapsher
       end
     end
 
+    # argument definitions
     class ArgDefinition < Node
       attr_reader :name, :type
 
@@ -334,6 +337,7 @@ module Wrapsher
       end
     end
 
+    # function and block bodies
     class Body < Node
       def initialize(slice, tables:)
         super
@@ -354,6 +358,7 @@ module Wrapsher
       end
     end
 
+    # int constants
     class IntTerm < Node
       def initialize(slice, tables:)
         super
@@ -374,9 +379,11 @@ module Wrapsher
     #   local variables that were captured in the closure.
     # - The any call(fun f) function in the core module
     #   strips the fun+ from
+    # rubocop:disable Metrics/ClassLength
     class Lambda < Node
       attr_reader :signature, :refid, :closure
 
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def initialize(slice, tables:)
         super
         @signature = slice[:signature]
@@ -475,6 +482,7 @@ module Wrapsher
         tables.context = saved_context
         tables.locals = saved_locals
       end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
       def errors
         @closure.errors
@@ -489,7 +497,9 @@ module Wrapsher
         ].join("\n  ")
       end
     end
+    # rubocop:enable Metrics/ClassLength
 
+    # meta <field> <data>
     class Meta < Node
       attr_reader :doc, :author, :source, :version
 
@@ -516,6 +526,7 @@ module Wrapsher
       end
     end
 
+    # module <module>
     class Module < Node
       def initialize(slice, tables:)
         super
@@ -539,6 +550,7 @@ module Wrapsher
       end
     end
 
+    # return <value>
     class Return < Node
       def initialize(slice, tables:)
         super
@@ -559,6 +571,7 @@ module Wrapsher
       end
     end
 
+    # shell <string>
     class ShellCode < Node
       def initialize(slice, tables:)
         super
@@ -570,6 +583,7 @@ module Wrapsher
       end
     end
 
+    # string contents
     class StringValue < Node
       attr_reader :value
 
@@ -590,6 +604,7 @@ module Wrapsher
       end
     end
 
+    # '...' | '''...'''
     class StringTerm < Node
       attr_reader :value
 
@@ -617,9 +632,8 @@ EOSTRING
       end
     end
 
+    # type <type> <store_type>
     class Type < Node
-      attr_reader :errors
-
       def initialize(slice, tables:)
         super
         @name = slice[:name].to_s
@@ -627,7 +641,8 @@ EOSTRING
         if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
           raise \
             Wrapsher::CompilationError,
-            "Invalid type name '#{@name}' at #{@filename}:#{@line} - must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes"
+            "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
+            'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
         end
 
         if tables.globals.key?(@name)
@@ -650,6 +665,7 @@ EOSTRING
       end
     end
 
+    # try { ... } catch <errorvar> { ... }
     class TryBlock < Node
       def initialize(slice, tables:)
         super
@@ -700,6 +716,7 @@ EOSTRING
       end
     end
 
+    # use external <command>
     class UseExternal < Node
       def initialize(slice, tables:)
         super
@@ -713,6 +730,8 @@ EOSTRING
       end
     end
 
+    # use feature <feature>
+    # pragmas
     class UseFeature < Node
       FEATURES = [
         'external'
@@ -736,6 +755,7 @@ EOSTRING
       end
     end
 
+    # use global <var> <initial_value>
     class UseGlobal < Node
       def initialize(slice, tables:)
         super
@@ -760,6 +780,7 @@ EOSTRING
       end
     end
 
+    # use module <module>
     class UseModule < Node
       attr_accessor :included
 
@@ -770,10 +791,11 @@ EOSTRING
         @included_nodes = [include].compact.flatten
       end
 
+      # rubocop:disable Metrics/AbcSize
       def include
         return if tables.included[@module_name]
 
-        wsh_include_path = tables.options[:wsh_include_path] || WSH_INCLUDE_PATH
+        wsh_include_path = tables.options[:wsh_include_path] || Wrapsher::Include.path
 
         wsh_include_path.flat_map do |loc|
           module_filename = "#{loc}/#{@module_name}.wsh"
@@ -794,8 +816,9 @@ EOSTRING
         end
         raise \
           Wrapsher::CompilationError,
-          "Module #{@module_name} not found in include paths: #{WSH_INCLUDE_PATH.join(', ')}"
+          "Module #{@module_name} not found in include paths: #{wsh_include_path.join(':')}"
       end
+      # rubocop:enable Metrics/AbcSize
 
       def to_s
         [
@@ -805,6 +828,7 @@ EOSTRING
       end
     end
 
+    # <var>
     class VarRef < Node
       def initialize(slice, tables:)
         super
@@ -819,7 +843,7 @@ EOSTRING
       end
 
       def ok
-        @@builtin_locals.include?(@name) || tables.globals.key?(@name) || @defined_locals.include?(@name)
+        BUILTIN_LOCALS.include?(@name) || tables.globals.key?(@name) || @defined_locals.include?(@name)
       end
 
       def to_s
@@ -833,6 +857,7 @@ EOSTRING
     class Version < Node
     end
 
+    # while <condition> { ... }
     class While < Node
       def initialize(slice, tables:)
         super
@@ -885,7 +910,7 @@ EOSTRING
 
     attr_reader :filename, :tables
 
-    @@nodes = {
+    NODES = {
       assignment: Assignment,
       bool_term: BoolTerm,
       break: Break,
@@ -912,15 +937,15 @@ EOSTRING
       while: While
     }.freeze
 
-    @@builtin_locals = %w[_reflist].freeze
+    BUILTIN_LOCALS = %w[_reflist].freeze
 
     class << self
       def from_obj(obj, tables:)
         PP.pp(obj, $stderr) unless obj.respond_to?(:keys)
         type = obj.keys.first
-        raise NotImplementedError, "Unknown node type: #{type}" unless @@nodes.key?(type)
+        raise NotImplementedError, "Unknown node type: #{type}" unless NODES.key?(type)
 
-        @@nodes[type].new(obj[type], tables: tables)
+        NODES[type].new(obj[type], tables: tables)
       end
     end
   end

@@ -53,6 +53,7 @@ task site: :docs do
   sh 'mdbook build'
 end
 
+# rubocop:disable Metrics/BlockLength
 namespace :profile do
   desc <<~DESC
     Convert JSON event stream FILE into Chrome traceEvents file.
@@ -95,3 +96,4 @@ namespace :profile do
     puts "Wrote #{output_file} (#{events.size} events)"
   end
 end
+# rubocop:enable Metrics/BlockLength

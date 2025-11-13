@@ -11,6 +11,7 @@ require 'parslet'
 require 'pry'
 
 module Wrapsher
+  # Utilities used in transformation
   class TransformUtil
     class << self
       # This should maybe be done further
@@ -23,9 +24,9 @@ module Wrapsher
       # a map, and for now, that's here.
       #
       # Is this pair.from_kv(...)?
-      def transformed_pair?(p)
-        if p[:fun_call] && p[:fun_call][:name] == 'from_kv' &&
-           p[:fun_call][:fun_args][0] == { var_ref: 'pair' }
+      def transformed_pair?(maybe_pair)
+        if maybe_pair[:fun_call] && maybe_pair[:fun_call][:name] == 'from_kv' &&
+           maybe_pair[:fun_call][:fun_args][0] == { var_ref: 'pair' }
           true
         else
           false
@@ -34,7 +35,11 @@ module Wrapsher
     end
   end
 
+  # Transforms parser tree into Wrapsher AST
+  # understood by the code generator
+  # rubocop:disable Metrics/ClassLength
   class Transform < Parslet::Transform
+    # rubocop:disable Metrics/BlockLength
     rule(list_term: subtree(:elements)) do
       the_elements = [elements].compact.flatten
 
@@ -71,6 +76,7 @@ module Wrapsher
         the_list
       end
     end
+    # rubocop:enable Metrics/BlockLength
 
     rule(pair: subtree(:pair)) do
       {
@@ -251,4 +257,5 @@ module Wrapsher
       end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

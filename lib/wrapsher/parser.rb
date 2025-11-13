@@ -12,6 +12,7 @@ require 'parslet'
 require 'wrapsher'
 
 module Wrapsher
+  # Wrapsher parser
   class Parser
     def initialize(logger: nil, level: nil)
       @logger = logger || Logger.new($stderr)

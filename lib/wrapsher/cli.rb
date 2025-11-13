@@ -16,6 +16,7 @@ require 'pry'
 
 module Wrapsher
   # Interpret command line arguments and options
+  # rubocop:disable Metrics/ClassLength
   class CLI
     def self.run(argv)
       me = new(argv)
@@ -23,15 +24,12 @@ module Wrapsher
     end
 
     def default_options
-      rv = {
+      {
         expr: [],
         level: :INFO,
-        wsh_include_path: ['wsh'],
+        wsh_include_path: Wrapsher::Include.path,
         directory: nil
       }
-      rv[:wsh_include_path].unshift("#{ENV['WSH_HOME']}/wsh") if ENV['WSH_HOME']
-      rv[:wsh_include_path] = ENV['WSH_INCLUDE'].split(':') + @options[:wsh_include_path] if ENV['WSH_INCLUDE']
-      rv
     end
 
     def initialize(argv)
@@ -189,6 +187,7 @@ module Wrapsher
       end
     end
 
+    # rubocop:disable Metrics/AbcSize
     def do_transform(args)
       args = @file_optparser.parse(*args)
       parser = Wrapsher::Parser.new(logger: @logger, level: @options[:level])
@@ -208,6 +207,7 @@ module Wrapsher
         end
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     def do_parse(args)
       args   = @file_optparser.parse(*args)
@@ -227,4 +227,5 @@ module Wrapsher
       end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'wrapsher'
 
 # This Source Code Form is subject to the terms of the Mozilla Public

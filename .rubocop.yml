@@ -1,5 +1,10 @@
 AllCops:
   TargetRubyVersion: 3.0
+  Exclude:
+    - Brewfile
+
+Style/HashLikeCase:
+  Enabled: false
 
 Style/StringLiterals:
   Enabled: true
