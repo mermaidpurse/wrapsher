@@ -6,7 +6,7 @@
 #
 # Copyright (c) 2025 Mermaidpurse
 
-require 'english'
+require 'English'
 require 'fileutils'
 require 'json'
 require 'logger'
