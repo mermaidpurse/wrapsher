@@ -49,3 +49,9 @@ they will use it.
 Module documentation should be written to inform the programmer who is
 using and loading the module. Program documentation should be written
 to inform the user who is running the command to accomplish a task.
+
+---
+
+> <sub>Copyright (c) 2025 Mermaidpurse
+> [MPL-2.0](https://www.mozilla.org/MPL/2.0/) (code)
+> [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) (docs)</sub>

@@ -1,3 +1,11 @@
+# frozen_string_literal: true
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
 require 'english'
 require 'fileutils'
 require 'json'
@@ -18,7 +26,8 @@ module Wrapsher
       rv = {
         expr: [],
         level: :INFO,
-        wsh_include_path: ['wsh']
+        wsh_include_path: ['wsh'],
+        directory: nil
       }
       rv[:wsh_include_path].unshift("#{ENV['WSH_HOME']}/wsh") if ENV['WSH_HOME']
       rv[:wsh_include_path] = ENV['WSH_INCLUDE'].split(':') + @options[:wsh_include_path] if ENV['WSH_INCLUDE']
@@ -31,10 +40,14 @@ module Wrapsher
       @logger = Logger.new $stderr
       @options = default_options
       @file_optparser = OptionParser.new do |opts|
-        opts.on('-eCODE', '--expr CODE', 'Expression/Wrapsher code to process') { |expr| @options[:expr] << expr }
-        opts.on('-IINCLUDE', '--include INCLUDE', 'Directory to search for Wrapsher modules') do |expr|
+        # TODO: Short options don't seem to work?
+        opts.on('-e', '--expr CODE', 'Expression/Wrapsher code to process') { |expr| @options[:expr] << expr }
+        opts.on('-I', '--include INCLUDE', 'Directory to search for Wrapsher modules') do |expr|
           @options[:wsh_include_path] ||= []
           @options[:wsh_include_path] = [expr] + @options[:wsh_include_path]
+        end
+        opts.on('-d', '--directory DIR', 'Output directory') do |expr|
+          @options[:directory] = expr
         end
         opts.on(
           '-pSHELL',
@@ -53,6 +66,8 @@ module Wrapsher
         help @argv
       when 'run'
         do_run @argv
+      when 'docs'
+        do_docs @argv
       when 'test'
         do_test @argv
       when 'compile'
@@ -73,13 +88,40 @@ module Wrapsher
         Usage:
           wrapsher COMMAND [options...]
 
-          Run wrapsher COMMAND --help for help:
+        Run wrapsher COMMAND --help for help:
             wrapsher compile
+            wrapsher docs
             wrapsher run
             wrapsher test
             wrapsher transform
             wrapsher parse
       HELP
+    end
+
+    def output_filename(source, ext = nil)
+      dest = if @options[:directory]
+               File.join(@options[:directory], File.basename(source))
+             else
+               source
+             end
+      dest = dest.delete_suffix('.wsh')
+      dest += ext if ext
+      dest
+    end
+
+    def do_docs(args)
+      args = @file_optparser.parse(*args)
+      compiler = Wrapsher::Compiler.new(logger: @logger, level: @options[:level])
+
+      args.each do |source|
+        output = output_filename(source, '.wsh.md')
+        docs = compiler.docs(
+          source,
+          type: :program,
+          tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options)
+        )
+        File.open(output, 'w', 0o755) { |fh| fh.write(docs) }
+      end
     end
 
     def do_run(args)
@@ -92,7 +134,7 @@ module Wrapsher
       else
         args.each do |source|
           source = File.expand_path(source)
-          output = source.delete_suffix('.wsh')
+          output = output_filename(source)
           compiled = compiler.compile(
             source,
             tables: Wrapsher::ProgramTables.new(filename: source, logger: @logger, options: @options),
@@ -113,7 +155,7 @@ module Wrapsher
 
       # TODO: Discover test files
       args.each do |source|
-        output = source.delete_suffix('.wsh')
+        output = output_filename(source)
         # TODO: change to :test ?
         compiled = compiler.compile(
           source,
@@ -136,7 +178,7 @@ module Wrapsher
         puts compiled
       else
         args.each do |source|
-          output = source.delete_suffix('.wsh')
+          output = output_filename(source)
           compiled = compiler.compile(
             source,
             type: :program,
@@ -157,8 +199,8 @@ module Wrapsher
         puts JSON.pretty_generate(transformed)
       else
         args.each do |source|
-          ppoutput = source.delete_suffix('.wsh') + '.pp'
-          output = source.delete_suffix('.wsh') + '.json'
+          ppoutput = output_filename(source, '.pp')
+          output = output_filename(source, '.json')
           parsed = parser.parse(source)
           transformed = Wrapsher::Transformer.new(logger: @logger, level: @options[:level]).transform(parsed)
           File.open(ppoutput, 'w') { |fh| PP.pp(transformed, fh) }
@@ -176,8 +218,8 @@ module Wrapsher
         puts JSON.pretty_generate(parsed)
       else
         args.each do |source|
-          ppoutput = source.delete_suffix('.wsh') + '.pp'
-          output = source.delete_suffix('.wsh') + '.json'
+          ppoutput = output_filename(source, '.pp')
+          output = output_filename(source, '.json')
           parsed = parser.parse(source)
           File.open(ppoutput, 'w') { |fh| PP.pp(parsed, fh) }
           File.open(output, 'w') { |fh| fh.write(JSON.pretty_generate(parsed)) }

@@ -1,5 +1,6 @@
 # wsh:preamble for scripts
 # Clear environment variables to prevent injection of bad initial values in `_wsh_ variables
+
 _wsh_clearenv() {
   _wsh_clearenv_env="$(export -p)"
   _wsh_iter=0

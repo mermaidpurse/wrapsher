@@ -7,6 +7,7 @@ Gem::Specification.new do |spec|
   spec.version = Wrapsher::VERSION
   spec.authors = ['Mermaidpurse Admin']
   spec.email = ['admin@mermaidpurse.org']
+  spec.license = 'MPL-2.0'
 
   spec.summary = 'Wrapsher programming language compiler and tools'
   spec.description = <<~DESC

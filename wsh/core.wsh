@@ -1,6 +1,14 @@
 module core
 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
 meta doc '''
+# core
+
 Wrapsher language core
 
 ## Usage
@@ -8,8 +16,57 @@ Wrapsher language core
 This module is implicitly `use`-ed in every Wrapsher program; there is
 no need to `use module core`. It contains functions that operate on all
 the core language types and provides several other utilities and types.
-'''
 
+## Types
+
+### `program_info`
+
+An fstruct describing information about the currently-compiled program.
+
+```wrapsher
+string name(program_info pi) { }
+string location(program_info pi) { }
+program_info set_name(program_info pi, string name) { }
+program_info set_location(program_info, string location) { }
+```
+
+### `command_info`
+
+An fstruct describing information about a command.
+
+```wrapsher
+string name(command_info ci) { }
+string location(command_info ci) { }
+string is_external(command_info ci) { }
+string is_available(command_info ci) { }
+```
+
+Use the `command_info get(type/command_info t, string name)` to get information
+about a command.
+
+Use the `command_info need(type/command_info t, string name)` to get information
+about a cammond, and throw an error if the command is not available.
+
+### `command_result`
+
+An fstruct describing the results of running a command.
+
+```wrapsher
+int exitcode(command_result cr) { }
+string output(command_result cr) { }
+list lines(command_result cr) { }
+bool is_success(command_result cr) { }
+```
+
+Run a command and get its output with the `command_result run(command_info ci, list args)`
+function. The `args` argument is passed to the command on its command line.
+
+## Global Variables
+
+- `program_info program`: Information about the currently-compiled program
+- `list externals`: list of `command_info`, information about external commands
+
+'''
 type error builtin
 type fun builtin
 type type builtin

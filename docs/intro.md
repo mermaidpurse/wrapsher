@@ -148,3 +148,9 @@ _Or: How does it work?_
 - [Internals](./internals.md)
 - [Decisions](./decisions.md)
 - [Roadmap](./roadmap.md)
+
+---
+
+> <sub>Copyright (c) 2025 Mermaidpurse
+> [MPL-2.0](https://www.mozilla.org/MPL/2.0/) (code)
+> [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) (docs)</sub>

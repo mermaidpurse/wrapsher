@@ -96,7 +96,7 @@ Top-level statements in Wrapsher can be:
     - `meta doc`: help documentation for the module or program.
       top-level (not in a `module`), this is used as help text in
       the standard option processing. See [Documentation Style](style.md)
-      for more. **UNIMPLEMENTED**
+      for more.
 - A `module` statement which defines the program as a loadable module,
   which can be loaded in other programs with a `use` statement, as well
   as the function namespace. See [Modules and Types](./modules-types.md)
@@ -750,12 +750,18 @@ The folllowing modules comprise the standard library:
 
 | Module | Description | Status |
 | :----- | :---------- | :----- |
-| [**core**](./wsh/core.wsh) | Core functions and builtin types--always included | pre-alpha |
-| [**io**](./wsh/io.wsh) | Basic I/O based on `echo` and `printf` | pre-alpha |
-| [**test**](./wsh/test.wsh) | Test framework | pre-alpha |
-| [**math**](./wsh/math.wsh) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
-| [**sys**](./wsh/sys.wsh) | System platform | **UNIMPLEMENTED** |
-| [**optparse**](./wsh/optparse.wsh) | Parse command-line options | **UNIMPLEMENTED** |
-| [**crypto**](./wsh/crypto.wsh) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |
-| [**http**](./wsh/http.wsh) | HTTP communication based on `curl` | **UNIMPLEMENTED** |
-| [**json**](./wsh/json.wsh) | JSON handling based on `jq` | **UNIMPLEMENTED** |
+| [**core**](./wsh/core.wsh.md) | Core functions and builtin types--always included | pre-alpha |
+| [**io**](./wsh/io.wsh.md) | Basic I/O based on `echo` and `printf` | pre-alpha |
+| [**test**](./wsh/test.wsh.md) | Test framework | pre-alpha |
+| [**math**](./wsh/math.wsh.md) | Floats and math functions based on `bc` | **UNIMPLEMENTED** |
+| [**sys**](./wsh/sys.wsh.md) | System platform | **UNIMPLEMENTED** |
+| [**optparse**](./wsh/optparse.wsh.md) | Parse command-line options | **UNIMPLEMENTED** |
+| [**crypto**](./wsh/crypto.wsh.md) | Cryptographic operations based on `openssl` | **UNIMPLEMENTED** |
+| [**http**](./wsh/http.wsh.md) | HTTP communication based on `curl` | **UNIMPLEMENTED** |
+| [**json**](./wsh/json.wsh.md) | JSON handling based on `jq` | **UNIMPLEMENTED** |
+
+---
+
+> <sub>Copyright (c) 2025 Mermaidpurse
+> [MPL-2.0](https://www.mozilla.org/MPL/2.0/) (code)
+> [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) (docs)</sub>

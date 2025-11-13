@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
 require 'json'
 require 'logger'
 require 'parslet'
@@ -9,7 +15,7 @@ module Wrapsher
   # Syntax definition for Wrapsher
   # rubocop:disable Metrics/ClassLength
   class Syntax < Parslet::Parser
-    rule(:program)                  { (comment >> str("\n") | statement).repeat }
+    rule(:program)                  { (eol | comment >> str("\n") | statement).repeat }
     rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol }
     rule(:use_statement)            do
       use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement

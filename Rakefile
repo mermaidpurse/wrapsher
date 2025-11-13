@@ -28,12 +28,28 @@ task :test, [:test_file] do |_, args|
   end
 end
 
+WSH_SOURCES = Rake::FileList.new('wsh/**.wsh') do |fl|
+  fl.exclude(/_test.wsh$/)
+end
+
+desc <<~DESC
+  Generate Wrapsher documentation
+    Usage:
+      rake docs
+DESC
+task :docs do
+  mkdir_p 'docs/wsh'
+  WSH_SOURCES.each do |source|
+    sh "bundle exec wrapsher docs --directory=docs/wsh #{source}"
+  end
+end
+
 desc <<~DESC
   Generate Wrapsher documentation site
     Usage:
       rake site
 DESC
-task :site do
+task site: :docs do
   sh 'mdbook build'
 end
 

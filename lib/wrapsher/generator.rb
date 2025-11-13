@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
 require 'json'
 require 'logger'
 require 'parslet'
@@ -43,6 +49,20 @@ module Wrapsher
       else
         ''
       end
+    end
+
+    def docs(program, tables: nil)
+      nodes = [program].flatten.map do |obj|
+        Wrapsher::Node.from_obj(obj, tables: tables)
+      end
+      meta_nodes = nodes.select do |node|
+        node.is_a? Wrapsher::Node::Meta
+      end
+      doc = []
+      meta_nodes.each do |node|
+        doc += [node.doc] if node.doc
+      end
+      doc.join("\n").delete_prefix("\n")
     end
 
     def generate(program, tables: nil)

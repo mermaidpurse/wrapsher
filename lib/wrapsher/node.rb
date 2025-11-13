@@ -1,3 +1,11 @@
+# frozen_string_literal: true
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
 require 'parslet'
 require 'wrapsher'
 require 'pry'
@@ -483,6 +491,8 @@ module Wrapsher
     end
 
     class Meta < Node
+      attr_reader :doc, :author, :source, :version
+
       def initialize(slice, tables:)
         super
         @line = slice[:meta_field].line_and_column[0] if slice[:meta_field].respond_to?(:line_and_column)
@@ -490,6 +500,12 @@ module Wrapsher
         case @field
         when 'doc'
           @doc = StringValue.new(slice[:meta_data], tables: tables)
+        when 'author'
+          @author = StringValue.new(slice[:meta_data], tables: tables)
+        when 'version'
+          @version = StringValue.new(slice[:meta_data], tables: tables)
+        when 'source'
+          @source = StringValue.new(slice[:meta_data], tables: tables)
         else
           raise Wrapsher::CompilationError, "Unknown meta field: #{@field} at #{@filename}:#{@line}"
         end

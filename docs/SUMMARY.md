@@ -10,3 +10,8 @@
 - [Style Guide](style.md)
 - [Decisions (Design and Musing)](decisions.md)
 - [Roadmap and Statuses](roadmap.md)
+- [Modules](wsh/modules.md)
+  - [core.wsh](wsh/core.wsh.md)
+  - [env.wsh](wsh/env.wsh.md)
+  - [io.wsh](wsh/io.wsh.md)
+  - [test.wsh](wsh/test.wsh.md)

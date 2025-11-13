@@ -1,5 +1,42 @@
 module io
 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
+meta doc '''
+# io
+
+Basic I/O using stdin, stdout, stderr via the commands printf and echo
+
+## Global Variables
+
+- `int stdout`: The file descriptor of the standard output
+- `int stderr`: The file descriptor of the standard error
+
+## Functions
+
+### `int println(module/io m, string s)`
+
+Print the string (with a newline added) and return the number of
+characters printed. For example:
+
+```wrapsher
+io.printlin('hello, world')
+```
+
+### `int println(int fd, string s)`
+
+Print the string to the specified file descriptor. For example:
+
+```wrapsher
+stderr.println('an error has occurred: ' + e.message())
+```
+
+'''
+
 use external printf
 
 use global stderr 2

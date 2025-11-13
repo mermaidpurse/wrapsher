@@ -157,3 +157,10 @@ would use this to initialize globals that can't have a hardcoded
 value, or that have a collection value.
 
 The **core** module uses this function to check external command dependencies.
+
+
+---
+
+> <sub>Copyright (c) 2025 Mermaidpurse
+> [MPL-2.0](https://www.mozilla.org/MPL/2.0/) (code)
+> [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) (docs)</sub>

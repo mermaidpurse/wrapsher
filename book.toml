@@ -1,26 +1,22 @@
 [book]
 title = "Wrapsher"
 authors = ["Mermaidpurse"]
-description = "The Wrapsher language manual and design notes."
+description = "The Wrapsher programming language."
 language = "en"
 multilingual = false
 src = "docs"
 
 [build]
-build-dir = "book"        # output dir; `mdbook build` will write here
-create-missing = false    # don’t auto-create missing chapter files
+build-dir = "book"
+create-missing = false
 
 [output.html]
-# Built-in themes: light, rust, coal, navy, ayu
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
 smart-punctuation = true
 git-repository-url = "https://github.com/mermaidpurse/wrapsher"
 git-repository-icon = "fa-github"
 additional-js = ["docs/theme/wrapsher-hljs.js"]
-
-# You can add extra CSS files later (see notes below)
-# additional-css = ["css/wrapsher.css"]
 
 [output.html.search]
 enable = true

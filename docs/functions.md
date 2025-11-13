@@ -161,3 +161,9 @@ int main(list args) {
   0
 }
 ```
+
+---
+
+> <sub>Copyright (c) 2025 Mermaidpurse
+> [MPL-2.0](https://www.mozilla.org/MPL/2.0/) (code)
+> [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) (docs)</sub>
