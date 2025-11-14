@@ -13,7 +13,7 @@ module Wrapsher
   # rubocop:disable Metrics/ClassLength
   class ProgramTables
     attr_accessor :filename, :functions, :globals, :feature, :external, :included, :compiler_refid, :adds,
-                  :options, :context, :locals, :state, :modules, :in_module
+                  :options, :context, :types, :locals, :state, :modules, :in_module
 
     # rubocop:disable Metrics/ParameterLists
     def initialize(
@@ -28,6 +28,7 @@ module Wrapsher
       logger: Logger.new($stderr),
       options: {},
       modules: [],
+      types: {},
       in_module: nil
     )
       @filename = filename
@@ -44,6 +45,7 @@ module Wrapsher
       @logger = logger
       @options = options
       @modules = modules
+      @types = types
       @in_module = in_module
       @logger.debug(
         "ProgramTables initialized with logger level: #{@logger.level}, " \
@@ -83,7 +85,7 @@ module Wrapsher
         },
         tables: self
       )
-      nodes += use_globals(%w[_globals _externals _functions])
+      nodes += use_globals(%w[_globals _externals _functions _types])
       nodes += feature_assignments
       nodes << program_init_call
       nodes += adds
@@ -104,19 +106,25 @@ module Wrapsher
             {
               assignment: {
                 var: '_functions',
-                rvalue: functions_rvalue
+                rvalue: rvalue(functions.keys)
               }
             },
             {
               assignment: {
                 var: '_globals',
-                rvalue: globals_rvalue
+                rvalue: rvalue(globals.keys)
+              }
+            },
+            {
+              assignment: {
+                var: '_types',
+                rvalue: rvalue(types.keys)
               }
             },
             {
               assignment: {
                 var: '_externals',
-                rvalue: externals_rvalue
+                rvalue: rvalue(external.keys)
               }
             },
             module_init_calls,
@@ -156,55 +164,19 @@ module Wrapsher
       end
     end
 
-    def externals_rvalue
-      external.keys.reduce(
+    def rvalue(elements)
+      elements.reduce(
         {
           fun_call: {
             name: 'new',
             fun_args: [{ var_ref: 'list' }]
           }
         }
-      ) do |acc, external_name|
+      ) do |acc, element|
         {
           fun_call: {
             name: 'push',
-            fun_args: [acc, { string_term: { single_quoted: external_name } }]
-          }
-        }
-      end
-    end
-
-    def globals_rvalue
-      globals.keys.reduce(
-        {
-          fun_call: {
-            name: 'new',
-            fun_args: [{ var_ref: 'list' }]
-          }
-        }
-      ) do |acc, global_name|
-        {
-          fun_call: {
-            name: 'push',
-            fun_args: [acc, { string_term: { single_quoted: global_name } }]
-          }
-        }
-      end
-    end
-
-    def functions_rvalue
-      functions.keys.reduce(
-        {
-          fun_call: {
-            name: 'new',
-            fun_args: [{ var_ref: 'list' }]
-          }
-        }
-      ) do |acc, fn_name|
-        {
-          fun_call: {
-            name: 'push',
-            fun_args: [acc, { string_term: { single_quoted: fn_name } }]
+            fun_args: [acc, { string_term: { single_quoted: element } }]
           }
         }
       end
@@ -223,9 +195,11 @@ module Wrapsher
       end.compact
     end
 
+    # rubocop:disable Metrics/AbcSize
     def to_s
       lines = []
       lines << "filename: #{filename}"
+      lines << "types: #{types.keys.join(' ')}"
       lines << "globals: #{globals.keys.join(' ')}"
       lines << "external: #{external.keys.join(' ')}"
       lines << 'included:'
@@ -241,6 +215,7 @@ module Wrapsher
       end
       lines.join("\n")
     end
+    # rubocop:enable Metrics/AbcSize
   end
   # rubocop:enable Metrics/ClassLength
 end

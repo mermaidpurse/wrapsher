@@ -735,38 +735,253 @@ EOSTRING
       end
     end
 
-    # type <type> <store_type>
-    class Type < Node
+    # struct <struct_name> [map]
+    # rubocop:disable Metrics/ClassLength
+    class Struct < Node
       def initialize(slice, tables:)
         super
+        @types = {}
         @name = slice[:name].to_s
-        @store_type = slice[:store_type].to_s if slice[:store_type]
-        if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
-          raise \
-            Wrapsher::CompilationError,
-            "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
-            'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
-        end
-
-        if tables.globals.key?(@name)
-          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
-        end
-
-        tables.globals[@name] = true
+        @line = slice[:name].line_and_column[0] if slice[:name].respond_to? :line_and_column
+        @type_statement = Node.from_obj(type_statement(slice[:name]), tables: tables)
+        @functions = make_functions(slice[:struct_spec])
       end
 
+      def type_statement(slice)
+        {
+          type: {
+            name: slice,
+            store_type: 'list'
+          }
+        }
+      end
+
+      def fail(message)
+        raise Wrapsher::CompilationError, "#{message} at #{@filename}:#{@line}"
+      end
+
+      def make_functions(spec)
+        fail('cannot specify an empty struct') if spec[:empty_map_term]
+        fail('struct spec is not a map') unless spec[:list_term]
+
+        elements = spec[:list_term][:elements]
+        fail('struct spec is not a map') if elements.nil?
+
+        elements = [elements] unless elements.is_a?(Array)
+        members = elements.map.with_index { |element, idx| extract_member(idx, element) }
+        accessors = members.map.with_index { |member, idx| make_function(idx, member) }.flatten
+        accessors + [make_constructor(members)]
+      end
+
+      def extract_member(idx, element)
+        fail('struct spec is not a map') unless element[:pair]
+
+        key = element[:pair][:key]
+        value = element[:pair][:value]
+        fail("struct spec key in pair #{idx} is not a string") unless key[:string_term]
+        fail("struct spec value in pair #{idx} is not a type") unless value[:var_ref]
+
+        key = StringValue.new(key[:string_term], tables: tables).to_s
+        member_type = value[:var_ref]
+        @types[member_type.to_s] = true
+
+        {
+          key: key,
+          type: member_type
+        }
+      end
+
+      def make_constructor(members)
+        Node.from_obj(
+          {
+            fun_statement: {
+              signature: {
+                type: @name,
+                name: 'new',
+                arg_definitions: [
+                  {
+                    type: "type/#{@name}",
+                    name: 't'
+                  }
+                ]
+              },
+              body: constructor_expression(members)
+            }
+          },
+          tables: tables
+        )
+      end
+
+      # _as(push(new(list), element), @name)
+      # rubocop:disable Metrics/MethodLength
+      def constructor_expression(members)
+        list = members.reduce(
+          {
+            fun_call: {
+              name: 'new',
+              fun_args: [
+                { var_ref: 'list' }
+              ]
+            }
+          }
+        ) do |acc, member|
+          {
+            fun_call: {
+              name: 'push',
+              fun_args: [
+                acc,
+                {
+                  fun_call: {
+                    name: 'new',
+                    fun_args: [
+                      { var_ref: member[:type] }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        end
+        {
+          fun_call: {
+            name: '_as',
+            fun_args: [
+              list,
+              { var_ref: @name }
+            ]
+          }
+        }
+      end
+      # rubocop:enable Metrics/MethodLength
+
+      def make_function(idx, member)
+        [
+          getter(member[:type], idx, member[:key]),
+          setter(member[:type], idx, member[:key])
+        ]
+      end
+
+      def getter(member_type, idx, key)
+        Node.from_obj(
+          {
+            fun_statement: {
+              signature: {
+                type: member_type,
+                name: key,
+                arg_definitions: [
+                  {
+                    type: @name,
+                    name: 'st'
+                  }
+                ]
+              },
+              body: getter_expression(idx)
+            }
+          },
+          tables: tables
+        )
+      end
+
+      # at(_as(st, list), idx)
+      def getter_expression(idx)
+        [
+          {
+            fun_call: {
+              name: 'at',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: '_as',
+                    fun_args: [
+                      { var_ref: 'st' },
+                      { var_ref: 'list' }
+                    ]
+                  }
+                },
+                { int_term: idx }
+              ]
+            }
+          }
+        ]
+      end
+
+      def setter(member_type, idx, key)
+        Node.from_obj(
+          {
+            fun_statement: {
+              signature: {
+                type: @name,
+                name: "set_#{key}",
+                arg_definitions: [
+                  {
+                    type: @name,
+                    name: 'st'
+                  },
+                  {
+                    type: member_type,
+                    name: 'value'
+                  }
+                ]
+              },
+              body: setter_expression(idx)
+            }
+          },
+          tables: tables
+        )
+      end
+
+      # _as(set(_as(st, list), idx, value), type_name)
+      # rubocop:disable Metrics/MethodLength
+      def setter_expression(idx)
+        [
+          {
+            fun_call: {
+              name: '_as',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'set',
+                    fun_args: [
+                      {
+                        fun_call: {
+                          name: '_as',
+                          fun_args: [
+                            { var_ref: 'st' },
+                            { var_ref: 'list' }
+                          ]
+                        }
+                      },
+                      { int_term: idx },
+                      { var_ref: 'value' }
+                    ]
+                  }
+                },
+                { var_ref: @name }
+              ]
+            }
+          }
+        ]
+      end
+      # rubocop:enable Metrics/MethodLength
+
       def errors
-        ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+        err = []
+        @types.each_key do |type_name|
+          err << "type #{type_name} is not valid in struct spec at #{@filename}:#{@line}" unless tables.types[type_name]
+        end
+        err
       end
 
       def to_s
         code = []
-        code << line
-        code << "# type #{@name}"
-        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        code << @type_statement.to_s
+        @functions.each do |f|
+          code << f.to_s
+        end
         code.join("\n")
       end
     end
+    # rubocop:enable Metrics/ClassLength
 
     # try { ... } catch <errorvar> { ... }
     class TryBlock < Node
@@ -814,6 +1029,40 @@ EOSTRING
         code << @catch_body.to_s
         code << ';;'
         code << 'esac # end catch block'
+      end
+    end
+
+    # type <type> <store_type>
+    class Type < Node
+      def initialize(slice, tables:)
+        super
+        @name = slice[:name].to_s
+        @store_type = slice[:store_type].to_s if slice[:store_type]
+        if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
+          raise \
+            Wrapsher::CompilationError,
+            "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
+            'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
+        end
+
+        if tables.globals.key?(@name)
+          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
+        end
+
+        tables.globals[@name] = true
+        tables.types[@name] = true
+      end
+
+      def errors
+        ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+      end
+
+      def to_s
+        code = []
+        code << line
+        code << "# type #{@name}"
+        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        code.join("\n")
       end
     end
 

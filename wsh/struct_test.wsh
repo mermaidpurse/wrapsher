@@ -1,0 +1,22 @@
+use module test
+
+struct person ['name': string, 'age': int]
+
+bool test_struct_new() {
+  p = person.new()
+  p.is_a(person)
+}
+
+bool test_struct_set_get() {
+  p = person.new().set_name('Glinda')
+  p.name() == 'Glinda'
+}
+
+bool test_struct_set_invalid() {
+  p = person.new()
+  try {
+    p = p.set_age('foo')
+  } catch e {
+    e.message().has('Expected type \'int\'')
+  }
+}

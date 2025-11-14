@@ -2,6 +2,7 @@
 
 ## Issues
 
+- Check that types in various places are actually types
 - We badly need either module-scoped variables or an easy way to use module
   fstructs.
 - Parser: Multiline function calls, or maybe multiline function calls with
