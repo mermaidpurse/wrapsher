@@ -36,7 +36,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           @rvalue.to_s,
           tables.globals[@name] ? "_wshg_#{@name}=\"${_wsh_result}\"" : "_wsh_set_local #{@name} \"${_wsh_result}\""
         ].join("\n  ")
@@ -52,7 +51,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "_wsh_result='bool:#{@value}'"
         ].join("\n  ")
       end
@@ -69,7 +67,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           'break # break'
         ].join("\n  ")
       end
@@ -105,16 +102,13 @@ module Wrapsher
 
       def to_s
         code = []
-        code << line
         code << @condition.to_s
-        code << line
         code << "_wsh_assert \"${_wsh_result}\" 'bool' 'if condition' || break"
         code << 'case "${_wsh_result}" in bool:true)'
         code << @then_body.to_s
         code << ';;'
         if @else_body
           code << '*)'
-          code << line
           code << @else_body.to_s
           code << ';;'
         end
@@ -134,9 +128,30 @@ module Wrapsher
 
       def to_s
         [
-          line,
           'continue # continue'
         ].join("\n  ")
+      end
+    end
+
+    # [:]
+    class EmptyMapTerm < Node
+      def initialize(slice, tables:)
+        super
+        @inner = Node.from_obj(inner_ast, tables: tables)
+        @inner.line = @line
+      end
+
+      def inner_ast
+        {
+          fun_call: {
+            name: 'new',
+            fun_args: [{ var_ref: 'map' }]
+          }
+        }
+      end
+
+      def to_s
+        @inner.to_s
       end
     end
 
@@ -154,9 +169,9 @@ module Wrapsher
 
       def errors
         e = []
-        e << ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
+        e << ["No such function '#{@function_name}' at #{filename}:#{@line}"] unless tables.functions.key?(@function_name)
         if @function_args.empty? && !tables.functions[@function_name].key?(:nullary)
-          e << ["No nullary function '#{@function_name}()' at #{line}"]
+          e << ["No nullary function '#{@function_name}()' at #{filename}:#{line}"]
         end
         # We can't actually check for the right arity functions which accept an argument
         # because we don't (yet) know the type of the first argument.
@@ -165,12 +180,10 @@ module Wrapsher
 
       def function_dispatch
         code = []
-        code << line
         code << "_wsh_prof_event B wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
         code << "_wsh_prof_event E wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_check_return \"in #{@function_name} at #{@filename}:#{@line}\" || break"
-        code << line
         code.join("\n  ")
       end
 
@@ -178,7 +191,7 @@ module Wrapsher
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
-            '_wsh_stack_push "${_wsh_result}"'
+            '_wsh_stack_push "${_wsh_result}" "#{@filename}:#{@line}"'
           ].join("\n  ")
         end
         [
@@ -233,7 +246,6 @@ module Wrapsher
           "# #{@signature.summary}",
           "#{@signature.function_name(:presence)}=1",
           "#{@signature.function_name(:definition)}() {",
-          line,
           "_wsh_result='bool:false'; _wsh_error=''",
           'while :; do',
           '  :',
@@ -295,9 +307,8 @@ module Wrapsher
       def argument_binding
         @arg_definitions.map do |arg|
           [
-            line,
             '_wsh_stack_peek_into _wshi',
-            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' || break",
+            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' '#{@filename}:#{@line}' || break",
             "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\""
           ].join("\n  ")
         end.join("\n  ")
@@ -367,9 +378,76 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "_wsh_result='int:#{@value}'"
         ].join("\n  ")
+      end
+    end
+
+    # list and map terms, constant or not
+    # TODO: detect if list or map is all
+    # constants and inline them if so
+    class ListTerm < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:lbracket].line_and_column[0] if slice[:lbracket].respond_to?(:line_and_column)
+        @elements = if slice[:elements].nil?
+                      []
+                    elsif slice[:elements].is_a?(Array)
+                      slice[:elements]
+                    else
+                      [slice[:elements]]
+                    end
+        new_node = {
+          fun_call: {
+            name: 'new',
+            fun_args: [{ var_ref: 'list' }]
+          }
+        }
+        @inner_ast = if @elements.empty?
+                       new_node
+                     else
+                       list = push_elements(new_node, @elements)
+                       if @all_pairs
+                         make_map(list)
+                       else
+                         list
+                       end
+                     end
+        @inner = Node.from_obj(@inner_ast, tables: tables)
+        @inner.line = @line
+      end
+
+      def make_map(list)
+        {
+          fun_call: {
+            name: 'from_pairlist',
+            fun_args: [
+              { var_ref: 'map' },
+              list
+            ]
+          }
+        }
+      end
+
+      def push_elements(list_node, elements)
+        @all_pairs = true
+        elements.reduce(list_node) do |acc, el|
+          @all_pairs = false unless pair?(el)
+          {
+            fun_call: {
+              name: 'push',
+              fun_args: [acc, el]
+            }
+          }
+        end
+      end
+
+      def pair?(element)
+        element&.keys&.first == :pair
+      end
+
+      def to_s
+        @inner.to_s
       end
     end
 
@@ -433,6 +511,7 @@ module Wrapsher
                                      ]
                                    }
                                  }, tables: tables)
+        @closure.line = @line
 
         get_context = [
           {
@@ -491,7 +570,6 @@ module Wrapsher
       def to_s
         # Unchecked cast to fun--will be uncast in call()
         [
-          line,
           @closure.to_s,
           '_wsh_result="fun+${_wsh_result}"'
         ].join("\n  ")
@@ -544,9 +622,35 @@ module Wrapsher
       def to_s
         [
           "# module #{@name}",
-          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'",
-          line
+          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'"
         ].join("\n")
+      end
+    end
+
+    # key: value
+    class Pair < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:key].line_and_column[0] if slice[:key].respond_to?(:line_and_column)
+        @inner = Node.from_obj(inner_ast(slice), tables: tables)
+        @inner.line = @line
+      end
+
+      def inner_ast(slice)
+        {
+          fun_call: {
+            name: 'from_kv',
+            fun_args: [
+              { var_ref: 'pair' },
+              slice[:key],
+              slice[:value]
+            ]
+          }
+        }
+      end
+
+      def to_s
+        @inner.to_s
       end
     end
 
@@ -619,7 +723,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "read -r -d '' _wshi <<'EOSTRING'
 _wsh_bof#{sh_value}
 _wsh_eof
@@ -702,13 +805,11 @@ EOSTRING
 
       def to_s
         code = []
-        code << line
         code << 'while :; do # try'
         code << '  :'
         code << @try_body.to_s
         code << '  break'
         code << 'done'
-        code << "_wsh_line='#{@filename}:#{@catch_line}'"
         code << 'case "${_wsh_error}" in ?*) # catch block'
         code << @catch_body.to_s
         code << ';;'
@@ -774,7 +875,6 @@ EOSTRING
         [
           "# use global #{@global_name}",
           @initial_value.to_s,
-          line,
           "_wsh_set_global '#{@global_name}' \"${_wsh_result}\""
         ].join("\n")
       end
@@ -837,7 +937,7 @@ EOSTRING
       end
 
       def errors
-        return ["variable '#{@name}' does not exist (not global, local or builtin) at #{line}"] unless ok
+        return ["variable '#{@name}' does not exist (not global, local or builtin) at #{@filename}:#{@line}"] unless ok
 
         []
       end
@@ -848,7 +948,6 @@ EOSTRING
 
       def to_s
         [
-          line,
           tables.globals[@name] ? "_wsh_result=\"${_wshg_#{@name}}\"" : "_wsh_get_local '#{@name}' _wsh_result"
         ].join("\n  ")
       end
@@ -896,10 +995,6 @@ EOSTRING
       @line = slice.line_and_column[0] if slice.respond_to? :line_and_column
     end
 
-    def line
-      @line ? "_wsh_line='#{@filename}:#{@line}'" : ''
-    end
-
     def errors
       []
     end
@@ -908,6 +1003,7 @@ EOSTRING
       raise NotImplementedError, "Subclasses(#{self.class}) must implement a to_s method: #{inspect}"
     end
 
+    attr_accessor :line
     attr_reader :filename, :tables
 
     NODES = {
@@ -918,14 +1014,18 @@ EOSTRING
       conditional: Conditional,
       continue: Continue,
       lambda: Lambda,
+      empty_map_term: EmptyMapTerm,
       fun_call: FunCall,
       fun_statement: FunStatement,
       int_term: IntTerm,
+      list_term: ListTerm,
       module: Module,
       meta: Meta,
+      pair: Pair,
       return: Return,
       shellcode: ShellCode,
       string_term: StringTerm,
+      struct: Struct,
       try_block: TryBlock,
       type: Type,
       use_external: UseExternal,

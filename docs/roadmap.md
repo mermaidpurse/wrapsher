@@ -2,6 +2,8 @@
 
 ## Issues
 
+- We badly need either module-scoped variables or an easy way to use module
+  fstructs.
 - Parser: Multiline function calls, or maybe multiline function calls with
   funs, don't seem to work, like `map(\n...fun...\n)`, maybe
   other multiline calls. It works when you break on the `{` and
@@ -21,6 +23,8 @@
 - stdlib: The core module should contain the `env` functionality;
   including core should get you everything that is accessible
   that is required by posix.
+- The compiler command `wrapsher test <something>.wsh` doesn't work,
+  only if there's a directory in front of it.
 - Compiler: Big files
     - also caused by header constants being set in code rather
       than something terser

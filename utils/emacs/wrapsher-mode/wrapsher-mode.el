@@ -3,7 +3,7 @@
 (defvar wrapsher-mode-hook nil)
 
 (defvar wrapsher-keywords
-  '("if" "else" "use" "module" "meta" "type"
+  '("if" "else" "use" "module" "meta" "type" "struct"
     "fun" "return" "while" "break" "continue" "shell"
     "throw" "try" "catch"
     ))

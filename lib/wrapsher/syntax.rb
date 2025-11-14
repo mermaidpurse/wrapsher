@@ -13,10 +13,13 @@ require 'wrapsher'
 
 module Wrapsher
   # Syntax definition for Wrapsher
-  # rubocop:disable Metrics/ClassLength
+  # rubocop:disable Metrics/ClassLength, Layout/ExtraSpacing
   class Syntax < Parslet::Parser
     rule(:program)                  { (eol | comment >> str("\n") | statement).repeat }
-    rule(:statement)                { (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol }
+    rule(:statement)                do
+      (use_statement | meta_statement | module_statement | type_statement |
+        struct_statement | fun_statement) >> eol
+    end
     rule(:use_statement)            do
       use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement
     end
@@ -30,6 +33,9 @@ module Wrapsher
     end
     rule(:module_statement)         { str('module') >> space >> word.as(:module) }
     rule(:type_statement)           { (str('type') >> space >> word.as(:name) >> space >> word.as(:store_type)).as(:type) }
+    rule(:struct_statement)         do
+      (str('struct') >> space >> word.as(:name) >> space >> list_term.as(:struct_spec)).as(:struct)
+    end
 
     rule(:fun_statement)            { (signature.as(:signature) >> block.as(:body)).as(:fun_statement) }
     rule(:signature)                do
@@ -147,7 +153,8 @@ module Wrapsher
     rule(:term)                     { group | int_term | bool_term | string_term | empty_map_term | list_term | fun_call | var_ref }
     rule(:empty_map_term)           { (lbracket >> space? >> colon >> space? >> rbracket).as(:empty_map_term) >> space? }
     rule(:list_term)                do
-      lbracket >> whitespace? >> (expression >> (comma >> expression).repeat).maybe.as(:list_term) >>
+      (lbracket.as(:lbracket) >> whitespace? >>
+        (expression >> (comma >> expression).repeat).maybe.as(:elements)).as(:list_term) >>
         whitespace? >> rbracket >> space?
     end
     rule(:group)                    { lparen >> expression.as(:group) >> rparen >> space? }
@@ -192,5 +199,5 @@ module Wrapsher
 
     root(:program)
   end
-  # rubocop:enable Metrics/ClassLength
+  # rubocop:enable Metrics/ClassLength, Layout/ExtraSpacing
 end

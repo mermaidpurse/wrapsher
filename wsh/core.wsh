@@ -30,22 +30,22 @@ program_info set_name(program_info pi, string name) { }
 program_info set_location(program_info, string location) { }
 ```
 
-### `command_info`
+### `command`
 
 An fstruct describing information about a command.
 
 ```wrapsher
-string name(command_info ci) { }
-string location(command_info ci) { }
-string is_external(command_info ci) { }
-string is_available(command_info ci) { }
+string name(command c) { }
+string location(command c) { }
+bool is_external(command c) { }
+bool is_available(command c) { }
 ```
 
-Use the `command_info get(type/command_info t, string name)` to get information
+Use the `command get(type/command t, string name)` to get information
 about a command.
 
-Use the `command_info need(type/command_info t, string name)` to get information
-about a cammond, and throw an error if the command is not available.
+Use the `command need(type/command t, string name)` to get information
+about a command, and throw an error if the command is not available.
 
 ### `command_result`
 
@@ -58,13 +58,15 @@ list lines(command_result cr) { }
 bool is_success(command_result cr) { }
 ```
 
-Run a command and get its output with the `command_result run(command_info ci, list args)`
-function. The `args` argument is passed to the command on its command line.
+Run a command and get its output with the `command_result run(command c, list args)`
+function. The `args` argument is passed to the command on its command line. Using
+the similar `command_result run_raw(command c, list args)` does the same without
+capturing its output.
 
 ## Global Variables
 
 - `program_info program`: Information about the currently-compiled program
-- `list externals`: list of `command_info`, information about external commands
+- `list externals`: list of `command`, information about external commands
 
 '''
 type error builtin
@@ -79,7 +81,7 @@ type list reflist
 type pair reflist
 type map reflist
 type program_info list
-type command_info list
+type command list
 type command_result list
 
 use global program ''
@@ -93,8 +95,8 @@ bool init(module/core m) {
   '''
   program = program.set_location(location)
 
-  externals = _externals.map(command_info fun (string n) {
-      command_info.need(n)
+  externals = _externals.map(command fun (string n) {
+      command.need(n)
     })
 
   true
@@ -143,31 +145,32 @@ string quote(command_result cr) {
   cr._as(list).quote()
 }
 
-# command_info is an fstruct
+# command is an fstruct
 # 0 - name
 # 1 - location
 # 2 - is_external
 # 3 - is_available
-command_info new(type/command_info t) {
-  ci = list.new().push('').push('').push(false).push(false)._as(command_info)
+command new(type/command t) {
+  ci = list.new().push('').push('').push(false).push(false)._as(command)
 }
 
-string to_string(command_info ci) {
+string to_string(command c) {
   [
-    'name': ci.name(),
-    'location': ci.location(),
-    'is_external': ci.is_external(),
-    'is_available': ci.is_available()
+    'name': c.name(),
+    'location': c.location(),
+    'is_external': c.is_external(),
+    'is_available': c.is_available()
   ].to_string()
 }
 
-string quote(command_info ci) {
+string quote(command c) {
   ci._as(list).quote()
 }
 
-command_info get(type/command_info t, string command_name) {
-  ci = command_info.new()
-  ci = ci.set_name(command_name)
+# TODO: Maybe get from `externals`
+command get(type/command t, string command_name) {
+  c = command.new()
+  c = c.set_name(command_name)
   loc = ''
   is_external = false
   is_available = false
@@ -200,35 +203,39 @@ command_info get(type/command_info t, string command_name) {
   ;;
   esac
   '''
-  ci = ci.set_location(loc)
-  ci = ci.set_is_external(is_external)
-  ci = ci.set_is_available(is_available)
+  c = c.set_location(loc)
+  c = c.set_is_external(is_external)
+  c = c.set_is_available(is_available)
 }
 
-command_info need(type/command_info t, string command_name) {
-  ci = command_info.get(command_name)
-  if !ci.is_available() {
+command need(type/command t, string command_name) {
+  c = command.get(command_name)
+  if !c.is_available() {
     throw 'required command \'' + command_name + '\' is unavailable'
   }
-  if ci.is_external() and !_feature_external {
+  if c.is_external() and !_feature_external {
     throw 'required command \'' + command_name + '\' is external but \'use feature external\' is not in effect'
   }
-  ci
+  c
 }
 
-command_result run(command_info ci, list args) {
-  if !ci.is_available() {
-    throw 'command \'' + ci.name() + '\' is not available'
+bool assert_ok(command c, list args) {
+  if !c.is_available() {
+    throw 'command \'' + c.name() + '\' is not available'
   }
-  if ci.is_external() and !_feature_external {
-    throw 'command \'' + ci.name() + '\' is external but \'use feature external\' is not in effect'
+  if c.is_external() and !_feature_external {
+    throw 'command \'' + c.name() + '\' is external but \'use feature external\' is not in effect'
   }
   if !args.all(bool fun (string s) { s.is_a(string) }) {
     throw 'can\'t pass non-string arguments to system commands'
   }
+}
+
+command_result run(command c, list args) {
+  c.assert_ok(args)
   rl = args.as_reflist()
-  loc = ci.location()
-  exitcode = 0
+  loc = c.location()
+  exitcode = -1
   output = ''
   shell '''
   _wsh_get_local rl _wshi
@@ -251,36 +258,59 @@ command_result run(command_info ci, list args) {
   cr = cr.set_output(output)
 }
 
-string name(command_info ci) {
-  ci._as(list).at(0)
+command_result run_raw(command c, list args) {
+  c.assert_ok(args)
+  rl = args.as_reflist()
+  loc = c.location()
+  exitcode = -1
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local loc _wshj
+  _wshk=0
+  _wsh_command_line="\"${_wshj#string:}\""
+  for _wshl in ${_wshi#reflist:}
+  do
+    _wsh_deref_into "${_wshl}" "_wsh_command_arg${_wshk}"
+    _wsh_command_line="${_wsh_command_line} \"\${_wsh_command_arg${_wshk}#string:}\""
+    : $((_wshk++))
+  done
+  eval "${_wsh_command_line}"
+  _wsh_set_local exitcode "int:$?"
+  '''
+  cr = command_result.new()
+  cr = cr.set_exitcode(exitcode)
 }
 
-string location(command_info ci) {
-  ci._as(list).at(1)
+string name(command c) {
+  c._as(list).at(0)
 }
 
-bool is_external(command_info ci) {
-  ci._as(list).at(2)
+string location(command c) {
+  c._as(list).at(1)
 }
 
-bool is_available(command_info ci) {
-  ci._as(list).at(3)
+bool is_external(command c) {
+  c._as(list).at(2)
 }
 
-command_info set_name(command_info ci, string name) {
-  ci._as(list).set(0, name)._as(command_info)
+bool is_available(command c) {
+  c._as(list).at(3)
 }
 
-command_info set_location(command_info ci, string loc) {
-  ci._as(list).set(1, loc)._as(command_info)
+command set_name(command c, string name) {
+  c._as(list).set(0, name)._as(command)
 }
 
-command_info set_is_external(command_info ci, bool is_external) {
-  ci._as(list).set(2, is_external)._as(command_info)
+command set_location(command c, string loc) {
+  c._as(list).set(1, loc)._as(command)
 }
 
-command_info set_is_available(command_info ci, bool is_available) {
-  ci._as(list).set(3, is_available)._as(command_info)
+command set_is_external(command c, bool is_external) {
+  c._as(list).set(2, is_external)._as(command)
+}
+
+command set_is_available(command c, bool is_available) {
+  c._as(list).set(3, is_available)._as(command)
 }
 
 
@@ -841,6 +871,14 @@ bool has_suffix(string s, string c) {
   '''
 }
 
+string replace_suffix(string s, string suff, string r) {
+  if s.has_suffix(suff) {
+    s.delete_suffix(suff) + r
+  } else {
+    s
+  }
+}
+
 list split(string s, string c) {
   _split3(s, c, [])
 }
@@ -889,6 +927,21 @@ string trim(string s, string c) {
     esac
     break
   done
+  _wsh_result="string:${_wshi}"
+  '''
+}
+
+string delete_suffix(string s, string suff) {
+  shell '''
+  _wsh_get_local s _wshi
+  _wsh_get_local suff _wshj
+  _wshk=0
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#string:}"
+  case "${_wshi}" in *"${_wshj}")
+    _wshi="${_wshi%"${_wshj}"}"
+  ;;
+  esac
   _wsh_result="string:${_wshi}"
   '''
 }

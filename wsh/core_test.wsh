@@ -139,6 +139,15 @@ bool test_string_replace() {
   g == 'one two'
 }
 
+bool test_string_delete_suffix() {
+  deleted = 'one-two'.delete_suffix('-two')
+  deleted == 'one'
+}
+
+bool test_string_replace_suffix() {
+  'one.two'.replace_suffix('.two', '.TWO') == 'one.TWO'
+}
+
 bool test_string_trim() {
   '"one"'.trim('"') == 'one'
 }
@@ -475,18 +484,18 @@ bool test_assert() {
   }
 }
 
-bool test_command_info_nonexistent() {
-  i = command_info.get('foobanza')
+bool test_command_nonexistent() {
+  i = command.get('foobanza')
   i.name() == 'foobanza' and !i.is_available()
 }
 
-bool test_command_info_builtin() {
-  i = command_info.get('type')
+bool test_command_builtin() {
+  i = command.get('type')
   i.location() == 'type' and !i.is_external() and i.is_available()
 }
 
-bool test_command_info_external() {
-  i = command_info.get('ruby')
+bool test_command_external() {
+  i = command.get('ruby')
   i.location().has('/ruby') and i.is_external() and i.is_available()
 }
 
@@ -496,13 +505,19 @@ bool test_command_result() {
 }
 
 bool test_command_run_builtin() {
-  c = command_info.get('type')
+  c = command.get('type')
   result = c.run(['type'])
   result.output() == 'type is a shell builtin' and result.is_success()
 }
 
+bool test_command_run_raw() {
+  c = command.get(':')
+  result = c.run_raw([])
+  result.is_success()
+}
+
 bool test_command_run_lines() {
-  c = command_info.get('export')
+  c = command.get('export')
   result = c.run(['-p'])
   result.lines().all(bool fun (string s) { s.has_prefix('export') })
 }
