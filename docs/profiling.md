@@ -13,7 +13,7 @@ the `--profile` option pointing to a suitable `bash` executable. For example,
 if you are using MacOS and have installed `bash` with homebrew:
 
 ```shell
-bundle exec wrapsher --profile=/opt/homebrew/bin/bash wsh/core_test.wsh
+bundle exec wrapsher compile --profile=/opt/homebrew/bin/bash wsh/core_test.wsh
 ```
 
 The `wsh/core_test` executable has the profiler built-in, but it is dormant

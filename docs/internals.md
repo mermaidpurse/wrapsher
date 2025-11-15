@@ -170,8 +170,8 @@ at the conclusion of each, `_wsh_error` is examined so that
 
 The Wrapsher "virtual machine" is composed of certain shell functions
 implemented in the [`preamble.sh`](../lib/wrapsher/preamble.sh) and
-[`postamble.sh`](../lib/wrapsher/postamble.sh) code snippets included
-every compiled Wrapsher program.
+[`postamble.sh`](../lib/wrapsher/postamble.sh), code snippets that are
+included in every compiled Wrapsher program.
 
 Functions in the preamble that "return" values do so either by setting
 a well-known global variable (e.g., `_wsh_typeof` sets `_wsh_type`)
