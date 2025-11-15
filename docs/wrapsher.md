@@ -116,7 +116,7 @@ Top-level statements in Wrapsher can be:
       syntactic sugar for allowing the method "receiver" to be passed
       as the function's first argument, when called.
 - A type definition of the form <code>type _typename_
-  _store\_type_</code> or <code>type _typename_ _struct_spec_.
+  _store\_type_</code> or <code>type _typename_ _struct_spec_</code>.
   This declares a new user-defined named type,
   based on _store\_type_ or the _struct\_spec_.
   Note that _store\_type_ is just used as

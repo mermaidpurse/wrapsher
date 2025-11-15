@@ -7,9 +7,7 @@ interpretable bash code that resembles the input language.
 
 In the end, Wrapsher has different goals, so I did a cursory
 comparison of some language features, and some commentary on why
-Wrapsher is different. Note that as of this writing (while Wrapsher is
-not even version `0.1.0`), some of Wrapsher's features are pending,
-and so indicated.
+Wrapsher is different.
 
 | Feature | [Amber 0.4.0](https://docs.amber-lang.com/0.4.0-alpha) | Wrapsher 0.1.0 | Comment |
 | :------ | :----------------------------------------------------- | :------------- | :------ |
