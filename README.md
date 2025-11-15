@@ -13,4 +13,5 @@ a better language that retains the "universality" of the
 POSIX shell.
 
 Read more:
+- [Documentation](https://mermaidpurse.github.io/wrapsher)
 - [Documentation source](./docs/intro.md)
