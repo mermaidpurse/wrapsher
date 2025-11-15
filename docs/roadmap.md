@@ -2,9 +2,7 @@
 
 ## Issues
 
-- Check that types in various places are actually types
-- We badly need either module-scoped variables or an easy way to use module
-  fstructs.
+- Check that types in various places are actually types (as struct does now)
 - Parser: Multiline function calls, or maybe multiline function calls with
   funs, don't seem to work, like `map(\n...fun...\n)`, maybe
   other multiline calls. It works when you break on the `{` and
@@ -41,7 +39,6 @@
 
 - Github actions for testing (strong preference to write these
   in wrapsher)
-- Implement docs
 - Implement versions, version constraints (compiler and modules)
 - Implement for loop
 - Implement rest of standard functions in the core module

@@ -57,6 +57,11 @@ such as constructors. This is an implementation detail that allows
 you to refer to the type by name. It's similar to modules, where
 the global variable `mycooltype` is of type `type/mycooltype`.
 
+When you create a type with a map instead of a storage type, it creates
+a struct implemented internally as a list. The map defines the member
+names and types; these are used to provide getters and setters and
+other functions to implement the struct.
+
 ## Optionals, nulls, zero values and exceptions
 
 There is no such thing as nullity in Wrapsher: all types have a

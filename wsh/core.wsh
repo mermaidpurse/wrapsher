@@ -21,24 +21,25 @@ the core language types and provides several other utilities and types.
 
 ### `program_info`
 
-An fstruct describing information about the currently-compiled program.
+A struct describing information about the currently-compiled program.
 
 ```wrapsher
-string name(program_info pi) { }
-string location(program_info pi) { }
-program_info set_name(program_info pi, string name) { }
-program_info set_location(program_info, string location) { }
+type program_info [
+  'location': string
+]
 ```
 
 ### `command`
 
-An fstruct describing information about a command.
+A struct describing information about a command.
 
 ```wrapsher
-string name(command c) { }
-string location(command c) { }
-bool is_external(command c) { }
-bool is_available(command c) { }
+type command [
+  'name': string,
+  'location': string,
+  'is_external': bool,
+  'is_available': bool
+]
 ```
 
 Use the `command get(type/command t, string name)` to get information
@@ -49,13 +50,13 @@ about a command, and throw an error if the command is not available.
 
 ### `command_result`
 
-An fstruct describing the results of running a command.
+A struct describing the results of running a command.
 
 ```wrapsher
-int exitcode(command_result cr) { }
-string output(command_result cr) { }
-list lines(command_result cr) { }
-bool is_success(command_result cr) { }
+type command_result [
+  'exitcode': int,
+  'output': string
+]
 ```
 
 Run a command and get its output with the `command_result run(command c, list args)`
@@ -80,9 +81,17 @@ type reflist builtin
 type list reflist
 type pair reflist
 type map reflist
-type program_info list
-type command list
-type command_result list
+type program_info ['location': string]
+type command [
+  'name': string,
+  'location': string,
+  'is_external': bool,
+  'is_available': bool
+]
+type command_result [
+  'exitcode': int,
+  'output': string
+]
 
 use global program ''
 use global externals ''
@@ -102,29 +111,6 @@ bool init(module/core m) {
   true
 }
 
-# command_result is an fstruct
-# 0 - exitcode
-# 1 - output (raw without trailing newline)
-command_result new(type/command_result t) {
-  list.new().push(0).push('')._as(command_result)
-}
-
-int exitcode(command_result cr) {
-  cr._as(list).at(0)
-}
-
-command_result set_exitcode(command_result cr, int exitcode) {
-  cr._as(list).set(0, exitcode)._as(command_result)
-}
-
-string output(command_result cr) {
-  cr._as(list).at(1)
-}
-
-command_result set_output(command_result cr, string output) {
-  cr._as(list).set(1, output)._as(command_result)
-}
-
 list lines(command_result cr) {
   cr.output().split('
 ')
@@ -134,40 +120,8 @@ bool is_success(command_result cr) {
   cr.exitcode() == 0
 }
 
-string to_string(command_result cr) {
-  [
-    'exitcode': cr.exitcode(),
-    'output': cr.output()
-  ].to_string()
-}
-
-string quote(command_result cr) {
-  cr._as(list).quote()
-}
-
-# command is an fstruct
-# 0 - name
-# 1 - location
-# 2 - is_external
-# 3 - is_available
-command new(type/command t) {
-  ci = list.new().push('').push('').push(false).push(false)._as(command)
-}
-
-string to_string(command c) {
-  [
-    'name': c.name(),
-    'location': c.location(),
-    'is_external': c.is_external(),
-    'is_available': c.is_available()
-  ].to_string()
-}
-
-string quote(command c) {
-  ci._as(list).quote()
-}
-
-# TODO: Maybe get from `externals`
+# TODO: Maybe get from `externals` to cache; maybe when maps
+# are less expensive than this
 command get(type/command t, string command_name) {
   c = command.new()
   c = c.set_name(command_name)
@@ -279,53 +233,6 @@ command_result run_raw(command c, list args) {
   '''
   cr = command_result.new()
   cr = cr.set_exitcode(exitcode)
-}
-
-string name(command c) {
-  c._as(list).at(0)
-}
-
-string location(command c) {
-  c._as(list).at(1)
-}
-
-bool is_external(command c) {
-  c._as(list).at(2)
-}
-
-bool is_available(command c) {
-  c._as(list).at(3)
-}
-
-command set_name(command c, string name) {
-  c._as(list).set(0, name)._as(command)
-}
-
-command set_location(command c, string loc) {
-  c._as(list).set(1, loc)._as(command)
-}
-
-command set_is_external(command c, bool is_external) {
-  c._as(list).set(2, is_external)._as(command)
-}
-
-command set_is_available(command c, bool is_available) {
-  c._as(list).set(3, is_available)._as(command)
-}
-
-
-# program_info is an fstruct
-# 0 - location
-program_info new(type/program_info pi) {
-  pi = list.new().push('')._as(program_info)
-}
-
-string location(program_info pi) {
-  pi._as(list).at(0)
-}
-
-program_info set_location(program_info pi, string loc) {
-  pi._as(list).set(0, loc)._as(program_info)
 }
 
 any _typeof(any i) {
@@ -1063,6 +970,15 @@ reflist set(reflist rl, int i, ref r) {
   '''
 }
 
+reflist plus(reflist rl, reflist o) {
+  shell '''
+  _wsh_get_local rl _wshi
+  _wsh_get_local o _wshj
+  _wshj="${_wshj#reflist:}"
+  _wsh_result="${_wshi}${_wshj:+ }${_wshj}"
+  '''
+}
+
 reflist minus(reflist rl, reflist o) {
   if o.length() > 0 {
     rl.delete(o.head()).minus(o.tail())
@@ -1155,6 +1071,10 @@ list set(list l, int i, any v) {
   l.as_reflist().set(i, v.ref()).as_list()
 }
 
+list plus(list l, list o) {
+  l.as_reflist().plus(o.as_reflist()).as_list()
+}
+
 bool eq(list l, list o) {
   if l.length() == 0 and o.length() == 0 {
     true
@@ -1226,6 +1146,27 @@ bool has(list l, any i) {
       true
     } else {
       l.tail().has(i)
+    }
+  }
+}
+
+int index(list l, any i) {
+  idx = _index3(l, i, 0)
+  if idx < 0 {
+    throw 'element not present in list'
+  }
+  idx
+}
+
+int _index3(list l, any i, int idx) {
+  if l == [] {
+    -1
+  } else {
+    h = l.head()
+    if h == i {
+      idx
+    } else {
+      l.tail()._index3(i, idx + 1)
     }
   }
 }
@@ -1306,6 +1247,10 @@ list as_pairlist(map m) {
   m._as(reflist)._as(list)
 }
 
+bool eq(map m, map other) {
+  m.as_pairlist() == other.as_pairlist()
+}
+
 pair head(map m) {
   m._as(reflist).head().deref()._as(pair)
 }
@@ -1333,6 +1278,10 @@ any at(map m, any k) {
   } else {
     m.tail().at(k)
   }
+}
+
+any pair_at(map m, any k) {
+  k: m.at(k)
 }
 
 bool has(map m, any k) {
@@ -1375,8 +1324,11 @@ map _set3(map m, pair p, map acc) {
     if h.key() == p.key() {
       acc.push(p) + m.tail()
     } else {
-      acc.push(m.head()) + m.tail()
+      _set3(m.tail(), p, acc.push(m.head()))
     }
   }
 }
 
+map plus(map m, map other) {
+  (m._as(reflist) + other._as(reflist))._as(map)
+}

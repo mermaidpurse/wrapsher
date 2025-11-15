@@ -156,8 +156,6 @@ float add(float f, can_float n) {
 }
 ```
 
-That could tie nicely into structs.
-
 I like the idea that interfaces are automatically implemented. Then again,
 I have runtime type checking all over the place so if the type doesn't implement
 the actual function there will be a failure. Hm.
@@ -191,51 +189,6 @@ stringlist filter(stringlist sl, stringfilter f) {
 
 Something like that? Or `call_with` so it's compatible with
 general funs?
-
-## "First class" structs?
-
-The convention right now are fstructs, which are manual struct-likes
-("false structs", "faux structs", "function structs") manually
-implemented from a reflist.
-
-But this seems to be such a common case that maybe something like
-`type foo struct [id: uuid, name: string]` should be accepted (or
-maybe it's actually the zero value, and therefore also defines the
-types: `type foo struct [id: uuid.new(), name: '']` and it will
-generate stuff like:
-
-```wrapsher
-foo new(type/foo t) {
-  [
-    uuid.new(),
-    ''
-  ]._as(foo)
-}
-
-uuid id(foo i) {
-  i._as(list).at(0)
-}
-
-foo set_id(foo i, uuid j) {
-  i._as(list).set(0, j)._as(foo)
-}
-
-string name(foo i) {
-  i._as(list).at(1)
-}
-
-foo set_name(foo i, string s) {
-  i._as(list).set(1, s)
-}
-```
-
-This requires (among other things) improvements in the parser
-and code generator so that collection constants aren't constructed
-from function calls.
-
-This could go along with syntactic sugar for struct member access,
-finally unlocking bareword method notation, where `expr.thing` means
-`thing(expr)` and `expr.thing = value` means `expr.set_thing(value)`.
 
 ## Top-level expressions
 

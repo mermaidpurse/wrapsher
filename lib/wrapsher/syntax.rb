@@ -16,11 +16,10 @@ module Wrapsher
   # rubocop:disable Metrics/ClassLength, Layout/ExtraSpacing
   class Syntax < Parslet::Parser
     rule(:program)                  { (eol | comment >> str("\n") | statement).repeat }
-    rule(:statement)                do
-      (use_statement | meta_statement | module_statement | type_statement |
-        struct_statement | fun_statement) >> eol
+    rule(:statement) do
+      (use_statement | meta_statement | module_statement | type_statement | fun_statement) >> eol
     end
-    rule(:use_statement)            do
+    rule(:use_statement) do
       use_version_statement | use_module_statement | use_feature_statement | use_external_statement | use_global_statement
     end
     rule(:meta_statement)           { (str('meta') >> space >> word.as(:meta_field) >> space >> string.as(:meta_data)).as(:meta) }
@@ -32,9 +31,9 @@ module Wrapsher
       (str('use') >> space >> str('global') >> space >> word.as(:name) >> space >> term.as(:value)).as(:use_global)
     end
     rule(:module_statement)         { str('module') >> space >> word.as(:module) }
-    rule(:type_statement)           { (str('type') >> space >> word.as(:name) >> space >> word.as(:store_type)).as(:type) }
-    rule(:struct_statement)         do
-      (str('struct') >> space >> word.as(:name) >> space >> list_term.as(:struct_spec)).as(:struct)
+    rule(:type_statement) do
+      (str('type') >> space >> word.as(:name) >> space >>
+        (word.as(:store_type) | list_term.as(:struct_spec))).as(:type)
     end
 
     rule(:fun_statement)            { (signature.as(:signature) >> block.as(:body)).as(:fun_statement) }

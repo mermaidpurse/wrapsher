@@ -36,7 +36,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   spec.add_dependency 'logger'
+  spec.add_dependency 'mustache', '~> 1.1.0'
   spec.add_dependency 'parslet', '~> 2.0.0'
+  spec.add_dependency 'reline'
   spec.add_development_dependency 'json'
   spec.add_development_dependency 'pry', '~> 0.14'
 end

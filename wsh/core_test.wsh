@@ -234,6 +234,11 @@ bool test_list_head() {
   s == 'one'
 }
 
+bool test_list_plus() {
+  l = ['one'] + ['two', 'three']
+  l == ['one', 'two', 'three']
+}
+
 bool test_list_join() {
   ['one', 'two', 'three'].join(', ') == 'one, two, three'
 }
@@ -315,6 +320,26 @@ bool test_list_has_absent() {
   [0, 1, 2].has(3).not()
 }
 
+bool test_list_index_present() {
+  [0, 1, 2].index(1) == 1
+}
+
+bool test_list_index_first() {
+  [0, 1, 2].index(0) == 0
+}
+
+bool test_list_index_last() {
+  [0, 1, 2].index(2) == 2
+}
+
+bool test_list_index_absent() {
+  try {
+    [0, 1, 2].index(3)
+  } catch e {
+    e.message().has('not present')
+  }
+}
+
 bool test_list_all_true() {
   [1, 2, 3, 4].all(bool fun (int i) { i > 0 })
 }
@@ -368,6 +393,16 @@ bool test_map_set_simple() {
   m = m.set('key1': 'value1')
   x = 'key1': 'value1'
   m.length() == 1 and m.head() == x
+}
+
+bool test_map_set_multi() {
+  m = [
+    'one': 1,
+    'two': 2,
+    'three': 3
+  ]
+  m = m.set('two': 20)
+  m.length() == 3 and m['two'] == 20
 }
 
 bool test_map_to_string_empty() {

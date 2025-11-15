@@ -18,14 +18,53 @@ end
 RSpec.describe 'parser/transform' do
   it 'parses a struct spec' do
     source = <<~'SOURCE'
-      struct x ['name': string, 'is_ok': bool]
+      type x ['name': string, 'is_ok': bool]
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = Wrapsher::Transformer.new.transform(ast)
     expect(program).to eq(
       [
         {
-          struct: {
+          type: {
+            name: 'x',
+            struct_spec: {
+              list_term: {
+                lbracket: '[',
+                elements: [
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'name' } },
+                      value: { var_ref: 'string' }
+                    }
+                  },
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'is_ok' } },
+                      value: { var_ref: 'bool' }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    )
+  end
+
+  it 'parses a multiline struct spec' do
+    source = <<~'SOURCE'
+      type x [
+        'name': string,
+        'is_ok': bool
+       ]
+    SOURCE
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = Wrapsher::Transformer.new.transform(ast)
+    expect(program).to eq(
+      [
+        {
+          type: {
             name: 'x',
             struct_spec: {
               list_term: {
@@ -178,8 +217,8 @@ RSpec.describe 'parser/transform' do
                   lbracket: '[',
                   elements: [
                     { int_term: '0' },
-                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }]} },
-                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }, { int_term: '2' }]} }
+                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }] } },
+                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }, { int_term: '2' }] } }
                   ]
                 }
               }
@@ -1106,6 +1145,47 @@ RSpec.describe 'parser/transform' do
                          fun_call: {
                            name: 'at',
                            fun_args: [{ var_ref: 'x' }, { int_term: '0' }]
+                         }
+                       },
+                       string_term('foo')
+                     ]
+                   }
+                 }
+               ])
+    )
+  end
+
+  it 'parses a subscript on an expression' do
+    source = <<~SOURCE
+      bool test() {
+        x.y()['foo']
+      }
+    SOURCE
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+                 {
+                   chain: {
+                     receiver: { var_ref: 'x' },
+                     calls: [
+                       { postfix: { fun_call: { name: 'y', fun_args: nil } } },
+                       { subscript: { index: string_term('foo') } }
+                     ]
+                   }
+                 }
+               ])
+    )
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+    expect(program).to eq(
+      test_fun([
+                 {
+                   fun_call: {
+                     name: 'at',
+                     fun_args: [
+                       {
+                         fun_call: {
+                           name: 'y',
+                           fun_args: [{ var_ref: 'x' }]
                          }
                        },
                        string_term('foo')

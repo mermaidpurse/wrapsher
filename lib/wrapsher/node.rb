@@ -9,6 +9,7 @@
 require 'parslet'
 require 'wrapsher'
 require 'pry'
+require 'wrapsher/macro'
 
 module Wrapsher
   # Base class for Wrapsher language nodes
@@ -191,7 +192,7 @@ module Wrapsher
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
-            '_wsh_stack_push "${_wsh_result}" "#{@filename}:#{@line}"'
+            "_wsh_stack_push \"${_wsh_result}\" '#{@filename}:#{@line}'"
           ].join("\n  ")
         end
         [
@@ -387,6 +388,7 @@ module Wrapsher
     # TODO: detect if list or map is all
     # constants and inline them if so
     class ListTerm < Node
+      # rubocop:disable Metrics/PerceivedComplexity, Metrics/MethodLength
       def initialize(slice, tables:)
         super
         @line = slice[:lbracket].line_and_column[0] if slice[:lbracket].respond_to?(:line_and_column)
@@ -416,6 +418,7 @@ module Wrapsher
         @inner = Node.from_obj(@inner_ast, tables: tables)
         @inner.line = @line
       end
+      # rubocop:enable Metrics/PerceivedComplexity, Metrics/MethodLength
 
       def make_map(list)
         {
@@ -448,6 +451,21 @@ module Wrapsher
 
       def to_s
         @inner.to_s
+      end
+    end
+
+    # ( ... )
+    class Group < Node
+      def initialize(slice, tables:)
+        super
+        slices = [slice] unless slice.is_a?(Array)
+        @nodes = slices.map { |obj| Node.from_obj(obj, tables: tables) }
+      end
+
+      def to_s
+        code = []
+        code += @nodes.map(&:to_s)
+        code.join("\n")
       end
     end
 
@@ -735,25 +753,15 @@ EOSTRING
       end
     end
 
-    # struct <struct_name> [map]
+    # type <struct_name> <struct_spec>
     # rubocop:disable Metrics/ClassLength
-    class Struct < Node
+    class StructSpec < Node
       def initialize(slice, tables:)
         super
         @types = {}
         @name = slice[:name].to_s
         @line = slice[:name].line_and_column[0] if slice[:name].respond_to? :line_and_column
-        @type_statement = Node.from_obj(type_statement(slice[:name]), tables: tables)
         @functions = make_functions(slice[:struct_spec])
-      end
-
-      def type_statement(slice)
-        {
-          type: {
-            name: slice,
-            store_type: 'list'
-          }
-        }
       end
 
       def fail(message)
@@ -769,8 +777,12 @@ EOSTRING
 
         elements = [elements] unless elements.is_a?(Array)
         members = elements.map.with_index { |element, idx| extract_member(idx, element) }
-        accessors = members.map.with_index { |member, idx| make_function(idx, member) }.flatten
-        accessors + [make_constructor(members)]
+        functions_ast = macro.ast(
+          type_name: @name,
+          members: members
+        )
+        functions_ast = [functions_ast].flatten
+        functions_ast.map { |expr| Node.from_obj(expr, tables: tables) }
       end
 
       def extract_member(idx, element)
@@ -782,185 +794,90 @@ EOSTRING
         fail("struct spec value in pair #{idx} is not a type") unless value[:var_ref]
 
         key = StringValue.new(key[:string_term], tables: tables).to_s
+        fail("struct spec key in pair #{idx} has an invalid name (must match /[a-zA-Z0-9_\/]+/)") unless ok_member_name(key)
+
         member_type = value[:var_ref]
         @types[member_type.to_s] = true
 
         {
+          index: idx,
           key: key,
-          type: member_type
+          type: member_type,
+          map_setter: member_type == 'map',
+          nonmap_setter: member_type != 'map'
         }
       end
 
-      def make_constructor(members)
-        Node.from_obj(
-          {
-            fun_statement: {
-              signature: {
-                type: @name,
-                name: 'new',
-                arg_definitions: [
-                  {
-                    type: "type/#{@name}",
-                    name: 't'
-                  }
-                ]
-              },
-              body: constructor_expression(members)
-            }
-          },
-          tables: tables
-        )
+      def ok_member_name(name)
+        %r{[a-zA-Z0-9_/]+}.match?(name)
       end
 
-      # _as(push(new(list), element), @name)
       # rubocop:disable Metrics/MethodLength
-      def constructor_expression(members)
-        list = members.reduce(
-          {
-            fun_call: {
-              name: 'new',
-              fun_args: [
-                { var_ref: 'list' }
-              ]
+      def macro
+        Macro.new <<~'MWSH'
+          {{type_name}} new(type/{{type_name}} t) {
+            list.new(){{#members}}.push({{type}}.new()){{/members}}._as({{type_name}})
+          }
+
+          {{#members}}
+          {{type}} {{key}}({{type_name}} st) {
+           st._as(list).at({{index}})
+          }
+
+          {{#nonmap_setter}}
+          {{type_name}} set_{{key}}({{type_name}} st, {{type}} value) {
+            st._as(list).set({{index}}, value)._as({{type_name}})
+          }
+          {{/nonmap_setter}}
+          {{#map_setter}}
+          {{type_name}} set_{{key}}({{type_name}} st, any value) {
+            if value.is_a(map) {
+              st._as(list).set({{index}}, value)._as({{type_name}})
+            } else {
+              value.assert(pair)
+              _current = st.{{key}}()
+              st._as(list).set({{index}}, _current.set(value))._as({{type_name}})
             }
           }
-        ) do |acc, member|
-          {
-            fun_call: {
-              name: 'push',
-              fun_args: [
-                acc,
-                {
-                  fun_call: {
-                    name: 'new',
-                    fun_args: [
-                      { var_ref: member[:type] }
-                    ]
-                  }
-                }
-              ]
-            }
+          {{/map_setter}}
+          {{/members}}
+
+          map to_map({{type_name}} st) {
+            m = map.new()
+            {{#members}}
+            m = m.set('{{key}}': st.{{key}}())
+            {{/members}}
           }
-        end
-        {
-          fun_call: {
-            name: '_as',
-            fun_args: [
-              list,
-              { var_ref: @name }
-            ]
+
+          string to_string({{type_name}} st) {
+            st.to_map().to_string()
           }
-        }
-      end
-      # rubocop:enable Metrics/MethodLength
 
-      def make_function(idx, member)
-        [
-          getter(member[:type], idx, member[:key]),
-          setter(member[:type], idx, member[:key])
-        ]
-      end
-
-      def getter(member_type, idx, key)
-        Node.from_obj(
-          {
-            fun_statement: {
-              signature: {
-                type: member_type,
-                name: key,
-                arg_definitions: [
-                  {
-                    type: @name,
-                    name: 'st'
-                  }
-                ]
-              },
-              body: getter_expression(idx)
-            }
-          },
-          tables: tables
-        )
-      end
-
-      # at(_as(st, list), idx)
-      def getter_expression(idx)
-        [
-          {
-            fun_call: {
-              name: 'at',
-              fun_args: [
-                {
-                  fun_call: {
-                    name: '_as',
-                    fun_args: [
-                      { var_ref: 'st' },
-                      { var_ref: 'list' }
-                    ]
-                  }
-                },
-                { int_term: idx }
-              ]
-            }
+          string quote({{type_name}} st) {
+            '{{type_name}}.from_map(' + st.to_map().quote() + ')'
           }
-        ]
-      end
 
-      def setter(member_type, idx, key)
-        Node.from_obj(
-          {
-            fun_statement: {
-              signature: {
-                type: @name,
-                name: "set_#{key}",
-                arg_definitions: [
-                  {
-                    type: @name,
-                    name: 'st'
-                  },
-                  {
-                    type: member_type,
-                    name: 'value'
-                  }
-                ]
-              },
-              body: setter_expression(idx)
-            }
-          },
-          tables: tables
-        )
-      end
-
-      # _as(set(_as(st, list), idx, value), type_name)
-      # rubocop:disable Metrics/MethodLength
-      def setter_expression(idx)
-        [
-          {
-            fun_call: {
-              name: '_as',
-              fun_args: [
-                {
-                  fun_call: {
-                    name: 'set',
-                    fun_args: [
-                      {
-                        fun_call: {
-                          name: '_as',
-                          fun_args: [
-                            { var_ref: 'st' },
-                            { var_ref: 'list' }
-                          ]
-                        }
-                      },
-                      { int_term: idx },
-                      { var_ref: 'value' }
-                    ]
-                  }
-                },
-                { var_ref: @name }
-              ]
-            }
+          {{type_name}} set({{type_name}} st, pair p) {
+            k = p.key()
+            k.assert(string)
+            {{#members}}
+            if k == '{{key}}' { return st.set_{{key}}(p.value()) }
+            {{/members}}
+            throw '\'' + k + '\' is not a member of {{type_name}}'
           }
-        ]
+
+          {{type_name}} from_map(type/{{type_name}} t, map m) {
+            st = {{type_name}}.new()
+            st._set_from_map(m)
+          }
+
+          {{type_name}} _set_from_map({{type_name}} st, map m) {
+            if m == [:] {
+              return st
+            }
+            st.set(m.head())._set_from_map(m.tail())
+          }
+        MWSH
       end
       # rubocop:enable Metrics/MethodLength
 
@@ -974,7 +891,6 @@ EOSTRING
 
       def to_s
         code = []
-        code << @type_statement.to_s
         @functions.each do |f|
           code << f.to_s
         end
@@ -1033,16 +949,23 @@ EOSTRING
     end
 
     # type <type> <store_type>
+    # type <type> <struct_spec>
     class Type < Node
       def initialize(slice, tables:)
         super
         @name = slice[:name].to_s
-        @store_type = slice[:store_type].to_s if slice[:store_type]
         if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
           raise \
             Wrapsher::CompilationError,
             "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
             'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
+        end
+
+        if slice[:struct_spec]
+          @store_type = 'list'
+          @struct_spec = StructSpec.new(slice, tables: tables)
+        elsif slice[:store_type]
+          @store_type = slice[:store_type].to_s
         end
 
         if tables.globals.key?(@name)
@@ -1054,14 +977,17 @@ EOSTRING
       end
 
       def errors
-        ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+        err = []
+        err << "Type #{@name} has nonexistent store type #{@store_type}" unless tables.globals[@store_type]
+        err += @struct_spec.errors if @struct_spec
+        err
       end
 
       def to_s
         code = []
-        code << line
         code << "# type #{@name}"
         code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        code << @struct_spec.to_s if @struct_spec
         code.join("\n")
       end
     end
@@ -1262,6 +1188,7 @@ EOSTRING
       comment: Comment,
       conditional: Conditional,
       continue: Continue,
+      group: Group,
       lambda: Lambda,
       empty_map_term: EmptyMapTerm,
       fun_call: FunCall,
@@ -1274,7 +1201,6 @@ EOSTRING
       return: Return,
       shellcode: ShellCode,
       string_term: StringTerm,
-      struct: Struct,
       try_block: TryBlock,
       type: Type,
       use_external: UseExternal,
