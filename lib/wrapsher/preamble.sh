@@ -75,7 +75,7 @@ _wsh_typeof_underscore() {
   done
 }
 
-# _wsh_assert value expected_type context/location
+# _wsh_assert value expected_type context/location file:line
 _wsh_assert() {
   _wsh_typeof "${1}"
   case "${2}" in any)
@@ -83,19 +83,18 @@ _wsh_assert() {
   ;; "${_wsh_type}")
     :
   ;; *)
-    _wsh_error="error:Expected type '${2}', got '${_wsh_type}': ${3}"
+    _wsh_error="error:Expected type '${2}', got '${_wsh_type}': ${3} at ${4}"
     return 1
   ;;
   esac
 }
 
 # or : ((_wsh_stack${_wsh_stackp}="${1}"))
-# _wsh_stack_push arg
+# _wsh_stack_push arg file:line
 _wsh_stack_push() {
   _wsh_stackp=$((_wsh_stackp + 1))
   case "$((_wsh_stackp > 10000))" in 1)
-    _wsh_error="error:Stack overflow pushing '${1}'
-at ${_wsh_line}"
+    _wsh_error="error:Stack overflow pushing '${1}' at ${2}"
     _wsh_panic 1 "_wsh_stack_push"
   ;;
   esac
@@ -262,7 +261,7 @@ _wsh_cleanup_refs() {
 }
 
 _wsh_debug() {
-  echo "${_wsh_line} Debug: ${1}" >&2
+  echo "Debug: ${1}" >&2
   _wsh_debug_stack >&2
 }
 

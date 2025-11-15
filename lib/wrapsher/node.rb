@@ -9,6 +9,7 @@
 require 'parslet'
 require 'wrapsher'
 require 'pry'
+require 'wrapsher/macro'
 
 module Wrapsher
   # Base class for Wrapsher language nodes
@@ -36,7 +37,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           @rvalue.to_s,
           tables.globals[@name] ? "_wshg_#{@name}=\"${_wsh_result}\"" : "_wsh_set_local #{@name} \"${_wsh_result}\""
         ].join("\n  ")
@@ -52,7 +52,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "_wsh_result='bool:#{@value}'"
         ].join("\n  ")
       end
@@ -69,7 +68,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           'break # break'
         ].join("\n  ")
       end
@@ -105,16 +103,13 @@ module Wrapsher
 
       def to_s
         code = []
-        code << line
         code << @condition.to_s
-        code << line
         code << "_wsh_assert \"${_wsh_result}\" 'bool' 'if condition' || break"
         code << 'case "${_wsh_result}" in bool:true)'
         code << @then_body.to_s
         code << ';;'
         if @else_body
           code << '*)'
-          code << line
           code << @else_body.to_s
           code << ';;'
         end
@@ -134,9 +129,30 @@ module Wrapsher
 
       def to_s
         [
-          line,
           'continue # continue'
         ].join("\n  ")
+      end
+    end
+
+    # [:]
+    class EmptyMapTerm < Node
+      def initialize(slice, tables:)
+        super
+        @inner = Node.from_obj(inner_ast, tables: tables)
+        @inner.line = @line
+      end
+
+      def inner_ast
+        {
+          fun_call: {
+            name: 'new',
+            fun_args: [{ var_ref: 'map' }]
+          }
+        }
+      end
+
+      def to_s
+        @inner.to_s
       end
     end
 
@@ -154,9 +170,9 @@ module Wrapsher
 
       def errors
         e = []
-        e << ["No such function '#{@function_name}' at #{line}"] unless tables.functions.key?(@function_name)
+        e << ["No such function '#{@function_name}' at #{filename}:#{@line}"] unless tables.functions.key?(@function_name)
         if @function_args.empty? && !tables.functions[@function_name].key?(:nullary)
-          e << ["No nullary function '#{@function_name}()' at #{line}"]
+          e << ["No nullary function '#{@function_name}()' at #{filename}:#{line}"]
         end
         # We can't actually check for the right arity functions which accept an argument
         # because we don't (yet) know the type of the first argument.
@@ -165,12 +181,10 @@ module Wrapsher
 
       def function_dispatch
         code = []
-        code << line
         code << "_wsh_prof_event B wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_dispatch '#{@function_name}' '#{@function_args.length}'"
         code << "_wsh_prof_event E wsh '#{@function_name}'" if tables.options[:profile]
         code << "_wsh_check_return \"in #{@function_name} at #{@filename}:#{@line}\" || break"
-        code << line
         code.join("\n  ")
       end
 
@@ -178,7 +192,7 @@ module Wrapsher
         call_bindings = @function_args.reverse.map do |arg|
           [
             arg.to_s,
-            '_wsh_stack_push "${_wsh_result}"'
+            "_wsh_stack_push \"${_wsh_result}\" '#{@filename}:#{@line}'"
           ].join("\n  ")
         end
         [
@@ -233,7 +247,6 @@ module Wrapsher
           "# #{@signature.summary}",
           "#{@signature.function_name(:presence)}=1",
           "#{@signature.function_name(:definition)}() {",
-          line,
           "_wsh_result='bool:false'; _wsh_error=''",
           'while :; do',
           '  :',
@@ -295,9 +308,8 @@ module Wrapsher
       def argument_binding
         @arg_definitions.map do |arg|
           [
-            line,
             '_wsh_stack_peek_into _wshi',
-            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' || break",
+            "_wsh_assert \"${_wshi}\" '#{arg.type}' '#{arg.name}' '#{@filename}:#{@line}' || break",
             "_wsh_stack_pop_into \"_wshv_${_wsh_frame}_#{arg.name}\""
           ].join("\n  ")
         end.join("\n  ")
@@ -367,9 +379,93 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "_wsh_result='int:#{@value}'"
         ].join("\n  ")
+      end
+    end
+
+    # list and map terms, constant or not
+    # TODO: detect if list or map is all
+    # constants and inline them if so
+    class ListTerm < Node
+      # rubocop:disable Metrics/PerceivedComplexity, Metrics/MethodLength
+      def initialize(slice, tables:)
+        super
+        @line = slice[:lbracket].line_and_column[0] if slice[:lbracket].respond_to?(:line_and_column)
+        @elements = if slice[:elements].nil?
+                      []
+                    elsif slice[:elements].is_a?(Array)
+                      slice[:elements]
+                    else
+                      [slice[:elements]]
+                    end
+        new_node = {
+          fun_call: {
+            name: 'new',
+            fun_args: [{ var_ref: 'list' }]
+          }
+        }
+        @inner_ast = if @elements.empty?
+                       new_node
+                     else
+                       list = push_elements(new_node, @elements)
+                       if @all_pairs
+                         make_map(list)
+                       else
+                         list
+                       end
+                     end
+        @inner = Node.from_obj(@inner_ast, tables: tables)
+        @inner.line = @line
+      end
+      # rubocop:enable Metrics/PerceivedComplexity, Metrics/MethodLength
+
+      def make_map(list)
+        {
+          fun_call: {
+            name: 'from_pairlist',
+            fun_args: [
+              { var_ref: 'map' },
+              list
+            ]
+          }
+        }
+      end
+
+      def push_elements(list_node, elements)
+        @all_pairs = true
+        elements.reduce(list_node) do |acc, el|
+          @all_pairs = false unless pair?(el)
+          {
+            fun_call: {
+              name: 'push',
+              fun_args: [acc, el]
+            }
+          }
+        end
+      end
+
+      def pair?(element)
+        element&.keys&.first == :pair
+      end
+
+      def to_s
+        @inner.to_s
+      end
+    end
+
+    # ( ... )
+    class Group < Node
+      def initialize(slice, tables:)
+        super
+        slices = [slice] unless slice.is_a?(Array)
+        @nodes = slices.map { |obj| Node.from_obj(obj, tables: tables) }
+      end
+
+      def to_s
+        code = []
+        code += @nodes.map(&:to_s)
+        code.join("\n")
       end
     end
 
@@ -433,6 +529,7 @@ module Wrapsher
                                      ]
                                    }
                                  }, tables: tables)
+        @closure.line = @line
 
         get_context = [
           {
@@ -491,7 +588,6 @@ module Wrapsher
       def to_s
         # Unchecked cast to fun--will be uncast in call()
         [
-          line,
           @closure.to_s,
           '_wsh_result="fun+${_wsh_result}"'
         ].join("\n  ")
@@ -544,9 +640,35 @@ module Wrapsher
       def to_s
         [
           "# module #{@name}",
-          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'",
-          line
+          "_wsh_set_global #{@name} 'module/#{@name}:#{@filename}'"
         ].join("\n")
+      end
+    end
+
+    # key: value
+    class Pair < Node
+      def initialize(slice, tables:)
+        super
+        @line = slice[:key].line_and_column[0] if slice[:key].respond_to?(:line_and_column)
+        @inner = Node.from_obj(inner_ast(slice), tables: tables)
+        @inner.line = @line
+      end
+
+      def inner_ast(slice)
+        {
+          fun_call: {
+            name: 'from_kv',
+            fun_args: [
+              { var_ref: 'pair' },
+              slice[:key],
+              slice[:value]
+            ]
+          }
+        }
+      end
+
+      def to_s
+        @inner.to_s
       end
     end
 
@@ -619,7 +741,6 @@ module Wrapsher
 
       def to_s
         [
-          line,
           "read -r -d '' _wshi <<'EOSTRING'
 _wsh_bof#{sh_value}
 _wsh_eof
@@ -632,38 +753,151 @@ EOSTRING
       end
     end
 
-    # type <type> <store_type>
-    class Type < Node
+    # type <struct_name> <struct_spec>
+    # rubocop:disable Metrics/ClassLength
+    class StructSpec < Node
       def initialize(slice, tables:)
         super
+        @types = {}
         @name = slice[:name].to_s
-        @store_type = slice[:store_type].to_s if slice[:store_type]
-        if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
-          raise \
-            Wrapsher::CompilationError,
-            "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
-            'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
-        end
-
-        if tables.globals.key?(@name)
-          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
-        end
-
-        tables.globals[@name] = true
+        @line = slice[:name].line_and_column[0] if slice[:name].respond_to? :line_and_column
+        @functions = make_functions(slice[:struct_spec])
       end
 
+      def fail(message)
+        raise Wrapsher::CompilationError, "#{message} at #{@filename}:#{@line}"
+      end
+
+      def make_functions(spec)
+        fail('cannot specify an empty struct') if spec[:empty_map_term]
+        fail('struct spec is not a map') unless spec[:list_term]
+
+        elements = spec[:list_term][:elements]
+        fail('struct spec is not a map') if elements.nil?
+
+        elements = [elements] unless elements.is_a?(Array)
+        members = elements.map.with_index { |element, idx| extract_member(idx, element) }
+        functions_ast = macro.ast(
+          type_name: @name,
+          members: members
+        )
+        functions_ast = [functions_ast].flatten
+        functions_ast.map { |expr| Node.from_obj(expr, tables: tables) }
+      end
+
+      def extract_member(idx, element)
+        fail('struct spec is not a map') unless element[:pair]
+
+        key = element[:pair][:key]
+        value = element[:pair][:value]
+        fail("struct spec key in pair #{idx} is not a string") unless key[:string_term]
+        fail("struct spec value in pair #{idx} is not a type") unless value[:var_ref]
+
+        key = StringValue.new(key[:string_term], tables: tables).to_s
+        fail("struct spec key in pair #{idx} has an invalid name (must match /[a-zA-Z0-9_\/]+/)") unless ok_member_name(key)
+
+        member_type = value[:var_ref]
+        @types[member_type.to_s] = true
+
+        {
+          index: idx,
+          key: key,
+          type: member_type,
+          map_setter: member_type == 'map',
+          nonmap_setter: member_type != 'map'
+        }
+      end
+
+      def ok_member_name(name)
+        %r{[a-zA-Z0-9_/]+}.match?(name)
+      end
+
+      # rubocop:disable Metrics/MethodLength
+      def macro
+        Macro.new <<~'MWSH'
+          {{type_name}} new(type/{{type_name}} t) {
+            list.new(){{#members}}.push({{type}}.new()){{/members}}._as({{type_name}})
+          }
+
+          {{#members}}
+          {{type}} {{key}}({{type_name}} st) {
+           st._as(list).at({{index}})
+          }
+
+          {{#nonmap_setter}}
+          {{type_name}} set_{{key}}({{type_name}} st, {{type}} value) {
+            st._as(list).set({{index}}, value)._as({{type_name}})
+          }
+          {{/nonmap_setter}}
+          {{#map_setter}}
+          {{type_name}} set_{{key}}({{type_name}} st, any value) {
+            if value.is_a(map) {
+              st._as(list).set({{index}}, value)._as({{type_name}})
+            } else {
+              value.assert(pair)
+              _current = st.{{key}}()
+              st._as(list).set({{index}}, _current.set(value))._as({{type_name}})
+            }
+          }
+          {{/map_setter}}
+          {{/members}}
+
+          map to_map({{type_name}} st) {
+            m = map.new()
+            {{#members}}
+            m = m.set('{{key}}': st.{{key}}())
+            {{/members}}
+          }
+
+          string to_string({{type_name}} st) {
+            st.to_map().to_string()
+          }
+
+          string quote({{type_name}} st) {
+            '{{type_name}}.from_map(' + st.to_map().quote() + ')'
+          }
+
+          {{type_name}} set({{type_name}} st, pair p) {
+            k = p.key()
+            k.assert(string)
+            {{#members}}
+            if k == '{{key}}' { return st.set_{{key}}(p.value()) }
+            {{/members}}
+            throw '\'' + k + '\' is not a member of {{type_name}}'
+          }
+
+          {{type_name}} from_map(type/{{type_name}} t, map m) {
+            st = {{type_name}}.new()
+            st._set_from_map(m)
+          }
+
+          {{type_name}} _set_from_map({{type_name}} st, map m) {
+            if m == [:] {
+              return st
+            }
+            st.set(m.head())._set_from_map(m.tail())
+          }
+        MWSH
+      end
+      # rubocop:enable Metrics/MethodLength
+
       def errors
-        ["Type #{@name} has nonexistent store type #{@store_type}"] unless tables.globals[@store_type]
+        err = []
+        @types.each_key do |type_name|
+          err << "type #{type_name} is not valid in struct spec at #{@filename}:#{@line}" unless tables.types[type_name]
+        end
+        err
       end
 
       def to_s
         code = []
-        code << line
-        code << "# type #{@name}"
-        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        @functions.each do |f|
+          code << f.to_s
+        end
         code.join("\n")
       end
     end
+    # rubocop:enable Metrics/ClassLength
 
     # try { ... } catch <errorvar> { ... }
     class TryBlock < Node
@@ -702,17 +936,59 @@ EOSTRING
 
       def to_s
         code = []
-        code << line
         code << 'while :; do # try'
         code << '  :'
         code << @try_body.to_s
         code << '  break'
         code << 'done'
-        code << "_wsh_line='#{@filename}:#{@catch_line}'"
         code << 'case "${_wsh_error}" in ?*) # catch block'
         code << @catch_body.to_s
         code << ';;'
         code << 'esac # end catch block'
+      end
+    end
+
+    # type <type> <store_type>
+    # type <type> <struct_spec>
+    class Type < Node
+      def initialize(slice, tables:)
+        super
+        @name = slice[:name].to_s
+        if @name !~ %r{^[a-z_][a-z0-9_/]*$} || @name.include?('__')
+          raise \
+            Wrapsher::CompilationError,
+            "Invalid type name '#{@name}' at #{@filename}:#{@line} - " \
+            'must start with a letter or underscore, and contain only letters, numbers, underscores, and slashes'
+        end
+
+        if slice[:struct_spec]
+          @store_type = 'list'
+          @struct_spec = StructSpec.new(slice, tables: tables)
+        elsif slice[:store_type]
+          @store_type = slice[:store_type].to_s
+        end
+
+        if tables.globals.key?(@name)
+          raise Wrapsher::CompilationError, "redefinition of global variable #{@name} at #{@filename}:#{@line}"
+        end
+
+        tables.globals[@name] = true
+        tables.types[@name] = true
+      end
+
+      def errors
+        err = []
+        err << "Type #{@name} has nonexistent store type #{@store_type}" unless tables.globals[@store_type]
+        err += @struct_spec.errors if @struct_spec
+        err
+      end
+
+      def to_s
+        code = []
+        code << "# type #{@name}"
+        code << "_wsh_set_global #{@name} 'type/#{@name}:#{@store_type}'"
+        code << @struct_spec.to_s if @struct_spec
+        code.join("\n")
       end
     end
 
@@ -774,7 +1050,6 @@ EOSTRING
         [
           "# use global #{@global_name}",
           @initial_value.to_s,
-          line,
           "_wsh_set_global '#{@global_name}' \"${_wsh_result}\""
         ].join("\n")
       end
@@ -837,7 +1112,7 @@ EOSTRING
       end
 
       def errors
-        return ["variable '#{@name}' does not exist (not global, local or builtin) at #{line}"] unless ok
+        return ["variable '#{@name}' does not exist (not global, local or builtin) at #{@filename}:#{@line}"] unless ok
 
         []
       end
@@ -848,7 +1123,6 @@ EOSTRING
 
       def to_s
         [
-          line,
           tables.globals[@name] ? "_wsh_result=\"${_wshg_#{@name}}\"" : "_wsh_get_local '#{@name}' _wsh_result"
         ].join("\n  ")
       end
@@ -896,10 +1170,6 @@ EOSTRING
       @line = slice.line_and_column[0] if slice.respond_to? :line_and_column
     end
 
-    def line
-      @line ? "_wsh_line='#{@filename}:#{@line}'" : ''
-    end
-
     def errors
       []
     end
@@ -908,6 +1178,7 @@ EOSTRING
       raise NotImplementedError, "Subclasses(#{self.class}) must implement a to_s method: #{inspect}"
     end
 
+    attr_accessor :line
     attr_reader :filename, :tables
 
     NODES = {
@@ -917,12 +1188,16 @@ EOSTRING
       comment: Comment,
       conditional: Conditional,
       continue: Continue,
+      group: Group,
       lambda: Lambda,
+      empty_map_term: EmptyMapTerm,
       fun_call: FunCall,
       fun_statement: FunStatement,
       int_term: IntTerm,
+      list_term: ListTerm,
       module: Module,
       meta: Meta,
+      pair: Pair,
       return: Return,
       shellcode: ShellCode,
       string_term: StringTerm,

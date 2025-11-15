@@ -11,95 +11,10 @@ require 'parslet'
 require 'pry'
 
 module Wrapsher
-  # Utilities used in transformation
-  class TransformUtil
-    class << self
-      # This should maybe be done further
-      # in the compiler, when there's more type
-      # information and we can make this guess
-      # based on the types of the expressions
-      # in the list (because there could be
-      # other ways of construcing a map. Somewhere, a list of pairs
-      # from the parser needs to be promoted to
-      # a map, and for now, that's here.
-      #
-      # Is this pair.from_kv(...)?
-      def transformed_pair?(maybe_pair)
-        if maybe_pair[:fun_call] && maybe_pair[:fun_call][:name] == 'from_kv' &&
-           maybe_pair[:fun_call][:fun_args][0] == { var_ref: 'pair' }
-          true
-        else
-          false
-        end
-      end
-    end
-  end
-
   # Transforms parser tree into Wrapsher AST
   # understood by the code generator
   # rubocop:disable Metrics/ClassLength
   class Transform < Parslet::Transform
-    # rubocop:disable Metrics/BlockLength
-    rule(list_term: subtree(:elements)) do
-      the_elements = [elements].compact.flatten
-
-      is_map = false
-      is_map = true if !the_elements.empty? && the_elements.all? { |p| TransformUtil.transformed_pair?(p) }
-
-      new_list = {
-        fun_call: {
-          name: 'new',
-          fun_args: [{ var_ref: 'list' }]
-        }
-      }
-
-      the_list = the_elements.reduce(new_list) do |acc, el|
-        {
-          fun_call: {
-            name: 'push',
-            fun_args: [acc, el]
-          }
-        }
-      end
-
-      if is_map
-        {
-          fun_call: {
-            name: 'from_pairlist',
-            fun_args: [
-              { var_ref: 'map' },
-              the_list
-            ]
-          }
-        }
-      else
-        the_list
-      end
-    end
-    # rubocop:enable Metrics/BlockLength
-
-    rule(pair: subtree(:pair)) do
-      {
-        fun_call: {
-          name: 'from_kv',
-          fun_args: [
-            { var_ref: 'pair' },
-            pair[:key],
-            pair[:value]
-          ]
-        }
-      }
-    end
-
-    rule(empty_map_term: simple(:empty_map)) do
-      {
-        fun_call: {
-          name: 'new',
-          fun_args: [{ var_ref: 'map' }]
-        }
-      }
-    end
-
     rule(conditional: subtree(:conditional)) do
       if conditional.is_a?(Array)
         last_conditional = conditional.pop

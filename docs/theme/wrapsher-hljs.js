@@ -1,7 +1,7 @@
 hljs.registerLanguage("wrapsher", (hljs) => ({
   name: "Wrapsher",
   keywords: {
-    keyword: "if else use module meta type fun return while break continue shell throw try catch",
+    keyword: "if else use module meta type struct fun return while break continue shell throw try catch",
     built_in: "any int bool string reflist ref list map pair error builtin",
     literal: "true false",
   },

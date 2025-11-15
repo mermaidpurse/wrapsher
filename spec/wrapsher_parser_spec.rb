@@ -16,6 +16,81 @@ end
 
 # rubocop:disable Metrics/BlockLength
 RSpec.describe 'parser/transform' do
+  it 'parses a struct spec' do
+    source = <<~'SOURCE'
+      type x ['name': string, 'is_ok': bool]
+    SOURCE
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = Wrapsher::Transformer.new.transform(ast)
+    expect(program).to eq(
+      [
+        {
+          type: {
+            name: 'x',
+            struct_spec: {
+              list_term: {
+                lbracket: '[',
+                elements: [
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'name' } },
+                      value: { var_ref: 'string' }
+                    }
+                  },
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'is_ok' } },
+                      value: { var_ref: 'bool' }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    )
+  end
+
+  it 'parses a multiline struct spec' do
+    source = <<~'SOURCE'
+      type x [
+        'name': string,
+        'is_ok': bool
+       ]
+    SOURCE
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    program = Wrapsher::Transformer.new.transform(ast)
+    expect(program).to eq(
+      [
+        {
+          type: {
+            name: 'x',
+            struct_spec: {
+              list_term: {
+                lbracket: '[',
+                elements: [
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'name' } },
+                      value: { var_ref: 'string' }
+                    }
+                  },
+                  {
+                    pair: {
+                      key: { string_term: { single_quoted: 'is_ok' } },
+                      value: { var_ref: 'bool' }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    )
+  end
+
   it 'parses a function call' do
     source = <<~'SOURCE'
       bool test() {
@@ -98,20 +173,25 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'x',
-                     rvalue: {
-                       list_term: [
-                         { int_term: '0' },
-                         { int_term: '1' },
-                         { int_term: '2' }
-                       ]
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    { int_term: '0' },
+                    { int_term: '1' },
+                    { int_term: '2' }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -127,20 +207,25 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'x',
-                     rvalue: {
-                       list_term: [
-                         { int_term: '0' },
-                         { list_term: [{ int_term: '0' }, { int_term: '1' }] },
-                         { list_term: [{ int_term: '0' }, { int_term: '1' }, { int_term: '2' }] }
-                       ]
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    { int_term: '0' },
+                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }] } },
+                    { list_term: { lbracket: '[', elements: [{ int_term: '0' }, { int_term: '1' }, { int_term: '2' }] } }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -156,29 +241,40 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'x',
-                     rvalue: {
-                       list_term: [
-                         {
-                           list_term: [
-                             { pair: { key: string_term('one'), value: { int_term: '1' } } },
-                             { pair: { key: string_term('two'), value: { int_term: '2' } } }
-                           ]
-                         },
-                         { empty_map_term: '[:]' },
-                         {
-                           list_term: {
-                             pair: { key: string_term('THREE'), value: { int_term: '3' } }
-                           }
-                         }
-                       ]
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    {
+                      list_term: {
+                        lbracket: '[',
+                        elements: [
+                          { pair: { key: string_term('one'), value: { int_term: '1' } } },
+                          { pair: { key: string_term('two'), value: { int_term: '2' } } }
+                        ]
+                      }
+                    },
+                    { empty_map_term: '[:]' },
+                    {
+                      list_term: {
+                        lbracket: '[',
+                        elements: {
+                          pair: { key: string_term('THREE'), value: { int_term: '3' } }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -193,40 +289,51 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'x',
-                     rvalue: {
-                       list_term: [
-                         {
-                           pair: {
-                             key: string_term('one'),
-                             value: {
-                               list_term: [
-                                 { int_term: '0' },
-                                 { int_term: '1' }
-                               ]
-                             }
-                           }
-                         },
-                         {
-                           pair: {
-                             key: string_term('two'),
-                             value: {
-                               list_term: [
-                                 { int_term: '0' },
-                                 { int_term: '1' },
-                                 { int_term: '2' }
-                               ]
-                             }
-                           }
-                         }
-                       ]
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    {
+                      pair: {
+                        key: string_term('one'),
+                        value: {
+                          list_term: {
+                            lbracket: '[',
+                            elements: [
+                              { int_term: '0' },
+                              { int_term: '1' }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      pair: {
+                        key: string_term('two'),
+                        value: {
+                          list_term: {
+                            lbracket: '[',
+                            elements: [
+                              { int_term: '0' },
+                              { int_term: '1' },
+                              { int_term: '2' }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -241,63 +348,68 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'x',
-                     rvalue: {
-                       list_term: [
-                         {
-                           pair: {
-                             key: string_term('add5'),
-                             value: {
-                               lambda: {
-                                 signature: {
-                                   type: 'int',
-                                   arg_definitions: {
-                                     type: 'int',
-                                     name: 'i'
-                                   }
-                                 },
-                                 body: {
-                                   additive_op: {
-                                     left: { var_ref: 'i' },
-                                     operator: '+',
-                                     right: { int_term: '5' }
-                                   }
-                                 }
-                               }
-                             }
-                           }
-                         },
-                         {
-                           pair: {
-                             key: string_term('sub3'),
-                             value: {
-                               lambda: {
-                                 signature: {
-                                   type: 'int',
-                                   arg_definitions: {
-                                     type: 'int',
-                                     name: 'i'
-                                   }
-                                 },
-                                 body: {
-                                   additive_op: {
-                                     left: { var_ref: 'i' },
-                                     operator: '-',
-                                     right: { int_term: '3' }
-                                   }
-                                 }
-                               }
-                             }
-                           }
-                         }
-                       ]
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'x',
+              rvalue: {
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    {
+                      pair: {
+                        key: string_term('add5'),
+                        value: {
+                          lambda: {
+                            signature: {
+                              type: 'int',
+                              arg_definitions: {
+                                type: 'int',
+                                name: 'i'
+                              }
+                            },
+                            body: {
+                              additive_op: {
+                                left: { var_ref: 'i' },
+                                operator: '+',
+                                right: { int_term: '5' }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      pair: {
+                        key: string_term('sub3'),
+                        value: {
+                          lambda: {
+                            signature: {
+                              type: 'int',
+                              arg_definitions: {
+                                type: 'int',
+                                name: 'i'
+                              }
+                            },
+                            body: {
+                              additive_op: {
+                                left: { var_ref: 'i' },
+                                operator: '-',
+                                right: { int_term: '3' }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -510,14 +622,7 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'new',
-                     fun_args: [{ var_ref: 'map' }]
-                   }
-                 }
-               ])
+      test_fun([{ empty_map_term: '[:]' }])
     )
   end
 
@@ -530,23 +635,20 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: '_x',
-                     fun_args: [
-                       { var_ref: 'y' },
-                       { var_ref: 'p' },
-                       {
-                         fun_call: {
-                           name: 'new',
-                           fun_args: [{ var_ref: 'map' }]
-                         }
-                       }
-                     ]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            fun_call: {
+              name: '_x',
+              fun_args: [
+                { var_ref: 'y' },
+                { var_ref: 'p' },
+                { empty_map_term: '[:]' }
+              ]
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -559,23 +661,21 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   assignment: {
-                     var: 'p',
-                     rvalue: {
-                       fun_call: {
-                         name: 'from_kv',
-                         fun_args: [
-                           { var_ref: 'pair' },
-                           string_term('key1'),
-                           string_term('value1')
-                         ]
-                       }
-                     }
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            assignment: {
+              var: 'p',
+              rvalue: {
+                pair: {
+                  key: { string_term: { single_quoted: 'key1' } },
+                  value: { string_term: { single_quoted: 'value1' } }
+                }
+              }
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -655,29 +755,6 @@ RSpec.describe 'parser/transform' do
                  }
                ])
     )
-    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
-    expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'eq',
-                     fun_args: [
-                       { var_ref: 'p' },
-                       {
-                         fun_call: {
-                           name: 'from_kv',
-                           fun_args: [
-                             { var_ref: 'pair' },
-                             string_term('key1'),
-                             string_term('value1')
-                           ]
-                         }
-                       }
-                     ]
-                   }
-                 }
-               ])
-    )
   end
 
   it 'parses a pair in an expression with chains' do
@@ -689,33 +766,31 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'eq',
-                     fun_args: [
-                       {
-                         fun_call: {
-                           name: 'head',
-                           fun_args: [
-                             { var_ref: 'm' }
-                           ]
-                         }
-                       },
-                       {
-                         fun_call: {
-                           name: 'from_kv',
-                           fun_args: [
-                             { var_ref: 'pair' },
-                             string_term('key1'),
-                             string_term('value1')
-                           ]
-                         }
-                       }
-                     ]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            fun_call: {
+              name: 'eq',
+              fun_args: [
+                {
+                  fun_call: {
+                    name: 'head',
+                    fun_args: [
+                      { var_ref: 'm' }
+                    ]
+                  }
+                },
+                {
+                  pair: {
+                    key: string_term('key1'),
+                    value: string_term('value1')
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -728,18 +803,16 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'from_kv',
-                     fun_args: [
-                       { var_ref: 'pair' },
-                       string_term('key1'),
-                       string_term('value1')
-                     ]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            pair: {
+              key: string_term('key1'),
+              value: string_term('value1')
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -751,77 +824,29 @@ RSpec.describe 'parser/transform' do
     SOURCE
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     expect(ast).to eq(
-      test_fun([
-                 {
-                   list_term: [
-                     {
-                       pair: {
-                         key: string_term('key1'),
-                         value: string_term('value1')
-                       }
-                     },
-                     {
-                       pair: {
-                         key: string_term('key2'),
-                         value: string_term('value2')
-                       }
-                     }
-                   ]
-                 }
-               ])
-    )
-    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
-    expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'from_pairlist',
-                     fun_args: [
-                       { var_ref: 'map' },
-                       {
-                         fun_call: {
-                           name: 'push',
-                           fun_args: [
-                             {
-                               fun_call: {
-                                 name: 'push',
-                                 fun_args: [
-                                   {
-                                     fun_call: {
-                                       name: 'new',
-                                       fun_args: [{ var_ref: 'list' }]
-                                     }
-                                   },
-                                   {
-                                     fun_call: {
-                                       name: 'from_kv',
-                                       fun_args: [
-                                         { var_ref: 'pair' },
-                                         string_term('key1'),
-                                         string_term('value1')
-                                       ]
-                                     }
-                                   }
-                                 ]
-                               }
-                             },
-                             {
-                               fun_call: {
-                                 name: 'from_kv',
-                                 fun_args: [
-                                   { var_ref: 'pair' },
-                                   string_term('key2'),
-                                   string_term('value2')
-                                 ]
-                               }
-                             }
-                           ]
-                         }
-                       }
-                     ]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            list_term: {
+              lbracket: '[',
+              elements: [
+                {
+                  pair: {
+                    key: string_term('key1'),
+                    value: string_term('value1')
+                  }
+                },
+                {
+                  pair: {
+                    key: string_term('key2'),
+                    value: string_term('value2')
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -1130,6 +1155,47 @@ RSpec.describe 'parser/transform' do
     )
   end
 
+  it 'parses a subscript on an expression' do
+    source = <<~SOURCE
+      bool test() {
+        x.y()['foo']
+      }
+    SOURCE
+    ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
+    expect(ast).to eq(
+      test_fun([
+                 {
+                   chain: {
+                     receiver: { var_ref: 'x' },
+                     calls: [
+                       { postfix: { fun_call: { name: 'y', fun_args: nil } } },
+                       { subscript: { index: string_term('foo') } }
+                     ]
+                   }
+                 }
+               ])
+    )
+    program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
+    expect(program).to eq(
+      test_fun([
+                 {
+                   fun_call: {
+                     name: 'at',
+                     fun_args: [
+                       {
+                         fun_call: {
+                           name: 'y',
+                           fun_args: [{ var_ref: 'x' }]
+                         }
+                       },
+                       string_term('foo')
+                     ]
+                   }
+                 }
+               ])
+    )
+  end
+
   it 'parses an empty list' do
     source = <<~SOURCE
       bool test(){
@@ -1139,14 +1205,16 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'new',
-                     fun_args: [{ var_ref: 'list' }]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            list_term: {
+              lbracket: '[',
+              elements: nil
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -1198,40 +1266,20 @@ RSpec.describe 'parser/transform' do
     ast = stringify(Wrapsher::Parser.new.parsetext(source)).flatten
     program = stringify(Wrapsher::Transformer.new.transform(ast)).flatten
     expect(program).to eq(
-      test_fun([
-                 {
-                   fun_call: {
-                     name: 'push',
-                     fun_args: [
-                       {
-                         fun_call: {
-                           name: 'push',
-                           fun_args: [
-                             {
-                               fun_call: {
-                                 name: 'push',
-                                 fun_args: [
-                                   {
-                                     fun_call: {
-                                       name: 'new',
-                                       fun_args: [
-                                         { var_ref: 'list' }
-                                       ]
-                                     }
-                                   },
-                                   { int_term: '1' }
-                                 ]
-                               }
-                             },
-                             { int_term: '2' }
-                           ]
-                         }
-                       },
-                       { int_term: '3' }
-                     ]
-                   }
-                 }
-               ])
+      test_fun(
+        [
+          {
+            list_term: {
+              lbracket: '[',
+              elements: [
+                { int_term: '1' },
+                { int_term: '2' },
+                { int_term: '3' }
+              ]
+            }
+          }
+        ]
+      )
     )
   end
 
@@ -1250,65 +1298,36 @@ RSpec.describe 'parser/transform' do
             assignment: {
               var: 'x',
               rvalue: {
-                fun_call: {
-                  fun_args: [
+                list_term: {
+                  lbracket: '[',
+                  elements: [
+                    { int_term: '0' },
                     {
                       fun_call: {
+                        name: 'to_string',
                         fun_args: [
-                          {
-                            fun_call: {
-                              fun_args: [
-                                {
-                                  fun_call: {
-                                    fun_args: [
-                                      {
-                                        fun_call: {
-                                          fun_args: [
-                                            { var_ref: 'list' }
-                                          ],
-                                          name: 'new'
-                                        }
-                                      },
-                                      { int_term: '0' }
-                                    ],
-                                    name: 'push'
-                                  }
-                                },
-                                {
-                                  fun_call: {
-                                    fun_args: [
-                                      { var_ref: 'a' }
-                                    ],
-                                    name: 'to_string'
-                                  }
-                                }
-                              ],
-                              name: 'push'
-                            }
-                          },
-                          {
-                            fun_call: {
-                              fun_args: [
-                                { var_ref: 'b' }
-                              ],
-                              name: 'not'
-                            }
-                          }
-                        ],
-                        name: 'push'
+                          { var_ref: 'a' }
+                        ]
                       }
                     },
                     {
                       fun_call: {
+                        name: 'not',
+                        fun_args: [
+                          { var_ref: 'b' }
+                        ]
+                      }
+                    },
+                    {
+                      fun_call: {
+                        name: 'minus',
                         fun_args: [
                           { int_term: '3' },
                           { int_term: '4' }
-                        ],
-                        name: 'minus'
+                        ]
                       }
                     }
-                  ],
-                  name: 'push'
+                  ]
                 }
               }
             }

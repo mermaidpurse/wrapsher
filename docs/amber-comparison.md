@@ -15,7 +15,7 @@ and so indicated.
 | :------ | :----------------------------------------------------- | :------------- | :------ |
 | Type-checking | optional | mandatory | Wrapsher has an `any` generic which matches all types |
 | Scalar types | Text, Num, Bool, Null | string, int, bool | |
-| Collection types | Array (1-dimension) | list, map, pair (arbitrarily nested) | |
+| Collection types | Array (1-dimension) | list, map, struct, pair (arbitrarily nested) | |
 | User-defined types | no | yes | Wrapsher allows you to define arbitrarily complex types |
 | Loops | infinite loop, for loop | while loop, `.map()` etc. | Iterates over any collection |
 | Error handling | ignore or manually checked | throw/try/catch | |

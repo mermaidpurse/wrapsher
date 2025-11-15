@@ -1,0 +1,63 @@
+use module test
+use module io
+
+type person [
+  'name': string,
+  'age': int,
+  'tags': list,
+  'relations': map
+]
+
+bool test_struct_new() {
+  p = person.new()
+  p.is_a(person) and p.name() == '' and p.tags() == [] and p.relations() == [:]
+}
+
+bool test_struct_to_map() {
+  p = person.new()
+  p.to_map() == ['name': '', 'age': 0, 'tags': [], 'relations': [:]]
+}
+
+bool test_struct_quote() {
+  p = person.new()
+  p.quote() == 'person.from_map([\'name\': , \'age\': 0, \'tags\': [], \'relations\': [:]])'
+}
+
+bool test_struct_set_get() {
+  p = person.new().set_name('Glinda')
+  p.name() == 'Glinda'
+}
+
+bool test_struct_set_invalid() {
+  p = person.new()
+  try {
+    p = p.set_age('foo')
+  } catch e {
+    e.message().has('Expected type \'int\'')
+  }
+}
+
+bool test_struct_set_map_with_map() {
+  p = person.new()
+  p = p.set_relations(['mentor': 'Glinda', 'lawyer': 'Erica'])
+  p.relations()['mentor'] == 'Glinda'
+}
+
+bool test_struct_set_map_key() {
+  p = person.new()
+  p = p.set_relations(['mentor': 'Glinda', 'lawyer': 'Erica'])
+  p = p.set_relations('lawyer': 'Tibault')
+  r = p.relations()
+  r['mentor'] == 'Glinda' and r['lawyer'] == 'Tibault'
+}
+
+bool test_struct_from_map() {
+  p = person.from_map([
+      'name': 'Glinda',
+      'age': 53,
+      'tags': ['one'],
+      'relations': ['lawyer': 'Tibault']
+    ])
+
+  p.name() == 'Glinda' and p.tags() == ['one'] and p.relations()['lawyer'] == 'Tibault'
+}

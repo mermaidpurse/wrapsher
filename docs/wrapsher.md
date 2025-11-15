@@ -116,8 +116,10 @@ Top-level statements in Wrapsher can be:
       syntactic sugar for allowing the method "receiver" to be passed
       as the function's first argument, when called.
 - A type definition of the form <code>type _typename_
-  _store\_type_</code>.  This declares a new user-defined named type,
-  based on _store\_type_.  Note that _store\_type_ is just used as
+  _store\_type_</code> or <code>type _typename_ _struct_spec_.
+  This declares a new user-defined named type,
+  based on _store\_type_ or the _struct\_spec_.
+  Note that _store\_type_ is just used as
   storage here, enabling the safe cast back and forth between the two;
   this is not any form of inheritance. See [Modules and
   Types](./modules-types.md) for how to implement a type.
@@ -542,56 +544,58 @@ factor = 10
 [10, 15, 20, 25, 30].select(bool fun (int i) { i % factor == 0 }) == [10, 20, 30]
 ```
 
-### Fstructs
+#### Structs
 
-Wrapsher has no first-class structs (yet). When it does, they will
-be compatible with manually-managed **fstructs**, a nickname for
-"faux structs" that are manually created and based on lists or
-some other type. Maps are pretty inefficient so lists are a better choice.
+A struct is declared by providing a map of member names
+and types to the `type` definition. The resulting type is
+implemented as a **list** and standard accessor methods are
+provided that operato on the type: a constructor, a
+convenience constructor `from_map()`, getters and setters
+`to_string()` and `quote()` and `to_map()`.
 
-For example, if you have a `person` structure with two fields,
-you might implement it like this:
+The struct specifier consists of pairs whose key is a string that is
+the member name, and whose value is a type. Like Wrapsher's other
+immutable collection types, mutating a struct means assigning a new
+struct to something.
+
+Struct members can be of any type, except that directly recursive
+definitions are not possible, because Wrapsher does not have null
+values to represent optionality. Make such members a list or map
+instead. When of type **map**, the setter accepts a whole map to
+replace the member, or a pair, and sets just that key in the map.
+
+Example for a hypothetical **employee** type.
 
 ```wrapsher
-type person list
+type employee [
+  'name': string,
+  'age': int,
+  'is_contractor': bool,
+  'managed_by': list
+]
 
-# person is a fstruct
-# 0 - name
-# 1 - age
-person new(type/person t) {
-  p = list.new().as_person()
-  p = p.set_name('')
-  p = p.set_age(0)
-}
+m = employee.new()        # zero value for all members
+m = e.set_name('Glinda')
+m = e.set_age(53)
 
-person as_person(list l) {
-  l._as(person)
-}
+e = employee.new()
+e = e.set_name('Herb')
+e = e.set_age(48)
+e = e.set_managed_by(e.managed_by().push(m))
 
-list as_list(person p) {
-  p._as(list)
-}
-
-string name(person p) {
-  p.as_list().at(0)
-}
-
-person set_name(person p, string name) {
-  p.as_list().set(0, name).as_person()
-}
-
-int age(person p) {
-  p._as_list().at(1)
-}
-
-person set_age(person p, int age) {
-  p.as_list().set(1, age).as_person()
-}
+e.managed_by().name() == 'Glinda'
+m.to_string() == '''
+[
+  name: Glinda,
+  age: 53,
+  is_contractor: false,
+  managed_by: []
+]
+'''
 ```
 
-Of course, this is quite tedious--future versions of Wrapsher
-will generate these getters and setters and/or allow some kind of
-first-class struct support or syntactic sugar for them.
+You're free to implement any other methods you wish against the
+type, of course.
 
 ### Variables
 

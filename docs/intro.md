@@ -112,7 +112,7 @@ potential to usefully solve the real problem described above.
 
 ## Getting Started: How do I run Wrapsher?
 
-_Or: Hello, world?
+_Or: Hello, world?_
 
 For now, the Wrapsher compiler is implemented in Ruby and is installable
 as a Ruby gem:

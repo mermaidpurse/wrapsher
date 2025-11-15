@@ -6,6 +6,8 @@ module test
 #
 # Copyright (c) 2025 Mermaidpurse
 
+use external echo
+
 meta doc '''
 Wrapsher test framework
 
@@ -48,7 +50,8 @@ int main(list args) {
     ;;
     esac
   done
-  # Doing our own I/O
+  # Doing raw I/O
+  echo "TAP version 13"
   echo "1..${_wsh_tests}"
   _wsh_test=0
   _wsh_fails=0
