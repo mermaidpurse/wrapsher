@@ -271,6 +271,55 @@ pair find(map m, any k, any d) {
 This tells you that the default was used _because it is the default_,
 and it's not in your collection.
 
+## Type Expressions, Narrowing
+
+It would be nice to be able to extend types in some way, without becoming
+object-oriented. The `type <typename> [<field>: <type>...]` syntax
+worked really well for structs, as did the compiler macros to help with
+generated AST. I've been thinking about using a similar syntax for
+enums, but if I do I probably can only enum basic types, so maybe that
+should wait. There definitely needs to be some kind of enum, though.
+
+But, a really common thing to want to do is to narrow the collection
+types. One way could be to use a function syntax for the type expression
+and use it to generate narrowed versions of the functions against the
+base type. For example, for `list`:
+
+`type list/string list(string)`
+
+I think we actually want this one automatically anyway because it's the
+type of the arguments in `main`. The idea is that the compiler uses
+the expression `list(string)` to mean "for every function F with
+receiver `list`, generate a function with receiver `list/string`,
+but replace any `any` arguments or the return value with `string`.
+
+Would that work if we want:
+
+`type map/string/int map(pair(string, int))`
+
+Or would we have to do
+
+```
+type pair/string/int pair(string, int)
+type map/string/int map(pair/string/int)
+```
+
+That actually makes sense, because in something like:
+
+```
+pair new(type/pair) => pair/string/int new(type/pair/string/int)
+pair from_kv(any k, any v) => pair/string/int from_kv(string k, int v)
+any key(pair p) => string key(pair/string/int p)
+??? int value(pair p) => int value(pair/string/int p) ??? How would it know?
+```
+
+That's close but not quite there. It definitely makes sense for a list, though. Could it
+make sense for arbitrary types? Or... should I just implement list/string and leave it
+up to the user for now?
+
+I should probably just implement list/string and leave this macro to stew for a little more.
+
+
 ## Safety, "Namespaces" and modules
 
 - Implement various warnings, lints and (overrideable errors), like:

@@ -16,7 +16,9 @@ preferred-dark-theme = "ayu"
 smart-punctuation = true
 git-repository-url = "https://github.com/mermaidpurse/wrapsher"
 git-repository-icon = "fa-github"
-additional-js = ["docs/theme/wrapsher-hljs.js"]
+additional-js = ["theme/wrapsher-hljs.js"]
+additional-css = ["theme/css/sidebar.css", "theme/css/profont.css"]
+favicon = "images/wrapsher-logo-64.png"
 
 [output.html.search]
 enable = true

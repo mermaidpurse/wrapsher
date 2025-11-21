@@ -16,16 +16,17 @@ Wrapsher is different.
 | Collection types | Array (1-dimension) | list, map, struct, pair (arbitrarily nested) | |
 | User-defined types | no | yes | Wrapsher allows you to define arbitrarily complex types |
 | Loops | infinite loop, for loop | while loop, `.map()` etc. | Iterates over any collection |
+| Lambdas | no | anonymous functions are closures | |
 | Error handling | ignore or manually checked | throw/try/catch | |
 | External commands | inlined text substitution | declared dependencies | Wrapsher is designed to fail early when prerequisites aren't met |
 | Code sharing | `import` functions from files | `use module`s | Wrapsher modules are intended to be a full module system[^1] |
 | Tests | manually-written | **test** module | |
 | Runtime | bash | any POSIX sh | |
 | Paradigm | compiled and interpreted; imperative | compiled; multiparadigm | functional, imperative |
-| Influence | ECMAScript, bash | C, Python, Lisp | |
+| Influence | ECMAScript, bash | C, Go, Python, Lisp | |
 | Implementation language | Rust | Ruby | |
 | REPL | no | no | |
-| IDE Tools | no | Emacs mode | |
+| IDE Tools | LSP | Emacs mode | |
 
 Wrapsher's intention is to allow you to build "somewhat large"
 programs and systems, and to provide the tools (like complex types,

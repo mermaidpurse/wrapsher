@@ -121,7 +121,7 @@ bool is_success(command_result cr) {
 }
 
 # TODO: Maybe get from `externals` to cache; maybe when maps
-# are less expensive than this
+# are less expensive than doing this
 command get(type/command t, string command_name) {
   c = command.new()
   c = c.set_name(command_name)

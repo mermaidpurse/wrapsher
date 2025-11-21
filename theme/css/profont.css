@@ -1,0 +1,13 @@
+@font-face {
+    font-family: 'ProFontWindows';
+    src: url('../../fonts/ProFontWindows.woff2') format('woff2'),
+         url('../../fonts/ProFontWindows.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap; /* avoids blocking rendering */
+}
+
+/* Apply to code blocks */
+code, pre, .hljs, .sidebar-title {
+    font-family: 'ProFontWindows', monospace !important;
+}
