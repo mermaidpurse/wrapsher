@@ -13,5 +13,6 @@
 - [Modules](wsh/modules.md)
   - [core.wsh](wsh/core.wsh.md)
   - [env.wsh](wsh/env.wsh.md)
+  - [file.wsh](wsh/file.wsh.md)
   - [io.wsh](wsh/io.wsh.md)
   - [test.wsh](wsh/test.wsh.md)
