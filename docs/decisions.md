@@ -240,6 +240,22 @@ signature" which is probably even better. Maybe not incompatible. But if
 I want to encourage people on this path, we should probably leave the current
 syntax clunky.
 
+### Destructors?
+
+Having to close things that you open is definitely not friendly. Right now,
+local variables are cleaned up by the compiler. Is there some way to arrange
+for a destructor to run, if one exists? It could be a special dispatch
+that examines the type and looks at the appropriate shell function predicate
+(e.g. corresponding to something like this):
+
+
+```wrapsher
+bool destroy(io_handle fh) {
+  fh.fd().close()
+}
+```
+
+
 ## Pairs for in-band errors
 
 Basically we only have unstructured errors and they're not checked (at
@@ -258,7 +274,7 @@ good with destructuring in an assignment; or at least, fairly common).
 I don't want to go full golang with the `ok, err` type stuff, but
 maybe a little of this kind of thing wouldn't be so bad:
 
-```
+```wrapsher
 pair find(map m, any k, any d) {
   if m.has(k) {
     'found': m[k]
@@ -272,6 +288,8 @@ This tells you that the default was used _because it is the default_,
 and it's not in your collection.
 
 ## Type Expressions, Narrowing
+
+What if type narrowing could exclude methods you want to write?
 
 It would be nice to be able to extend types in some way, without becoming
 object-oriented. The `type <typename> [<field>: <type>...]` syntax
@@ -318,6 +336,21 @@ make sense for arbitrary types? Or... should I just implement list/string and le
 up to the user for now?
 
 I should probably just implement list/string and leave this macro to stew for a little more.
+
+Okay, how about this: only missing methods get generated, so:
+
+```
+type pair/string pair(string)
+
+any value(pair/string ps) {
+  ps._as(pair).value()
+}
+
+type pair/string/int pair/string(int)
+```
+
+That would work because you only narrow one `any` at a time and override the
+methods that can't be generated.
 
 
 ## Safety, "Namespaces" and modules

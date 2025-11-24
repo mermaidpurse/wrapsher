@@ -13,8 +13,9 @@ Basic I/O using stdin, stdout, stderr via the commands printf and echo
 
 ## Global Variables
 
-- `int stdout`: The file descriptor of the standard output
-- `int stderr`: The file descriptor of the standard error
+- `io_handle stdout`: The file descriptor of the standard output
+- `io_handle stderr`: The file descriptor of the standard error
+- `io_handle stdin`: The file discriptor of the standard input
 
 ## Functions
 
@@ -27,34 +28,263 @@ characters printed. For example:
 io.printlin('hello, world')
 ```
 
-### `int println(int fd, string s)`
+### `int println(io_handle fh, string s)`
 
-Print the string to the specified file descriptor. For example:
+Print the string to the specified I/O handle. For example:
 
 ```wrapsher
 stderr.println('an error has occurred: ' + e.message())
 ```
 
+### `int write(module/io m, string s)`
+### `int write(io_handle fh, string s)`
+
+Write the raw string to the specified I/O handle or stdout.
+
+### `bool printf(module/io m, string fmt, list args)`
+### `bool printf(io_handle fh, string fmt, list args)`
+
+Use `printf` and a format string (in `fmt`) to format
+the arguments. The arguments can be of any type--but note,
+they are converted to strings with `to_string()` before
+being passed to `printf`.
+
+### `string sprintf(module/io m, string fmt, list args)`
+
+As with `printf`, but return the formatted string instead
+of producing output.
+
+### `list readlines(io_handle fh)`
+
+Read lines until the end-of-file is reached on the specified
+I/O handle. The result is a list of strings.
+
+### `string slurp(io_handle fh)`
+
+Read content until the end-of-file is reached on the specified
+I/O handle and return the result as a single string. Note that
+this reads line-by-line in a manner similar to `readlines`.
+
+### `list map(io_handle fh, fun f)`
+
+Read content line by line, invoking the passed-in function
+on each line.
+
+### `bool is_tty(io_handle fh)`
+
+Returns `true` if the I/O handle is a terminal.
+
 '''
 
 use external printf
+use external exec
+use external test
 
 use global stderr 2
 use global stdout 1
+use global stdin 0
 
-int println(module/io m, string s) {
-  shell '''
-  _wsh_get_local s _wshi
-  printf '%s\n' "${_wshi#string:}"
-  _wsh_result="int:$((${#_wshi} - 7))"
-  '''
+type io_handle [
+  'fd': int,
+  'mode': string
+]
+use global _io_fdtable false
+
+bool init(module/io m) {
+  stderr = io_handle.from_map(['fd': 2, 'mode': 'write'])
+  stdout = io_handle.from_map(['fd': 1, 'mode': 'write'])
+  stdin = io_handle.from_map(['fd': 0, 'mode': 'read'])
+  _io_fdtable = [3]
+  true
 }
 
-int println(int fd, string s) {
+bool _is_valid_mode(module/io m, string mode) {
+  if mode != 'read' and mode != 'write' and mode != 'readwrite' and mode != 'append' {
+    return false
+  }
+  return true
+}
+
+bool _assert_valid_mode(module/io m, string mode) {
+  if !m._is_valid_mode(mode) {
+    throw 'mode ' + mode + ' invalid, must be one of: read, write, readwrite, or append'
+  }
+  return true
+}
+
+# We do our own fd allocation because {var}>sth is
+# a 'may' support item in POSIX.
+int _get_fd(module/io m) {
+  next = _io_fdtable[0]
+  _io_fdtable = _io_fdtable.tail()
+  if _io_fdtable.length() == 0 {
+    _io_fdtable = [next + 1]
+  }
+  next
+}
+
+bool _return_fd(module/io m, int it) {
+  _io_fdtable = [it] + _io_fdtable
+  true
+}
+
+int println(module/io m, string s) {
+  stdout.println(s)
+}
+
+bool is_writeable(io_handle fh) {
+  mode = fh.mode()
+  mode == 'write' or mode == 'readwrite' or mode == 'append'
+}
+
+bool is_readable(io_handle fh) {
+  mode = fh.mode()
+  mode == 'read' or mode == 'readwrite'
+}
+
+bool _assert_is_writeable(io_handle fh) {
+  if !fh.is_writeable() {
+    throw 'filehandle not writeable (fd=' + fh.fd().to_string() + ')'
+  }
+} 
+
+bool _assert_is_readable(io_handle fh) {
+  if !fh.is_readable() {
+    throw 'filehandle not readable (fd=' + fh.fd().to_string() + ')'
+  }
+}
+
+bool is_tty(io_handle fh) {
+  test = command.need('test')
+  r = test.run_raw(['-t', fh.fd().to_string()])
+  r.is_success()
+}
+
+io_handle get(type/io_handle t, string mode) {
+  io._assert_valid_mode(mode)
+  io_handle.new().set_fd(io._get_fd()).set_mode(mode)
+}
+
+bool close(io_handle fh) {
+  fd = fh.fd()
+  mode = fh.mode()
   shell '''
   _wsh_get_local fd _wshi
-  _wsh_get_local s _wshj
-  printf '%s\n' "${_wshj#string:}" >&"${_wshi#int:}"
-  _wsh_result="int:$((${#_wshi} - 7))"
+  _wsh_get_local mode _wshj
+  _wshi="${_wshi#int:}"
+  case "${_wshj}" in read|append)
+    exec "${_wshj}"<&-
+  ;; readwrite)
+    exec "${_wshj}"<&- "${_wshj}">&-
+  ;; write)
+    exec "${_wshj}">&-
+  esac
   '''
+  io._return_fd(fd)
+}
+
+int println(io_handle fh, string s) {
+  if !s.has_suffix('
+') {
+    s = s + '
+'
+  }
+  fh.write(s)
+}
+
+bool printf(module/io m, string fmt, list args) {
+  stdout.printf(fmt, args)
+}
+
+int write(io_handle fh, string s) {
+  fh.printf('%s', [s])
+  s.length()
+}
+
+bool printf(io_handle fh, string fmt, list args) {
+  fh._assert_is_writeable()
+  printf = command.need('printf')
+  result = printf._run_raw_to([fmt] + args, fh.fd())
+  if !result.is_success() {
+    throw 'error running printf command, exited ' + result.exitcode().to_string()
+  }
+}
+
+string sprintf(module/io m, string fmt, list args) {
+  printf = command.need('printf')
+  result = printf.run([fmt] + args.map(string fun (any i) { i.to_string() }))
+  if !result.is_success() {
+    throw 'error running printf command, exited ' + result.exitcode().to_string()
+  }
+  result.output()
+}
+
+pair _readline(io_handle fh) {
+  fd = fh.fd()
+  line = ''
+  st = true
+  the_error = ''
+  shell '''
+  _wsh_get_local fd _wshi
+  _wshi="${_wshi#int:}"
+  read -r _wshj <&"${_wshi}"
+  _wshk=$?
+  _wsh_set_local line "string:${_wshj}"
+  case "${_wshk}" in 0)
+    _wsh_set_local st "bool:true"
+  ;; 1)
+    _wsh_set_local st "bool:false"
+  ;; *)
+    _wsh_set_local the_error "error reading line from filehandle"
+  ;;
+  esac
+  '''
+  if the_error != '' {
+    throw the_error
+  }
+  pair.from_kv(st, line)
+}
+
+list readlines(io_handle fh) {
+  _assert_is_readable(fh)
+  result = []
+  r = fh._readline()
+  while r.key() or r.value() != '' {
+    result = result.push(r.value())
+    if !r.key() {
+      break
+    }
+    r = fh._readline()
+  }
+  result
+}
+
+list map(io_handle fh, fun f) {
+  _assert_is_readable(fh)
+  result = []
+  r = fh._readline()
+  while r.key() or r.value() != '' {
+    result = result.push(f.call().with(r.value()))
+    if !r.key() {
+      break
+    }
+    r = fh._readline()
+  }
+  result
+}
+
+string slurp(io_handle fh) {
+  _assert_is_readable(fh)
+  result = ''
+  r = fh._readline()
+  while r.key() or r.value() != '' {
+    result = result + r.value()
+    if !r.key() {
+      break
+    }
+    result = result + '
+'
+    r = fh._readline()
+  }
+  result
 }

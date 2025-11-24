@@ -1,0 +1,163 @@
+module file
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2025 Mermaidpurse
+
+meta doc '''
+# file
+
+File and directory operations
+
+## Types
+
+### file_info
+
+```wrapsher
+type file_info [
+  'name': string
+]
+
+fi = file_info.get('my-cool-file.txt')
+
+```
+You can construct a `file_info` value from
+a filename which exists or does not exist (to
+test this, use `bool is_existent(file_info)`.
+
+## Functions
+
+### Tests
+
+The following are predicate function to test various characteristics
+of a file:
+
+- `is_existent`
+- `is_directory`
+- `is_writeable`
+- `is_readable`
+- `is_fifo`
+- `is_symlink`
+
+### File Operations
+
+#### `bool remove(file_info fi)`
+
+Remove a file or directory.
+
+#### `io_handle open(file_info fi, string mode)`
+
+Open a file with the specified I/O mode (e.g. `read`
+or `write`--see the **io** module for more) and return
+a filehandle which can be used to read or write
+data, as appropriate.
+
+'''
+
+use module io
+
+use external ls
+use external test
+use external exec
+use external rm
+
+type file_info [
+  'name': string
+]
+
+bool _test(file_info fi, string opt) {
+  test = command.need('test')
+  r = test.run_raw([opt, fi.name()])
+  r.is_success()
+}
+
+bool is_existent(file_info fi) {
+  fi._test('-e')
+}
+
+bool is_directory(file_info fi) {
+  fi._test('-d')
+}
+
+bool is_writeable(file_info fi) {
+  fi._test('-w')
+}
+
+bool is_readable(file_info fi) {
+  fi._test('-r')
+}
+
+bool is_fifo(file_info fi) {
+  fi._test('-p')
+}
+
+bool is_symlink(file_info fi) {
+  fi._test('-L')
+}
+
+string _ls(module/file m, string name, list args) {
+  r = file_ls.run(args)
+  if !r.is_success() {
+    throw 'can\'t run ls ' + name + args.to_string()
+  }
+}
+
+# Should this error or not when the file
+# doesn't exist? Should you get a file_info
+# to open a file in create mode?
+file_info get(module/file m, string name) {
+  fi = file_info.new()
+  fi = fi.set_name(name)
+}
+
+
+io_handle open(file_info fi, string mode) {
+  file.open(fi.name(), mode)
+}
+
+io_handle open(module/file m, string name, string mode) {
+  fh = io_handle.get(mode)
+  fd = fh.fd()
+  shell '''
+  _wsh_get_local mode _wshi
+  _wsh_get_local fd _wshj
+  _wsh_get_local name _wshk
+  _wshi="${_wshi#string:}"
+  _wshj="${_wshj#int:}"
+  _wshk="${_wshk#string:}"
+  case "${_wshi}" in read)
+    eval "exec ${_wshj}<\"\${_wshk}\""
+  ;; write)
+    eval "exec ${_wshj}>\"\${_wshk}\""
+  ;; readwrite)
+    eval "exec ${_wshj}<>\"\${_wshk}\""
+  ;; append)
+    eval "exec ${_wshj}>>\"\${_wshk}\""
+  ;; *)
+    _wsh_error="error:invalid I/O mode ${_wshi}, must be one of: read, write, readwrite, append"
+    break
+  ;;
+  esac
+  '''
+  fh
+}
+
+# TODO: Think about idempotency and race
+# conditions for when file already doesn't
+# exist.
+bool remove(module/file m, string name) {
+  fi = file.get(name)
+  fi.remove()
+}
+
+bool remove(file_info fi) {
+  rm = command.need('rm')
+  if fi.is_directory() {
+    r = rm.run_raw(['-r', fi.name()])
+  } else {
+    r = rm.run_raw([fi.name()])
+  }
+  r.is_success()
+}

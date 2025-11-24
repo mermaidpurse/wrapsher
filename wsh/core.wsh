@@ -213,6 +213,14 @@ command_result run(command c, list args) {
 }
 
 command_result run_raw(command c, list args) {
+  # This is a bit hardcoded so we can keep the
+  # io_handle type in module io.
+  c._run_raw_to(args, 1)
+}
+
+# This might need more work around redirection, e.g., stderr
+# as well
+command_result _run_raw_to(command c, list args, int fd) {
   c.assert_ok(args)
   rl = args.as_reflist()
   loc = c.location()
@@ -221,6 +229,8 @@ command_result run_raw(command c, list args) {
   _wsh_get_local rl _wshi
   _wsh_get_local loc _wshj
   _wshk=0
+  _wsh_get_local fd _wshm
+  _wshm="${_wshm#int:}"
   _wsh_command_line="\"${_wshj#string:}\""
   for _wshl in ${_wshi#reflist:}
   do
@@ -228,7 +238,7 @@ command_result run_raw(command c, list args) {
     _wsh_command_line="${_wsh_command_line} \"\${_wsh_command_arg${_wshk}#string:}\""
     : $((_wshk++))
   done
-  eval "${_wsh_command_line}"
+  eval "${_wsh_command_line}" >&"${_wshm}"
   _wsh_set_local exitcode "int:$?"
   '''
   cr = command_result.new()

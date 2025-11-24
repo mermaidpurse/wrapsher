@@ -2,7 +2,13 @@
 
 ## Issues
 
+- Change command.get() and command.need() so that they only work for
+  declared externals (they should only get it from the externals list,
+  which probably needs to be a map or some kind of special proplist based
+  on words and not strings
 - Check that types in various places are actually types (as struct does now)
+- It's important to document that closures close over variables but cannot
+  change them
 - Parser: Multiline function calls, or maybe multiline function calls with
   funs, don't seem to work, like `map(\n...fun...\n)`, maybe
   other multiline calls. It works when you break on the `{` and

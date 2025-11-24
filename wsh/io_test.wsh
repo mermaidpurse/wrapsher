@@ -1,0 +1,26 @@
+use module io
+use module test
+
+bool test_stdio_fds() {
+  stdin.fd() == 0 and stdout.fd() == 1 and stderr.fd() == 2
+}
+
+bool test_get_fds() {
+  first = io._get_fd()
+  second = io._get_fd()
+  third = io._get_fd()
+  io._return_fd(second)
+  fourth = io._get_fd()
+  fifth = io._get_fd()
+  first == 3 and second == 4 and third == 5 and fourth == 4 and fifth == 6
+}
+
+bool test_sprintf_int() {
+  io.sprintf('one%dthree', [2]) == 'one2three'
+}
+
+bool test_sprintf_string_int_hex() {
+  r = io.sprintf('one %s 0x%02x', ['two', 15])
+  r == 'one two 0x0f'
+}
+
