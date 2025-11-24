@@ -1,0 +1,77 @@
+use module file
+use module test
+
+use external touch
+use feature external
+
+bool test_is_readable() {
+  touch = command.get('touch')
+  touch.run_raw(['test-file'])
+  tf = file.get('test-file')
+  r = tf.is_readable()
+  tf.remove()
+  r
+}
+
+bool test_write_and_slurp() {
+  tf = 'test-file-slurp'
+  fh = file.open(tf, 'write')
+  fh.println('one')
+  fh.println('two')
+  fh.println('three')
+  fh.close()
+  fh = file.open(tf, 'read')
+  content = fh.slurp()
+  fh.close()
+  r = content == 'one
+two
+three
+'
+  file.get(tf).remove()
+  r
+}
+
+bool test_write_and_slurp_nonl() {
+  tf = 'test-file-slurp-nonl'
+  fh = file.open(tf, 'write')
+  fh.println('one')
+  fh.println('two')
+  fh.write('three')
+  fh.close()
+  fh = file.open(tf, 'read')
+  content = fh.slurp()
+  fh.close()
+  r = content == 'one
+two
+three'
+  file.get(tf).remove()
+  r
+}
+
+bool test_readlines() {
+  tf = 'test-file-readlines'
+  fh = file.open(tf, 'write')
+  fh.println('one')
+  fh.println('two')
+  fh.println('three')
+  fh.close()
+  fh = file.open(tf, 'read')
+  lines = fh.readlines()
+  fh.close()
+  file.get(tf).remove()
+  lines == ['one', 'two', 'three']
+}
+
+bool test_map() {
+  tf = 'test-file-map'
+  fh = file.open(tf, 'write')
+  fh.println('one')
+  fh.println('two')
+  fh.println('three')
+  fh.close()
+  fh = file.open(tf, 'read')
+  lengths = fh.map(int fun (string s) { s.length() })
+  fh.close()
+  file.get(tf).remove()
+  lengths == [3, 3, 5]
+}
